@@ -21,12 +21,14 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
+#include "common.h"
 #include <cstdlib>
 #include <iostream>
 #include <cmath>
 #include <vector>
 #include <sstream>
 #include <ctime>
+#include <chrono>
 
 #ifdef _OPENMP
    #include <omp.h>
@@ -54,6 +56,7 @@
 #include "object_wrapper.h"
 #include "fieldsolver/gridGlue.hpp"
 #include "fieldsolver/derivatives.hpp"
+#include "vdf_compression/compression.h"
 
 #ifdef CATCH_FPE
 #include <fenv.h>
@@ -813,6 +816,7 @@ int simulate(int argn,char* args[]) {
    double beforeTime = MPI_Wtime();
    double beforeSimulationTime=P::t_min;
    double beforeStep=P::tstep_min;
+   Real compress_time=0.0;
    
    while(P::tstep <= P::tstep_max  &&
          P::t-P::dt <= P::t_max+DT_EPSILON &&
@@ -1295,13 +1299,47 @@ int simulate(int argn,char* args[]) {
          s << "The timestep dt=" << P::dt << " went below bailout.bailout_min_dt (" << to_string(P::bailout_min_dt) << ")." << endl;
          bailout(true, s.str(), __FILE__, __LINE__);
       }
+
+      // //Asterix-VDF Compression
+      // MPI_Barrier(MPI_COMM_WORLD);
+      // phiprof::Timer compression_interface {"asterix-compression"};
+      // const bool compressNow=compress_time+P::dt>=P::compression_interval;
+      // if (P::doCompress && compressNow){
+      //    auto start = std::chrono::high_resolution_clock::now();
+      //    compress_time=0.0; //reset the compression timer
+      //    size_t number_of_spatial_cells=P::xcells_ini*P::ycells_ini*P::zcells_ini; //will deal with AMR later
+      //    ASTERIX::compress_vdfs(mpiGrid,number_of_spatial_cells,P::vdf_compression_method,false,1);
+         
+      //    //Adjust Blocks
+      //    for (uint pop=0; pop<getObjectWrapper().particleSpecies.size(); ++pop) {
+      //       const auto& cells = getLocalCells();
+      //       if (!adjustVelocityBlocks(mpiGrid,cells,true,pop)){
+      //          throw std::runtime_error("Block adjustment after VDF compression failed!");
+      //       }
+      //    }
+      //    auto stop = std::chrono::high_resolution_clock::now();    
+      //    float elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
+      //    float total_compression_time_ms=0.0;
+      //    MPI_Barrier(MPI_COMM_WORLD);
+      //    int mpiProcs;
+      //    MPI_Comm_size(MPI_COMM_WORLD,&mpiProcs); 
+      //    MPI_Reduce(&elapsed_ms, &total_compression_time_ms, 1, MPI_FLOAT, MPI_SUM, MASTER_RANK,
+      //               MPI_COMM_WORLD);
+      //    MPI_Barrier(MPI_COMM_WORLD);
+      //    if (myRank == MASTER_RANK) {
+      //       logFile << "(INFO): Average  time to compress = " << total_compression_time_ms/(1000.0*60)/((float)mpiProcs) <<" minutes."<<std::endl;
+      //    }
+      // }
+      // MPI_Barrier(MPI_COMM_WORLD);
+      // compression_interface.stop();
+      
       //Move forward in time
       P::meshRepartitioned = false;
       globalflags::ionosphereJustSolved = false;
       ++P::tstep;
       P::t += P::dt;
-
-   }
+      compress_time+=P::dt;
+   }//main while loop
 
    double after = MPI_Wtime();
 

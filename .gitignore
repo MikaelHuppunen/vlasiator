@@ -18,3 +18,10 @@ vlasiator+pat
 nbproject
 vlsvdiff_DP
 vlsvextract_DP
+compile_commands.json
+.cache/
+*lock
+target/      
+vdf_compression/cuda_mlp/*.so
+vdf_compression/include/
+vdf_compression/lib/

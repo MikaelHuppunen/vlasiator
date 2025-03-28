@@ -29,6 +29,7 @@
 #include <iostream>
 #include <limits>
 #include <set>
+#include <stdexcept>
 #include <unistd.h>
 
 #include "fieldtracing/fieldtracing.h"
@@ -210,6 +211,21 @@ std::array<FsGridTools::Task_t,3> P::overrideReadFsGridDecomposition = {0,0,0};
 
 std::string tracerString; /*!< Fieldline tracer to use for coupling ionosphere and magnetosphere */
 bool P::computeCurvature;
+
+//Asterix - VDF Compression
+std::vector<std::size_t> P::mlp_arch;
+std::size_t P::mlp_fourier_order;
+std::size_t P::mlp_max_epochs;
+Real P::mlp_tollerance;
+Real P::octree_tolerance;
+std::string P::mlpLayer; 
+Real P::compression_interval; 
+bool P::doCompress=false;
+bool P::transferKnowledge=false;
+std::string P::method_str;
+P::ASTERIX_COMPRESSION_METHODS P::vdf_compression_method;
+std::size_t P::max_vdfs_per_nn;
+
 
 bool P::addParameters() {
    typedef Readparameters RP;
@@ -540,6 +556,17 @@ bool P::addParameters() {
    RP::add("fieldtracing.fluxrope_max_curvature_radii_to_trace", "Maximum number of seedpoint curvature radii to trace forward and backward from each DCCRG cell to find flux ropes", 10);
    RP::add("fieldtracing.fluxrope_max_curvature_radii_extent", "Maximum extent in seedpoint curvature radii from the seed a field line is allowed to extend to be counted as a flux rope", 2);
 
+   //Asterix - VDF Compression
+   RP::add("Asterix.mlp_layers", string("Hidden layer architecture for MLP"),"");
+   RP::add("Asterix.tol", string("Compression reconstruction tolerance"),1e-5);
+   RP::add("Asterix.octree_tolerance", string("Compression reconstruction tolerance for octree"),1e-3);
+   RP::add("Asterix.max_epochs", string("Max epochs per VDF"),1);
+   RP::add("Asterix.fourier_order", string("Fourier Order"),0);
+   RP::add("Asterix.interval", string("Compression interval in seconds"),1.0);
+   RP::add("Asterix.state", string("Compression toggle"),false);
+   RP::add("Asterix.method", string("Compression toggle"),"");
+   RP::add("Asterix.transfer", string("Use transfer learning") ,false);
+   RP::add("Asterix.max_vdfs_per_nn",string("Max vdfs in multi regression mode") ,1);
    return true;
 }
 
@@ -873,6 +900,57 @@ void Parameters::getParameters() {
    RP::get("AMR.box_center_z", P::amrBoxCenterZ);
    RP::get("AMR.transShortPencils", P::amrTransShortPencils);
    RP::get("AMR.filterpasses", P::blurPassString);
+
+   //Asterix
+   RP::get("Asterix.mlp_layers", P::mlpLayer);
+   RP::get("Asterix.max_epochs",P::mlp_max_epochs );
+   RP::get("Asterix.tol", P::mlp_tollerance);
+   RP::get("Asterix.octree_tolerance", P::octree_tolerance);
+   RP::get("Asterix.fourier_order",P::mlp_fourier_order );
+   RP::get("Asterix.interval",P::compression_interval);
+   RP::get("Asterix.state",P::doCompress);
+   RP::get("Asterix.method",P::method_str);
+   RP::get("Asterix.transfer",P::transferKnowledge);
+   RP::get("Asterix.max_vdfs_per_nn",P::max_vdfs_per_nn);
+   
+   if (P::doCompress){
+      if(P::method_str == "MLP") {
+         P::vdf_compression_method=ASTERIX_COMPRESSION_METHODS::MLP;
+         P::doCompress=true;
+      }else if(P::method_str == "MLP_MULTI") {
+         P::vdf_compression_method=ASTERIX_COMPRESSION_METHODS::MLP_MULTI;
+         P::doCompress=true;
+      } else if (P::method_str == "ZFP") {
+         P::vdf_compression_method=ASTERIX_COMPRESSION_METHODS::ZFP;
+         P::doCompress=true;
+      } else if (P::method_str == "OCTREE") {
+         P::vdf_compression_method=ASTERIX_COMPRESSION_METHODS::OCTREE;
+         P::doCompress=true;
+      } else {
+         P::vdf_compression_method=ASTERIX_COMPRESSION_METHODS::NONE;
+         P::doCompress=false;
+      }
+   }else{
+      P::vdf_compression_method=ASTERIX_COMPRESSION_METHODS::NONE;
+      P::doCompress=false;
+   }
+   
+   //Parse MLP Layer string
+   auto parseToSize_T = [](const std::string& str) -> std::vector<size_t> {
+      std::vector<std::size_t> result;
+      std::string clean_str;
+      std::copy_if(str.begin(), str.end(), std::back_inserter(clean_str), [](unsigned char c) {
+         return !std::isspace(c);    
+      });
+
+      std::stringstream ss(clean_str);
+      std::string token;
+      while (std::getline(ss, token, ',')) {
+         result.push_back(std::stoull(token));  // Convert each token to size_t
+      }
+      return result;
+   };
+   P::mlp_arch=parseToSize_T(P::mlpLayer);
 
    // We need the correct number of parameters for the AMR boxes
    if(   P::amrBoxNumber != (int)P::amrBoxHalfWidthX.size()

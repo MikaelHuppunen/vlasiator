@@ -237,6 +237,27 @@ struct Parameters {
 
    static std::array<FsGridTools::Task_t,3> manualFsGridDecomposition;
    static std::array<FsGridTools::Task_t,3> overrideReadFsGridDecomposition;
+
+   //Asterix  VDF Compression
+   enum ASTERIX_COMPRESSION_METHODS{
+       MLP,
+       MLP_MULTI,
+       ZFP,
+       OCTREE,
+       NONE
+   };
+   static std::string mlpLayer;
+   static std::vector<std::size_t> mlp_arch; /* Hidden Layers in fMLP*/
+   static std::size_t mlp_fourier_order;       /* Maximum fourier order in fMLP */
+   static std::size_t mlp_max_epochs;
+   static Real compression_interval;
+   static Real mlp_tollerance;
+   static std::size_t max_vdfs_per_nn;
+   static Real octree_tolerance;
+   static bool doCompress;
+   static bool transferKnowledge;
+   static std::string method_str;
+   static ASTERIX_COMPRESSION_METHODS vdf_compression_method;
    
    static bool computeCurvature; /*<! Boolean flag, if true the curvature of magnetic field is computed. */
 
