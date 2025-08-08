@@ -189,15 +189,138 @@ __global__ void __launch_bounds__(Hashinator::defaults::MAX_BLOCKSIZE, FULLBLOCK
  * Extracts keys (GIDs, if firstonly is true) or key-value pairs (GID-LID pairs)
  * from all provided hashmaps to provided splitvectors, and stores the vector size in an array.
  */
-template <typename Rule, typename ELEMENT, bool FIRSTONLY=false>
-__global__ void __launch_bounds__(Hashinator::defaults::MAX_BLOCKSIZE, FULLBLOCKS_PER_MP) extract_GIDs_kernel(
+template <typename Rule>
+__global__ void __launch_bounds__(Hashinator::defaults::MAX_BLOCKSIZE, FULLBLOCKS_PER_MP) extract_GIDs_kernel_first(
    const Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>* __restrict__ const *input_maps, // buffer of pointers to source maps
-   split::SplitVector<ELEMENT> **output_vecs,
-   vmesh::LocalID* output_sizes,
+   vmesh::LocalID *scanReduceOutput,
    Rule rule,
    const vmesh::VelocityMesh* __restrict__ const *rule_meshes, // buffer of pointers to vmeshes, sizes used by rules
    const Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>* __restrict__ const *rule_maps,
    const split::SplitVector<vmesh::GlobalID>* __restrict__ const *rule_vectors
+   ) {
+   //launch parameters: dim3 grid(nMaps,1,1); // As this is a looping reduction
+   const size_t cellIndex = blockIdx.x;
+   const size_t hashmapIndex = 2*blockIdx.x; // Assumes maps are with a stride of two due to allMaps buffer holding two for each cell
+   if (input_maps[hashmapIndex]==0) {
+      return; // Early return for invalid cells
+   }
+   const Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>* __restrict__ thisMap = input_maps[hashmapIndex];
+
+   // Threshold value used by some rules
+   const vmesh::LocalID threshold = rule_meshes[cellIndex]->size()
+      + rule_vectors[cellIndex]->size() - rule_maps[hashmapIndex]->size();
+
+   const vmesh::LocalID  invalidLID = rule_meshes[cellIndex]->invalidLocalID();
+   const vmesh::GlobalID invalidGID = rule_meshes[cellIndex]->invalidGlobalID();
+
+   // This must be equal to at least both WARPLENGTH and MAX_BLOCKSIZE/WARPLENGTH
+   __shared__ uint32_t warpSums[WARPLENGTH];
+   const int tid = threadIdx.x;
+   const int wid = tid / WARPLENGTH;
+   const int w_tid = tid % WARPLENGTH;
+   // zero init shared buffer
+   if (wid == 0) {
+      warpSums[w_tid] = 0;
+   }
+   __syncthreads();
+   // full warp votes for rule-> mask = [01010101010101010101010101010101]
+   uint32_t inputOffset = blockIdx.y*blockDim.x;
+   // Start loop
+   const Hashinator::hash_pair<vmesh::GlobalID, vmesh::LocalID>* __restrict__ input = thisMap->expose_bucketdata<false>();
+   const int remaining = (thisMap->bucket_count())-inputOffset;
+   const int current = remaining > blockDim.x ? blockDim.x : remaining;
+   __syncthreads();
+   const int active = (tid < current) ? rule(thisMap, input[inputOffset + tid], threshold, invalidLID, invalidGID) : false;
+   const auto mask = split::s_warpVote(active == 1, SPLIT_VOTING_MASK);
+   const auto warpCount = split::s_pop_count(mask);
+   if (w_tid == 0) {
+      warpSums[wid] = warpCount;
+   }
+   __syncthreads();
+   // Figure out the total here because we overwrite shared mem later
+   if (wid == 0) {
+      // ceil int division
+      int activeWARPS = nextPow2(1 + ((current - 1) / WARPLENGTH));
+      auto reduceCounts = [activeWARPS](int localCount) -> int {
+                           for (int i = activeWARPS / 2; i > 0; i = i / 2) {
+                              localCount += split::s_shuffle_down(localCount, i, SPLIT_VOTING_MASK);
+                           }
+                           return localCount;
+                        };
+      auto localCount = warpSums[w_tid];
+      const int totalCount = reduceCounts(localCount);
+      if (w_tid == 0) {
+         scanReduceOutput[blockIdx.x*gridDim.y+blockIdx.y] = totalCount;
+      }
+   }
+}
+
+template <typename ELEMENT>
+__global__ void scanInclusive(
+   const Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>* __restrict__ const *input_maps, // buffer of pointers to source maps
+   vmesh::LocalID *scanReduceOutput,
+   int n,
+   vmesh::LocalID* output_sizes,
+   split::SplitVector<ELEMENT> **output_vecs
+   ) {
+   const size_t cellIndex = blockIdx.x;
+   const size_t hashmapIndex = 2*blockIdx.x; // Assumes maps are with a stride of two due to allMaps buffer holding two for each cell
+   if (input_maps[hashmapIndex]==0) {
+      return; // Early return for invalid cells
+   }
+   extern __shared__ vmesh::LocalID temp[];
+   int tid = threadIdx.x;
+
+   // Load input into shared memory
+   if (2 * tid < n)     temp[2 * tid]     = scanReduceOutput[blockIdx.x * n + 2 * tid];
+   if (2 * tid + 1 < n) temp[2 * tid + 1] = scanReduceOutput[blockIdx.x * n + 2 * tid + 1];
+
+   __syncthreads();
+
+   // Upsweep (reduce) phase
+   for (int d = 1; d < n; d <<= 1) {
+      int i = (tid + 1) * d * 2 - 1;
+      if (i < n)
+         temp[i] += temp[i - d];
+      __syncthreads();
+   }
+
+   // Downsweep phase
+   if (tid == 0){
+      vmesh::LocalID outputSize = temp[n - 1];
+      (output_vecs[cellIndex])->device_resize(outputSize);
+      if (output_sizes) {
+         output_sizes[cellIndex] = outputSize;
+      }
+      temp[n - 1] = 0; // set last element to zero
+   }
+
+   __syncthreads();
+
+   for (int d = n >> 1; d > 0; d >>= 1) {
+      int i = (tid + 1) * d * 2 - 1;
+      if (i < n) {
+         int t = temp[i - d];
+         temp[i - d] = temp[i];
+         temp[i] += t;
+      }
+      __syncthreads();
+   }
+
+   // Write results
+   if (2 * tid < n)     scanReduceOutput[blockIdx.x * n + 2 * tid]     = temp[2 * tid];
+   if (2 * tid + 1 < n) scanReduceOutput[blockIdx.x * n + 2 * tid + 1] = temp[2 * tid + 1];
+}
+
+template <typename Rule, typename ELEMENT, bool FIRSTONLY=false>
+__global__ void __launch_bounds__(Hashinator::defaults::MAX_BLOCKSIZE, FULLBLOCKS_PER_MP) extract_GIDs_kernel_second(
+   const Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>* __restrict__ const *input_maps, // buffer of pointers to source maps
+   split::SplitVector<ELEMENT> **output_vecs,
+   Rule rule,
+   const vmesh::VelocityMesh* __restrict__ const *rule_meshes, // buffer of pointers to vmeshes, sizes used by rules
+   const Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>* __restrict__ const *rule_maps,
+   const split::SplitVector<vmesh::GlobalID>* __restrict__ const *rule_vectors,
+   vmesh::LocalID *scanReduceOutput
    ) {
    //launch parameters: dim3 grid(nMaps,1,1); // As this is a looping reduction
    const size_t cellIndex = blockIdx.x;
@@ -217,7 +340,6 @@ __global__ void __launch_bounds__(Hashinator::defaults::MAX_BLOCKSIZE, FULLBLOCK
 
    // This must be equal to at least both WARPLENGTH and MAX_BLOCKSIZE/WARPLENGTH
    __shared__ uint32_t warpSums[WARPLENGTH];
-   __shared__ uint32_t outputCount;
    const int tid = threadIdx.x;
    const int wid = tid / WARPLENGTH;
    const int w_tid = tid % WARPLENGTH;
@@ -229,78 +351,43 @@ __global__ void __launch_bounds__(Hashinator::defaults::MAX_BLOCKSIZE, FULLBLOCK
    }
    __syncthreads();
    // full warp votes for rule-> mask = [01010101010101010101010101010101]
-   int64_t remaining = thisMap->bucket_count();
-   const uint capacity = outputVec->capacity();
-   uint32_t outputSize = 0;
-   uint32_t inputOffset = 0;
+   uint32_t inputOffset = blockIdx.y*blockDim.x;
    // Initial pointers into data
    //Hashinator::hash_pair<vmesh::GlobalID, vmesh::LocalID> *input = thisMap->expose_bucketdata<false>();
    ELEMENT* output = outputVec->data();
+
    // Start loop
-   while (remaining > 0) {
-      const Hashinator::hash_pair<vmesh::GlobalID, vmesh::LocalID>* __restrict__ input = thisMap->expose_bucketdata<false>();
-      const int current = remaining > blockDim.x ? blockDim.x : remaining;
-      __syncthreads();
-      const int active = (tid < current) ? rule(thisMap, input[inputOffset + tid], threshold, invalidLID, invalidGID) : false;
-      const auto mask = split::s_warpVote(active == 1, SPLIT_VOTING_MASK);
-      const auto warpCount = split::s_pop_count(mask);
-      if (w_tid == 0) {
-         warpSums[wid] = warpCount;
-      }
-      __syncthreads();
-      // Figure out the total here because we overwrite shared mem later
-      if (wid == 0) {
-         // ceil int division
-         int activeWARPS = nextPow2(1 + ((current - 1) / WARPLENGTH));
-         auto reduceCounts = [activeWARPS](int localCount) -> int {
-                                for (int i = activeWARPS / 2; i > 0; i = i / 2) {
-                                   localCount += split::s_shuffle_down(localCount, i, SPLIT_VOTING_MASK);
-                                }
-                                return localCount;
-                             };
-         auto localCount = warpSums[w_tid];
-         const int totalCount = reduceCounts(localCount);
-         if (w_tid == 0) {
-            outputCount = totalCount;
-            outputSize += totalCount;
-            assert((outputSize <= capacity) && "extract_GIDs_kernel ran out of capacity!");
-            outputVec->device_resize(outputSize);
-         }
-      }
-      // Prefix scan WarpSums on the first warp
-      if (wid == 0) {
-         auto value = warpSums[w_tid];
-         for (uint d = 1; d < warpsPerBlock; d = 2 * d) {
-            int res = split::s_shuffle_up(value, (int)d, SPLIT_VOTING_MASK);
-            if (tid % warpsPerBlock >= d) {
-               value += res;
-            }
-         }
-         warpSums[w_tid] = value;
-      }
-      __syncthreads();
-      auto offset = (wid == 0) ? 0 : warpSums[wid - 1];
-      auto pp = split::s_pop_count(mask & ((ONE << w_tid) - ONE));
-      const auto warpTidWriteIndex = offset + pp;
-      if (active) {
-         if constexpr (FIRSTONLY) {
-            output[warpTidWriteIndex] = input[inputOffset + tid].first;
-         } else {
-            output[warpTidWriteIndex] = input[inputOffset + tid];
-         }
-      }
-      // Next loop iteration:
-      //input += current;
-      inputOffset += current;
-      output += outputCount;
-      remaining -= current;
+   const Hashinator::hash_pair<vmesh::GlobalID, vmesh::LocalID>* __restrict__ input = thisMap->expose_bucketdata<false>();
+   const int remaining = (thisMap->bucket_count())-inputOffset;
+   const int current = remaining > blockDim.x ? blockDim.x : remaining;
+   __syncthreads();
+   const int active = (tid < current) ? rule(thisMap, input[inputOffset + tid], threshold, invalidLID, invalidGID) : false;
+   const auto mask = split::s_warpVote(active == 1, SPLIT_VOTING_MASK);
+   const auto warpCount = split::s_pop_count(mask);
+   if (w_tid == 0) {
+      warpSums[wid] = warpCount;
    }
    __syncthreads();
-   if (tid == 0) {
-      // Resize to final correct output size.
-      outputVec->device_resize(outputSize);
-      if (output_sizes) {// Only store lengths if output buffer is not null
-         output_sizes[cellIndex] = outputSize;
+   // Prefix scan WarpSums on the first warp
+   if (wid == 0) {
+      auto value = warpSums[w_tid];
+      for (uint d = 1; d < warpsPerBlock; d = 2 * d) {
+         int res = split::s_shuffle_up(value, (int)d, SPLIT_VOTING_MASK);
+         if (tid % warpsPerBlock >= d) {
+            value += res;
+         }
+      }
+      warpSums[w_tid] = value;
+   }
+   __syncthreads();
+   auto offset = (wid == 0) ? 0 : warpSums[wid - 1];
+   auto pp = split::s_pop_count(mask & ((ONE << w_tid) - ONE));
+   const auto warpTidWriteIndex = scanReduceOutput[blockIdx.x*gridDim.y+blockIdx.y] + offset + pp;
+   if (active) {
+      if constexpr (FIRSTONLY) {
+         output[warpTidWriteIndex] = input[inputOffset + tid].first;
+      } else {
+         output[warpTidWriteIndex] = input[inputOffset + tid];
       }
    }
 }
@@ -317,15 +404,39 @@ void extract_GIDs_kernel_launcher(
    const uint nCells,
    gpuStream_t stream
    ) {
-   extract_GIDs_kernel<Rule,ELEMENT,FIRSTONLY><<<nCells, Hashinator::defaults::MAX_BLOCKSIZE, 0, stream>>>(
+   const uint maxBucketSize = 4096;
+   dim3 grid(nCells, maxBucketSize/Hashinator::defaults::MAX_BLOCKSIZE, 1);
+   vmesh::LocalID *scanReduceOutput;
+   CHK_ERR( gpuMallocAsync((void **)&scanReduceOutput, nCells*maxBucketSize/Hashinator::defaults::MAX_BLOCKSIZE*sizeof(vmesh::LocalID), stream) );
+
+   extract_GIDs_kernel_first<Rule><<<grid, Hashinator::defaults::MAX_BLOCKSIZE, 0, stream>>>(
       input_maps,
-      output_vecs,
-      output_sizes,
+      scanReduceOutput,
       rule,
       rule_meshes,
       rule_maps,
       rule_vectors
-      );
+   );
+   CHK_ERR( gpuPeekAtLastError() );
+   scanInclusive<ELEMENT><<<nCells, Hashinator::defaults::MAX_BLOCKSIZE>>>(
+      input_maps,
+      scanReduceOutput,
+      maxBucketSize/Hashinator::defaults::MAX_BLOCKSIZE,
+      output_sizes,
+      output_vecs
+   );
+   CHK_ERR( gpuPeekAtLastError() );
+   extract_GIDs_kernel_second<Rule,ELEMENT,FIRSTONLY><<<grid, Hashinator::defaults::MAX_BLOCKSIZE, 0, stream>>>(
+      input_maps,
+      output_vecs,
+      rule,
+      rule_meshes,
+      rule_maps,
+      rule_vectors,
+      scanReduceOutput
+   );
+   CHK_ERR( gpuPeekAtLastError() );
+   CHK_ERR( gpuFreeAsync(scanReduceOutput, stream) );
    CHK_ERR( gpuPeekAtLastError() );
 }
 
