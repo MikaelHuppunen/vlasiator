@@ -908,11 +908,25 @@ __global__ void __launch_bounds__(WID3) reorder_blocks_by_dimension_kernel(
    } // if valid setIndex
 }
 
-// Use max 2048 per MP threads due to register usage limitations
-#if THREADS_PER_MP < (REGISTERS_PER_MP/64 + 1)
+// Register usage reguirements based on hardware and wether we're using testpackage
+#ifdef __CUDACC__ // Nvidia hardware
+   #if defined(DPF) || (THREADS_PER_MP < 2048)
+      #define ACCELERATION_KERNEL_REGISTER_REQUIREMENT 64
+   #else
+      #define ACCELERATION_KERNEL_REGISTER_REQUIREMENT 42
+   #endif
+#else // AMD hardware
+   #ifdef DPF
+      #define ACCELERATION_KERNEL_REGISTER_REQUIREMENT 72
+   #else
+      #define ACCELERATION_KERNEL_REGISTER_REQUIREMENT 64
+   #endif
+#endif
+
+#if THREADS_PER_MP < (REGISTERS_PER_MP/ACCELERATION_KERNEL_REGISTER_REQUIREMENT + 1)
   #define ACCELERATION_KERNEl_MIN_BLOCKS THREADS_PER_MP/(WID3)
 #else
-  #define ACCELERATION_KERNEl_MIN_BLOCKS (REGISTERS_PER_MP/64)/(WID3)
+  #define ACCELERATION_KERNEl_MIN_BLOCKS (REGISTERS_PER_MP/ACCELERATION_KERNEL_REGISTER_REQUIREMENT)/(WID3)
 #endif
 /*!
    \brief GPU kernel for main task of semi-Lagrangian acceleration. Reads data in from buffer,
