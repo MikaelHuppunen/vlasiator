@@ -23,10 +23,10 @@ create_verification_files=0
 reference_dir="/scratch/project_462000358/testpackage_2025_06/"
 cd $SLURM_SUBMIT_DIR
 
-#bin="./vlasiator"
-bin="./vlasiator_WID8"
+bin="../vlasiator"
+#bin="./vlasiator_WID8"
 #diffbin="/scratch/project_462000358/testpackage_2025_06/vlsvdiff_gpu_DP"
-diffbin="./vlsvdiff_DP"
+diffbin="../vlsvdiff_DP"
 
 # compare agains which revision?
 reference_revision="current"
@@ -41,8 +41,8 @@ cat << EOT > select_gpu_${SLURM_JOB_ID}
 #!/bin/bash
 export ROCR_VISIBLE_DEVICES=\$SLURM_LOCALID
 export OMP_NUM_THREADS=6
-#LD_PRELOAD="__CWD__/libhooks.so:__CWD__/libpreload-me_622.so" exec \$*
-LD_PRELOAD=__CWD__/libpreload-me_622.so exec \$*
+#LD_PRELOAD="__CWD__/../libhooks.so:__CWD__/../libpreload-me_622.so" exec \$*
+LD_PRELOAD=__CWD__/../libpreload-me_622.so exec \$*
 exec \$*
 EOT
 chmod +x ./select_gpu_${SLURM_JOB_ID}
@@ -85,7 +85,38 @@ umask 007
 echo "Running on ${SLURM_NTASKS} mpi tasks with ${OMP_NUM_THREADS} threads per task on ${SLURM_JOB_NUM_NODES} nodes"
 
 # Define test
-source __RUN_FILE__
+
+## Define test and runs
+
+if [ ! -f $bin ]
+then
+   echo Executable $bin does not exist
+   exit
+fi
+
+# where the tests are run
+run_dir="run"
+
+# where the directories for different tests, including cfg and other needed data files are located 
+test_dir="tests"
+
+# Counter for creating tests
+index=1
+
+#######
+# ACCELERATION TESTS (1..5)
+#######
+
+# 13 Large AMR translation flowthrough test
+test_name[${index}]="__CFG__"
+comparison_vlsv[${index}]="bulk.0000001.vlsv"
+comparison_phiprof[${index}]="phiprof_0.txt"
+variable_names[${index}]="proton/vg_rho proton/vg_v proton/vg_v proton/vg_v fg_b fg_b fg_b fg_e fg_e fg_e"
+variable_components[${index}]="0 0 1 2 0 1 2 0 1 2"
+
+# Alternatively, set tests manually, e.g.
+run_tests=( 1 )
+
 wait
 # Run tests
 source run_tests.sh

@@ -31,7 +31,6 @@ SH_INPUT=${16}
 SH_FILE="weak_scaling_${GPUS}.sh"
 CFG="Flowthrough_amr_${GPUS}"
 CFG_FILE="tests/Flowthrough_amr_${GPUS}/Flowthrough_amr_${GPUS}.cfg"
-RUN_FILE="test_definitions_small_${GPUS}.sh"
 
 CWD=$(pwd)
 
@@ -78,52 +77,14 @@ BEGIN {in_section=0}
     print
 }' "$FILE" > "$CFG_FILE"
 
-cat > "$RUN_FILE" << 'EOF'
-
-## Define test and runs
-
-# Assume binaries are set in job script
-#bin=vlasiator
-#diffbin=vlsvdiff_DP
-
-if [ ! -f $bin ]
-then
-   echo Executable $bin does not exist
-   exit
-fi
-
-# where the tests are run
-run_dir="run"
-
-# where the directories for different tests, including cfg and other needed data files are located 
-test_dir="tests"
-
-# Counter for creating tests
-index=1
-
-#######
-# ACCELERATION TESTS (1..5)
-#######
-
-# 13 Large AMR translation flowthrough test
-test_name[${index}]="__CFG__"
-comparison_vlsv[${index}]="bulk.0000001.vlsv"
-comparison_phiprof[${index}]="phiprof_0.txt"
-variable_names[${index}]="proton/vg_rho proton/vg_v proton/vg_v proton/vg_v fg_b fg_b fg_b fg_e fg_e fg_e"
-variable_components[${index}]="0 0 1 2 0 1 2 0 1 2"
-
-# Alternatively, set tests manually, e.g.
-run_tests=( 1 )
-EOF
-
 sed -i "s/__TASKS_PER_NODE__/${TASKS_PER_NODE}/" "$SH_FILE"
 sed -i "s/__NTASKS__/${NTASKS}/" "$SH_FILE"
 sed -i "s/__GPUS_PER_NODE__/${GPUS_PER_NODE}/" "$SH_FILE"
 sed -i "s/__GPUS__/${GPUS}/" "$SH_FILE"
 sed -i "s/__NODES__/${NODES}/" "$SH_FILE"
-sed -i "s/__RUN_FILE__/${RUN_FILE}/" "$SH_FILE"
 sed -i "s/__PARTITION__/${PARTITION}/" "$SH_FILE"
 sed -i "s|__CWD__|${CWD}|g" "$SH_FILE"
+sed -i "s/__CFG__/${CFG}/" "$SH_FILE"
 
 sed -i "s/__X_LENGTH__/${X_LENGTH}/" "$CFG_FILE"
 sed -i "s/__Y_LENGTH__/${Y_LENGTH}/" "$CFG_FILE"
@@ -135,7 +96,5 @@ sed -i "s/__X_MIN__/${X_MIN}/" "$CFG_FILE"
 sed -i "s/__Y_MIN__/${Y_MIN}/" "$CFG_FILE"
 sed -i "s/__Z_MIN__/${Z_MIN}/" "$CFG_FILE"
 sed -i "s/__T_MAX__/${T_MAX}/" "$CFG_FILE"
-
-sed -i "s/__CFG__/${CFG}/" "$RUN_FILE"
 
 echo "✅ Generated weak_scaling.sh and Flowthrough_amr/Flowthrough_amr.cfg"
