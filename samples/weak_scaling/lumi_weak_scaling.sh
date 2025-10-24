@@ -23,10 +23,10 @@ create_verification_files=0
 reference_dir="/scratch/project_462000358/testpackage_2025_06/"
 cd $SLURM_SUBMIT_DIR
 
-bin="../vlasiator"
+bin="../../vlasiator"
 #bin="./vlasiator_WID8"
 #diffbin="/scratch/project_462000358/testpackage_2025_06/vlsvdiff_gpu_DP"
-diffbin="../vlsvdiff_DP"
+diffbin="../../vlsvdiff_DP"
 
 # compare agains which revision?
 reference_revision="current"
@@ -41,8 +41,8 @@ cat << EOT > select_gpu_${SLURM_JOB_ID}
 #!/bin/bash
 export ROCR_VISIBLE_DEVICES=\$SLURM_LOCALID
 export OMP_NUM_THREADS=6
-#LD_PRELOAD="__CWD__/../libhooks.so:__CWD__/../libpreload-me_622.so" exec \$*
-LD_PRELOAD=__CWD__/../libpreload-me_622.so exec \$*
+#LD_PRELOAD="__CWD__/../../libhooks.so:__CWD__/../../libpreload-me_622.so" exec \$*
+LD_PRELOAD=__CWD__/../../libpreload-me_622.so exec \$*
 exec \$*
 EOT
 chmod +x ./select_gpu_${SLURM_JOB_ID}
