@@ -9,13 +9,13 @@ SCALE_X=1
 SCALE_Y=0
 SCALE_Z=0
 
-PARTITION="standard-g"
+PARTITION="dev-g"
 
 ### USER EDITED SECTION ENDS
 
 # Input arguments
 
-FILE=$1
+FOLDER=$1
 SH_INPUT=$2
 MIN_EXPONENT=$3
 MAX_EXPONENT=$4
@@ -100,7 +100,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
             # Add other keys if needed
         esac
     fi
-done < "$FILE"
+done < "$FOLDER/$FOLDER.cfg"
 
 
 : > percent_diff.txt
@@ -141,8 +141,8 @@ for (( i=MIN_EXPONENT; i<=MAX_EXPONENT; i++ )); do
                                "$X_LENGTH" "$Y_LENGTH" "$Z_LENGTH" \
                                "$X_MIN" "$X_MAX" "$Y_MIN" "$Y_MAX" \
                                "$Z_MIN" "$Z_MAX" "$T_MAX" "$PARTITION" \
-                               "$FILE" "$SH_INPUT"
-    SH_FILE="weak_scaling_${GPUS}.sh"
+                               "$FOLDER" "$SH_INPUT"
+    SH_FILE="$FOLDER/weakScaling_${GPUS}/weakScaling_${GPUS}.sh"
     sbatch "$SH_FILE"
 
     while true; do

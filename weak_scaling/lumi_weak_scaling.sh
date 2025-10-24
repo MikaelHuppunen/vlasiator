@@ -95,10 +95,10 @@ then
 fi
 
 # where the tests are run
-run_dir="run"
+run_dir="./__FOLDER__/__CFG__/run"
 
 # where the directories for different tests, including cfg and other needed data files are located 
-test_dir="tests"
+test_dir="./__FOLDER__/"
 
 # Counter for creating tests
 index=1

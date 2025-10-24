@@ -25,18 +25,17 @@ Z_MAX=${12}
 
 T_MAX=${13}
 PARTITION=${14}
-FILE=${15}
+FOLDER=${15}
 SH_INPUT=${16}
 
-SH_FILE="weak_scaling_${GPUS}.sh"
-CFG="Flowthrough_amr_${GPUS}"
-CFG_FILE="tests/Flowthrough_amr_${GPUS}/Flowthrough_amr_${GPUS}.cfg"
+SH_FILE="$FOLDER/weakScaling_${GPUS}/weakScaling_${GPUS}.sh"
+CFG="weakScaling_${GPUS}"
+CFG_FILE="$FOLDER/weakScaling_${GPUS}/weakScaling_${GPUS}.cfg"
 
 CWD=$(pwd)
 
-mkdir tests
-mkdir tests/Flowthrough_amr_${GPUS}
-cp ./sw1.dat tests/Flowthrough_amr_${GPUS}
+mkdir $FOLDER/weakScaling_${GPUS}
+cp ./$FOLDER/sw1.dat $FOLDER/weakScaling_${GPUS}
 
 # ==============================
 # Generate weak_scaling.sh
@@ -47,7 +46,7 @@ cp "$SH_INPUT" "$SH_FILE"
 chmod +x ${SH_FILE}
 
 # ==============================
-# Generate Flowthrough_amr.cfg
+# Generate weakScaling.cfg
 # ==============================
 
 awk -v XL="$X_LENGTH" -v YL="$Y_LENGTH" -v ZL="$Z_LENGTH" \
@@ -75,7 +74,7 @@ BEGIN {in_section=0}
 
     # print other lines unchanged
     print
-}' "$FILE" > "$CFG_FILE"
+}' "$FOLDER/$FOLDER.cfg" > "$CFG_FILE"
 
 sed -i "s/__TASKS_PER_NODE__/${TASKS_PER_NODE}/" "$SH_FILE"
 sed -i "s/__NTASKS__/${NTASKS}/" "$SH_FILE"
@@ -85,6 +84,7 @@ sed -i "s/__NODES__/${NODES}/" "$SH_FILE"
 sed -i "s/__PARTITION__/${PARTITION}/" "$SH_FILE"
 sed -i "s|__CWD__|${CWD}|g" "$SH_FILE"
 sed -i "s/__CFG__/${CFG}/" "$SH_FILE"
+sed -i "s/__FOLDER__/${FOLDER}/" "$SH_FILE"
 
 sed -i "s/__X_LENGTH__/${X_LENGTH}/" "$CFG_FILE"
 sed -i "s/__Y_LENGTH__/${Y_LENGTH}/" "$CFG_FILE"
@@ -97,4 +97,4 @@ sed -i "s/__Y_MIN__/${Y_MIN}/" "$CFG_FILE"
 sed -i "s/__Z_MIN__/${Z_MIN}/" "$CFG_FILE"
 sed -i "s/__T_MAX__/${T_MAX}/" "$CFG_FILE"
 
-echo "✅ Generated weak_scaling.sh and Flowthrough_amr/Flowthrough_amr.cfg"
+echo "✅ Generated weak_scaling.sh and weakScaling/weakScaling.cfg"
