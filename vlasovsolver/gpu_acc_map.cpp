@@ -918,15 +918,15 @@ __global__ void __launch_bounds__(WID3) reorder_blocks_by_dimension_kernel(
 // Register usage reguirements based on hardware and wether we're using testpackage
 #ifdef __CUDACC__ // Nvidia hardware
    #if defined(DPF) || (THREADS_PER_MP < 2048)
-      #define ACCELERATION_KERNEL_REGISTER_REQUIREMENT 64
+      #define ACCELERATION_KERNEL_REGISTER_REQUIREMENT 85
    #else
-      #define ACCELERATION_KERNEL_REGISTER_REQUIREMENT 42
+      #define ACCELERATION_KERNEL_REGISTER_REQUIREMENT 56
    #endif
 #else // AMD hardware
    #ifdef DPF
-      #define ACCELERATION_KERNEL_REGISTER_REQUIREMENT 72
+      #define ACCELERATION_KERNEL_REGISTER_REQUIREMENT 73
    #else
-      #define ACCELERATION_KERNEL_REGISTER_REQUIREMENT 64
+      #define ACCELERATION_KERNEL_REGISTER_REQUIREMENT 60
    #endif
 #endif
 
