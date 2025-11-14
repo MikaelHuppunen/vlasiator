@@ -158,6 +158,8 @@ __host__ void gpu_init_device() {
    CHK_ERR( gpuDeviceSynchronize() );
    CHK_ERR( gpuGetDevice(&myDevice) );
 
+   std::cout << "At setup: amps_rank = " << amps_rank << ", amps_node_rank = " << amps_node_rank << ", myDevice = " << myDevice << '\n';
+
    // Decide on number of allocations to prepare
    const uint nBaseCells = P::xcells_ini * P::ycells_ini * P::zcells_ini;
    allocationCount = (nBaseCells == 1) ? 1 : P::GPUallocations;
@@ -265,11 +267,10 @@ __host__ void gpu_debug_device() {
    MPI_Comm_rank(amps_CommNode, &amps_node_rank);
    MPI_Comm_size(amps_CommNode, &amps_node_size);
 
-   std::cout << "amps_rank = " << amps_rank << '\n';
    CHK_ERR( gpuDeviceSynchronize() );
    CHK_ERR( gpuGetDevice(&myDevice) );
 
-   std::cout << "myDevice = " << myDevice << '\n';
+   std::cout << "amps_rank = " << amps_rank << ", amps_node_rank = " << amps_node_rank << ", myDevice = " << myDevice << '\n';
 
    int *leastPriority = new int; // likely 0
    int *greatestPriority = new int; // likely -1
