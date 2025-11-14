@@ -844,6 +844,8 @@ int simulate(int argn,char* args[]) {
          P::t-P::dt <= P::t_max+DT_EPSILON &&
          wallTimeRestartCounter <= P::exitAfterRestarts) {
 
+      gpu_debug_device();
+
       addTimedBarrier("barrier-loop-start");
       
       phiprof::Timer ioTimer {"IO"};

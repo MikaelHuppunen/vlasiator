@@ -73,6 +73,7 @@ static const int TRANSLATION_BUFFER_ALLOCATION_FACTOR = 5;
 #define MAXCPUTHREADS 512 // hypothetical max size for some allocation arrays
 
 void gpu_init_device();
+void gpu_debug_device();
 void gpu_clear_device();
 gpuStream_t gpu_getStream();
 gpuStream_t gpu_getPriorityStream();
