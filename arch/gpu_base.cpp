@@ -152,6 +152,9 @@ __host__ void gpu_init_device() {
          std::cout << "(Node 0) MPI ranks see single GPU device each." << std::endl;
       }
    }
+
+   CHK_ERR( gpuSetDevice(amps_node_rank % deviceCount) );
+
    CHK_ERR( gpuDeviceSynchronize() );
    CHK_ERR( gpuGetDevice(&myDevice) );
 
