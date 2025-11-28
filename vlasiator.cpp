@@ -844,7 +844,8 @@ int simulate(int argn,char* args[]) {
          P::t-P::dt <= P::t_max+DT_EPSILON &&
          wallTimeRestartCounter <= P::exitAfterRestarts) {
 
-      gpu_debug_device();
+      logFile << "Got to 0. point\n";
+      logFile << writeVerbose;
 
       addTimedBarrier("barrier-loop-start");
       
@@ -857,6 +858,8 @@ int simulate(int argn,char* args[]) {
       }
       externalsTimer.stop();
 
+      logFile << "Got to 1. point\n";
+      logFile << writeVerbose;
       //write out phiprof profiles and logs with a lower interval than normal
       //diagnostic (every 10 diagnostic intervals).
       phiprof::Timer loggingTimer {"logfile-io"};
@@ -889,6 +892,9 @@ int simulate(int argn,char* args[]) {
       logFile << writeVerbose;
       loggingTimer.stop();
 
+      logFile << "Got to 2. point \n";
+      logFile << writeVerbose;
+
       // Check whether diagnostic output has to be produced
       if (P::diagnosticInterval != 0 && P::tstep % P::diagnosticInterval == 0) {
          phiprof::Timer memTimer {"memory-report"};
@@ -906,6 +912,9 @@ int simulate(int argn,char* args[]) {
 
          }
       }
+
+      logFile << "Got to 3. point\n";
+      logFile << writeVerbose;
 
       // write system, loop through write classes
       for (uint i = 0; i < P::systemWriteTimeInterval.size(); i++) {
@@ -962,6 +971,9 @@ int simulate(int argn,char* args[]) {
       MPI_Allreduce(&(globalflags::bailingOut), &(doBailout), 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
       bailoutReduceTimer.stop();
 
+      logFile << "Got to 4. point\n";
+      logFile << writeVerbose;
+
       // Write restart data if needed
       // Combined with checking of additional load balancing to have only one collective call.
       phiprof::Timer restartCheckTimer {"compute-is-restart-written-and-extra-LB"};
@@ -1000,6 +1012,9 @@ int simulate(int argn,char* args[]) {
             }
          }
       }
+      logFile << "Got to 5. point\n";
+      logFile << writeVerbose;
+
       MPI_Bcast( &doNow, 4 , MPI_INT , MASTER_RANK ,MPI_COMM_WORLD);
       if (doNow[donow::DOLB] == 1) {
          P::prepareForRebalance = true;
@@ -1047,6 +1062,8 @@ int simulate(int argn,char* args[]) {
          }
          timer.stop();
       }
+      logFile << "Got to 6. point\n";
+      logFile << writeVerbose;
       
       if (doNow[donow::DORC] == 1){ // write recover
          phiprof::Timer timer {"write-recover"};
@@ -1084,6 +1101,8 @@ int simulate(int argn,char* args[]) {
          }
          timer.stop();
       }
+      logFile << "Got to 7. point\n";
+      logFile << writeVerbose;
 
       ioTimer.stop();
       addTimedBarrier("barrier-end-io");
@@ -1156,6 +1175,8 @@ int simulate(int argn,char* args[]) {
          // moved.
          SBC::ionosphereGrid.updateIonosphereCommunicator(mpiGrid, technicalGrid);
       }
+      logFile << "Got to 8. point\n";
+      logFile << writeVerbose;
 
       //get local cells
       const vector<CellID>& cells = getLocalCells();
@@ -1194,6 +1215,8 @@ int simulate(int argn,char* args[]) {
             //addTimedBarrier("barrier-new-dt-set");
          }
       }
+      logFile << "Got to 9. point\n";
+      logFile << writeVerbose;
 
       if (P::tstep % P::rebalanceInterval == P::rebalanceInterval-1 || P::prepareForRebalance == true) {
          if(P::prepareForRebalance == true) {
@@ -1233,6 +1256,8 @@ int simulate(int argn,char* args[]) {
          timer.stop();
          addTimedBarrier("barrier-boundary-conditions");
       }
+      logFile << "Got to 10. point\n";
+      logFile << writeVerbose;
       
       phiprof::Timer momentsTimer {"Compute interp moments"};
       calculateInterpolatedVelocityMoments(
@@ -1250,6 +1275,8 @@ int simulate(int argn,char* args[]) {
          CellParams::P_12_DT2
       );
       momentsTimer.stop();
+      logFile << "Got to 11. point\n";
+      logFile << writeVerbose;
       
       // Propagate fields forward in time by dt. This needs to be done before the
       // moments for t + dt are computed (field uses t and t+0.5dt)
@@ -1293,6 +1320,8 @@ int simulate(int argn,char* args[]) {
          propagateTimer.stop(cells.size(),"SpatialCells");
          addTimedBarrier("barrier-after-field-solver");
       }
+      logFile << "Got to 12. point\n";
+      logFile << writeVerbose;
 
       if(FieldTracing::fieldTracingParameters.useCache) {
          FieldTracing::resetReconstructionCoefficientsCache();
@@ -1326,6 +1355,8 @@ int simulate(int argn,char* args[]) {
          SBC::Ionosphere::solveCount++;
          globalflags::ionosphereJustSolved = true;
       }
+      logFile << "Got to 13. point\n";
+      logFile << writeVerbose;
       
       phiprof::Timer vspaceTimer {"Velocity-space"};
       if ( P::propagateVlasovAcceleration ) {
@@ -1337,6 +1368,8 @@ int simulate(int argn,char* args[]) {
       }
       vspaceTimer.stop(computedCells, "Cells");
       addTimedBarrier("barrier-after-acceleration");
+      logFile << "Got to 13.1. point\n";
+      logFile << writeVerbose;
 
       if (P::artificialPADiff){
          phiprof::Timer diffusionTimer {"Pitch-angle diffusion"};
@@ -1345,6 +1378,8 @@ int simulate(int argn,char* args[]) {
          }
          diffusionTimer.stop(computedCells, "Cells");
       }
+      logFile << "Got to 13.2. point\n";
+      logFile << writeVerbose;
 
       if (P::propagateVlasovTranslation || P::propagateVlasovAcceleration ) {
          phiprof::Timer timer {"Update system boundaries (Vlasov post-acceleration)"};
@@ -1352,6 +1387,8 @@ int simulate(int argn,char* args[]) {
          timer.stop();
          addTimedBarrier("barrier-boundary-conditions");
       }
+      logFile << "Got to 13.3. point\n";
+      logFile << writeVerbose;
       
       momentsTimer.start();
       // *here we compute rho and rho_v for timestep t + dt, so next
@@ -1371,6 +1408,8 @@ int simulate(int argn,char* args[]) {
          CellParams::P_12
       );
       momentsTimer.stop();
+      logFile << "Got to 14. point\n";
+      logFile << writeVerbose;
 
       propagateTimer.stop(computedCells,"Cells");
       
@@ -1389,7 +1428,8 @@ int simulate(int argn,char* args[]) {
       globalflags::ionosphereJustSolved = false;
       ++P::tstep;
       P::t += P::dt;
-
+      logFile << "Got to final point\n";
+      logFile << writeVerbose;
    }
 
    double after = MPI_Wtime();

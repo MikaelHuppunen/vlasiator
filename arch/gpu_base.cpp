@@ -216,6 +216,10 @@ __host__ void gpu_init_device() {
       SUBPOINTER_ALLOCATE(gpuMemoryManager, returnLID, i, 8*sizeof(vmesh::LocalID));
    }
 
+   for (uint i = 0; i < maxNThreads; i++){
+      std::cout << i << ": " << gpuStreamList[i] << std::endl;
+   }
+
    CREATE_UNIQUE_POINTER(gpuMemoryManager, gpu_cell_indices_to_id);
    CREATE_UNIQUE_POINTER(gpuMemoryManager, gpu_block_indices_to_id);
    CREATE_UNIQUE_POINTER(gpuMemoryManager, gpu_block_indices_to_probe);
@@ -227,57 +231,6 @@ __host__ void gpu_init_device() {
    CHK_ERR( gpuDeviceSynchronize() );
 
    // Using just a single context for whole MPI task
-}
-
-__host__ void gpu_debug_device() {
-   const uint maxNThreads = gpu_getMaxThreads();
-   int deviceCount;
-   // CHK_ERR( gpuFree(0));
-   CHK_ERR( gpuGetDeviceCount(&deviceCount) );
-   printf("GPU device count %d with %d threads/streams\n",deviceCount,maxNThreads);
-
-   /* Create communicator with one rank per compute node to identify which GPU to use */
-   int amps_size;
-   int amps_rank;
-   int amps_node_rank;
-   int amps_node_size;
-   // int amps_write_rank;
-   // int amps_write_size;
-   MPI_Comm amps_CommWorld = MPI_COMM_NULL;
-   MPI_Comm amps_CommNode = MPI_COMM_NULL;
-
-   MPI_Comm_dup(MPI_COMM_WORLD, &amps_CommWorld);
-   MPI_Comm_size(amps_CommWorld, &amps_size);
-   MPI_Comm_rank(amps_CommWorld, &amps_rank);
-
-   /* Create communicator with one rank per compute node */
-#if MPI_VERSION >= 3
-   MPI_Comm_split_type(amps_CommWorld, MPI_COMM_TYPE_SHARED, 0, MPI_INFO_NULL, &amps_CommNode);
-#else
-   /* Split the node level communicator based on Adler32 hash keys of processor name */
-   char processor_name[MPI_MAX_PROCESSOR_NAME];
-   int namelen;
-   MPI_Get_processor_name(processor_name, &namelen);
-   uint32_t checkSum = Adler32((unsigned char*)processor_name, namelen);
-   /* Comm split only accepts non-negative numbers */
-   /* Not super great for hashing purposes but hoping MPI-3 code will be used on most cases */
-   checkSum &= INT_MAX;
-   MPI_Comm_split(amps_CommWorld, checkSum, amps_rank, &amps_CommNode);
-#endif
-   MPI_Comm_rank(amps_CommNode, &amps_node_rank);
-   MPI_Comm_size(amps_CommNode, &amps_node_size);
-
-   CHK_ERR( gpuDeviceSynchronize() );
-   CHK_ERR( gpuGetDevice(&myDevice) );
-
-   std::cout << "amps_rank = " << amps_rank << ", amps_node_rank = " << amps_node_rank << ", myDevice = " << myDevice << '\n';
-
-   int *leastPriority = new int; // likely 0
-   int *greatestPriority = new int; // likely -1
-   CHK_ERR( gpuDeviceGetStreamPriorityRange (leastPriority, greatestPriority) );
-   if (*leastPriority==*greatestPriority) {
-      printf("Warning when initializing GPU streams: minimum and maximum stream priority are identical! %d == %d \n",*leastPriority, *greatestPriority);
-   }
 }
 
 __host__ void gpu_clear_device() {

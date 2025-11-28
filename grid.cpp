@@ -796,6 +796,7 @@ bool adjustVelocityBlocks(dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geometry>& m
    // Batch adjusts velocity blocks in local spatial cells, doesn't adjust velocity blocks in remote cells.
    adjust_velocity_blocks_in_cells(mpiGrid, validCells, popID);
 
+   std::cout << "Got to 13.0.4.5" << std::endl;
    // prepare to receive full block data for all cells (irrespective of list of cells to adjust)
    if (doPrepareToReceiveBlocks) {
       if (P::vlasovSolverGhostTranslate) {
@@ -804,6 +805,7 @@ bool adjustVelocityBlocks(dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geometry>& m
          updateRemoteVelocityBlockLists(mpiGrid,popID);
       }
    }
+   std::cout << "Got to 13.0.4.6" << std::endl;
    return true;
 }
 
@@ -878,6 +880,7 @@ void updateRemoteVelocityBlockLists(
    phiprof::Timer receivesTimer {"Preparing receives"};
    const std::vector<uint64_t> incoming_cells = mpiGrid.get_remote_cells_on_process_boundary(neighborhood);
 
+   std::cout << "size = " << incoming_cells.size() << std::endl;
    #pragma omp parallel for
    for (unsigned int i=0; i<incoming_cells.size(); ++i) {
      uint64_t cell_id = incoming_cells[i];

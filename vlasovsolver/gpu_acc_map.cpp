@@ -1669,6 +1669,9 @@ __host__ bool gpu_acc_map_1d(
    phiprof::Timer accTimer {"acceleration kernel"};
    const dim3 grid_acc(largest_totalColumnSets,nLaunchCells,1);
    const dim3 block_acc(WID,WID,WID); // Calculates a whole block at a time
+   if (largest_totalColumnSets == 0 || nLaunchCells == 0){
+      std::cout << "OH NO, THIS IS NOT SUPPOSED TO HAPPEN!" << " largest_totalColumnSets = " << largest_totalColumnSets << ", nLaunchCells = " << nLaunchCells << '\n';
+   }
    acceleration_kernel<<<grid_acc, block_acc, 0, baseStream>>> (
       GET_POINTER(gpuMemoryManager, vmesh::VelocityMesh*, dev_vmeshes), // indexing: cellOffset
       GET_POINTER(gpuMemoryManager, vmesh::VelocityBlockContainer*, dev_VBCs), // indexing: cellOffset

@@ -559,9 +559,11 @@ void calculateAcceleration(dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geometry>& 
             // Accelerate population over one subcycle step
             calculateAcceleration(popID,(uint)globalMaxSubcycles,step,mpiGrid,acceleratedCells,dt);
          } // for-loop over acceleration substeps
+         std::cout << "Got to 13.0.4" << std::endl;
 
          // final adjust for all cells, also updating full remote block lists
          adjustVelocityBlocks(mpiGrid, cells, true, popID);
+         std::cout << "Got to 13.0.5" << std::endl;
       } // for-loop over particle species
    }
 

@@ -33,6 +33,41 @@
 
 using namespace std;
 
+inline void debugStreamSync(gpuStream_t stream, double timeout_seconds = 10.0) {
+    double t0 = MPI_Wtime();
+
+    while (true) {
+        // Non-blocking check
+        hipError_t q = hipStreamQuery(stream);
+
+        if (q == hipSuccess) {
+            // Kernel completed
+            std::cout << "[Watchdog] Kernel finished" << std::endl;
+            CHK_ERR( gpuStreamSynchronize(stream) );  // should return immediately
+            return;
+        }
+
+        if (q != hipErrorNotReady) {
+            // Something bad happened (runtime error)
+            std::cerr << "[Watchdog] hipStreamQuery error: "
+                      << gpuGetErrorString(q) << std::endl;
+            CHK_ERR(q);
+        }
+
+        double dt = MPI_Wtime() - t0;
+        if (dt > timeout_seconds) {
+            std::cout << "[Watchdog] Kernel still running after "
+                      << dt << " seconds" << std::endl;
+            // Reset timer so we print again after each timeout period
+            t0 = MPI_Wtime();
+        }
+
+        // Avoid busy-spin
+        usleep(5000); // 5ms
+    }
+}
+
+
 // Certain addition lists are used in acceleration, and can require a larger allocation
 // in case very many blocks are added at once.
 const static uint acc_reserve_multiplier = 3;
@@ -1027,7 +1062,9 @@ namespace spatial_cell {
     * have not been adapted to this new list. Here we re-initialize
     * the cell with empty blocks based on the new list.*/
    void SpatialCell::prepare_to_receive_blocks(const uint popID) {
+      std::cout << "Got to prepare_to_receive_blocks.0" << std::endl;
       setNewSizeClear(popID);
+      std::cout << "Got to prepare_to_receive_blocks.1" << std::endl;
       // As the globalToLocalMap is empty, instead of calling
       // vmesh->setGrid() we can update both that and the block
       // parameters with a single kernel launch.
@@ -1043,6 +1080,7 @@ namespace spatial_cell {
          #else
          const uint launchBlocks = 1 + ((newSize - 1) / (WARPSPERBLOCK*GPUTHREADS));
          #endif
+         std::cout << "Got to prepare_to_receive_blocks.2" << std::endl;
          update_vmesh_and_blockparameters_kernel<<<launchBlocks, (WARPSPERBLOCK*GPUTHREADS), 0, stream>>> (
             populations[popID].dev_vmesh,
             populations[popID].dev_blockContainer,
@@ -1051,6 +1089,7 @@ namespace spatial_cell {
          CHK_ERR( gpuPeekAtLastError() );
          CHK_ERR( gpuStreamSynchronize(stream) );
       }
+      std::cout << "Got to prepare_to_receive_blocks.3" << std::endl;
    }
 
    /** Set the particle species SpatialCell should use in functions that

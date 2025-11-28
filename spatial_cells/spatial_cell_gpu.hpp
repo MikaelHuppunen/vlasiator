@@ -221,8 +221,8 @@ __global__ static void resize_and_empty_kernel (
    const int blockSize = blockDim.x;
    if (ti==0) {
       // assert checks already happen in the actual setNewSize calls
-      // assert(vmesh->capacity() >= newSize && "Insufficient vmesh capacity in resize_and_empty_kernel!");
-      // assert(blockContainer->capacity() >= newSize && "Insufficient VBC capacity in resize_and_empty_kernel!");
+      assert(vmesh->capacity() >= newSize && "Insufficient vmesh capacity in resize_and_empty_kernel!");
+      assert(blockContainer->capacity() >= newSize && "Insufficient VBC capacity in resize_and_empty_kernel!");
       vmesh->device_setNewSize(newSize);
       blockContainer->setNewSize(newSize);
    }
@@ -419,13 +419,16 @@ __global__ static void resize_and_empty_kernel (
          // and that the VBC has the correct size, but does not alter contents of these.
          gpuStream_t stream = gpu_getStream();
 
+         std::cout << "Got to ResizeClear.00" << std::endl;
          const bool reallocated1 = blockContainer->setNewCapacity(newSize);
          const bool reallocated2 = vmesh->setNewCapacity(newSize);
          // vmesh->print_sizes();
+         std::cout << "Got to ResizeClear.0" << std::endl;
          if (reallocated1 || reallocated2) { // Beware short-circuit evaluation, don't place the recapacitations inside this check!
             Upload();
          }
 
+         std::cout << "Got to ResizeClear.1" << std::endl;
          // The following kernel tries to resize the vmesh localToGlobalMap,
          // clears the vmesh GlobalToLocalMap, and resizes the velocity block container.
          // Contents of the localToGlobalMap or the VBC are not edited.
@@ -435,9 +438,11 @@ __global__ static void resize_and_empty_kernel (
             newSize
             );
          CHK_ERR( gpuPeekAtLastError() );
+         std::cout << "Got to ResizeClear.2" << std::endl;
          vmesh->setNewCachedSize(newSize);
          blockContainer->setNewCachedSize(newSize);
          // CHK_ERR( gpuStreamSynchronize(stream) );
+         std::cout << "Got to ResizeClear.3" << std::endl;
       }
 
       void Scale(creal factor) {
