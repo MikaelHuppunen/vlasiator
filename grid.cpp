@@ -879,6 +879,8 @@ void updateRemoteVelocityBlockLists(
    const std::vector<uint64_t> incoming_cells = mpiGrid.get_remote_cells_on_process_boundary(neighborhood);
 
 #ifdef USE_GPU
+   // TODO: using #pragma omp parallel for sometimes causes a deadlock somewhere
+   // inside this loop on GPUs. Underlying cause yet to be identified.
    for (unsigned int i=0; i<incoming_cells.size(); ++i)
 #else
    #pragma omp parallel for
