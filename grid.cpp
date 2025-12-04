@@ -878,8 +878,13 @@ void updateRemoteVelocityBlockLists(
    phiprof::Timer receivesTimer {"Preparing receives"};
    const std::vector<uint64_t> incoming_cells = mpiGrid.get_remote_cells_on_process_boundary(neighborhood);
 
+#ifdef USE_GPU
+   for (unsigned int i=0; i<incoming_cells.size(); ++i)
+#else
    #pragma omp parallel for
-   for (unsigned int i=0; i<incoming_cells.size(); ++i) {
+   for (unsigned int i=0; i<incoming_cells.size(); ++i)
+#endif
+   {
      uint64_t cell_id = incoming_cells[i];
      SpatialCell* cell = mpiGrid[cell_id];
      if (cell == NULL) {
