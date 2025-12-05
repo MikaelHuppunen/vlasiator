@@ -64,8 +64,8 @@ module load LUMI/24.03; module load partition/G; module load cpeAMD; module load
 # module load papi/7.1.0.1
 module list
 
-#export OMP_PLACES=cores
-#export OMP_PROC_BIND=close
+export OMP_PLACES=cores
+export OMP_PROC_BIND=close
 export MPICH_OFI_NIC_POLICY=GPU
 export MPICH_GPU_SUPPORT_ENABLED=1
 # Turn off forced managed memory paging
