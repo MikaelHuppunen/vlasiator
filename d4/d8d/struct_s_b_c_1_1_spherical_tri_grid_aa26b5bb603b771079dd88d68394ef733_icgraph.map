@@ -1,0 +1,9 @@
+<map id="SBC::SphericalTriGrid::updateConnectivity" name="SBC::SphericalTriGrid::updateConnectivity">
+<area shape="rect" id="Node000001" title=" " alt="" coords="260,69,419,109"/>
+<area shape="rect" id="Node000002" href="$d4/d8d/struct_s_b_c_1_1_spherical_tri_grid.html#ad19124015dfc897cbbed5b4c7b3c57e2" title=" " alt="" coords="26,5,191,45"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="253,68,181,48,182,43,254,63"/>
+<area shape="rect" id="Node000003" href="$d4/d8d/struct_s_b_c_1_1_spherical_tri_grid.html#a0822de8d756442de02e01d252c8ef1c6" title=" " alt="" coords="5,69,212,109"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="246,92,212,92,212,87,246,87"/>
+<area shape="rect" id="Node000004" href="$d4/d8d/struct_s_b_c_1_1_spherical_tri_grid.html#a7dd76050a4fb33eb8a62e7e2b42566a0" title=" " alt="" coords="27,133,190,173"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="254,116,182,136,181,131,253,110"/>
+</map>

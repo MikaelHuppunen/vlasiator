@@ -1,0 +1,72 @@
+<map id="spatial_cell::SpatialCell::get_velocity_block_global_id" name="spatial_cell::SpatialCell::get_velocity_block_global_id">
+<area shape="rect" id="Node000001" title=" " alt="" coords="1604,399,1823,439"/>
+<area shape="rect" id="Node000002" href="$d1/d3f/classspatial__cell_1_1_spatial_cell.html#a6cabc1ee2449f057831682b4ce91c5f9" title=" " alt="" coords="1352,244,1556,284"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="1665,394,1488,287,1490,282,1668,389"/>
+<area shape="rect" id="Node000024" href="$da/daf/iowrite_8cpp.html#a544f081b60957e4d492d9b8a12a2362f" title=" " alt="" coords="1076,638,1291,663"/>
+<area shape="poly" id="edge36_Node000001_Node000024" title=" " alt="" coords="1655,447,1215,640,1213,635,1653,442"/>
+<area shape="rect" id="Node000003" href="$d7/d70/grid_8cpp.html#a874a66df2ab86fe718f89ca7dbe8efb6" title="Balance load." alt="" coords="563,273,667,298"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="1338,261,1082,255,931,257,780,264,667,279,666,273,780,259,931,251,1082,250,1338,256"/>
+<area shape="rect" id="Node000007" href="$da/ddf/class_s_b_c_1_1_maxwellian.html#a833c7cf658faf049300eec716cc4b8c7" title="Generate the template cell for the face corresponding to the index passed. This function generates a ..." alt="" coords="1085,387,1282,427"/>
+<area shape="poly" id="edge7_Node000002_Node000007" title=" " alt="" coords="1423,295,1370,337,1305,377,1276,389,1274,384,1303,372,1367,333,1419,291"/>
+<area shape="rect" id="Node000008" href="$db/d19/classprojects_1_1_project.html#ad425d38e349f5797d870c8047ad1973c" title="Sets the distribution function in a cell." alt="" coords="1116,107,1251,147"/>
+<area shape="poly" id="edge8_Node000002_Node000008" title=" " alt="" coords="1415,238,1363,202,1303,168,1250,147,1252,142,1305,163,1366,198,1418,234"/>
+<area shape="rect" id="Node000011" href="$d7/d70/grid_8cpp.html#ac9cfc94f1a8849f0b2c95f805cc44b8d" title=" " alt="" coords="1080,323,1287,363"/>
+<area shape="poly" id="edge12_Node000002_Node000011" title=" " alt="" coords="1372,290,1254,325,1252,320,1371,285"/>
+<area shape="rect" id="Node000023" href="$da/d6b/class_s_b_c_1_1_ionosphere.html#ac904b9ee61069aa1314aa2b638a2f4e9" title=" " alt="" coords="1063,43,1304,83"/>
+<area shape="poly" id="edge35_Node000002_Node000023" title=" " alt="" coords="1431,234,1379,164,1343,128,1303,97,1279,85,1282,81,1305,92,1346,124,1383,161,1435,231"/>
+<area shape="rect" id="Node000004" href="$d7/d70/grid_8cpp.html#a1787e9ee97555055ad3dc0587e460344" title="Initialize DCCRG and fsgrids." alt="" coords="286,273,398,298"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="549,288,398,288,398,283,549,283"/>
+<area shape="rect" id="Node000005" href="$d4/d5b/vlasiator_8cpp.html#acfd343080edd07ae79384688a7e48693" title=" " alt="" coords="108,406,187,431"/>
+<area shape="poly" id="edge6_Node000003_Node000005" title=" " alt="" coords="549,299,379,333,295,352,236,370,199,388,168,408,165,403,196,384,234,366,294,347,378,328,548,294"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="274,303,236,321,211,341,189,365,158,407,154,404,185,361,207,337,233,316,272,298"/>
+<area shape="rect" id="Node000006" href="$d4/d5b/vlasiator_8cpp.html#a54790573f350e250ccca3cbb94733391" title=" " alt="" coords="5,406,60,431"/>
+<area shape="poly" id="edge5_Node000005_Node000006" title=" " alt="" coords="94,421,60,421,60,416,94,416"/>
+<area shape="rect" id="Node000009" href="$db/d19/classprojects_1_1_project.html#afb2a412ae6cedce4e914650ea35b8f42" title="Set the perturbed fields and distribution of a cell according to the default simulation settings...." alt="" coords="830,56,965,96"/>
+<area shape="poly" id="edge9_Node000008_Node000009" title=" " alt="" coords="1102,115,964,90,965,85,1103,110"/>
+<area shape="poly" id="edge11_Node000009_Node000004" title=" " alt="" coords="818,95,781,112,767,123,758,136,749,149,733,161,700,177,671,186,618,194,564,198,533,203,498,213,425,244,367,275,364,270,423,239,496,208,532,198,563,192,617,188,670,181,698,172,731,156,745,145,754,133,763,120,779,107,816,90"/>
+<area shape="rect" id="Node000010" href="$d5/d71/class_s_b_c_1_1_outflow.html#ab81fa2d4bc924e1b8406ae4e83b8365b" title=" " alt="" coords="521,5,708,45"/>
+<area shape="poly" id="edge10_Node000009_Node000010" title=" " alt="" coords="816,64,708,45,709,39,817,59"/>
+<area shape="poly" id="edge26_Node000011_Node000003" title=" " alt="" coords="1120,320,1069,303,1014,291,919,280,823,277,667,283,667,278,823,272,919,275,1015,285,1070,298,1122,315"/>
+<area shape="rect" id="Node000012" href="$d7/d70/grid_8cpp.html#a333de5e10ce6bf9d4e75b2cdfb4a5c22" title=" " alt="" coords="547,437,682,462"/>
+<area shape="poly" id="edge13_Node000011_Node000012" title=" " alt="" coords="1071,372,1064,377,1054,388,1048,401,1043,427,1037,453,1029,466,1016,477,969,499,917,511,864,514,812,510,762,501,716,489,645,465,647,460,717,484,763,496,813,504,865,508,917,506,967,494,1013,472,1025,462,1032,451,1037,426,1042,399,1049,385,1061,373,1067,368"/>
+<area shape="rect" id="Node000013" href="$d7/d70/grid_8cpp.html#a7baea7fe82d2a96da4d085e946f24e41" title=" " alt="" coords="819,121,976,146"/>
+<area shape="poly" id="edge16_Node000011_Node000013" title=" " alt="" coords="1143,316,1013,218,915,148,918,144,1016,214,1146,312"/>
+<area shape="rect" id="Node000016" href="$dd/d3d/class_sys_boundary.html#af6a2ecc415f39459e7579179de3ed66a" title="Apply the Vlasov system boundary conditions to all system boundary cells at time t." alt="" coords="497,323,732,363"/>
+<area shape="poly" id="edge23_Node000011_Node000016" title=" " alt="" coords="1080,323,1014,313,897,306,780,313,703,325,702,320,780,308,897,301,1015,308,1081,317"/>
+<area shape="rect" id="Node000017" href="$d5/d5d/vlasovmover_8cpp.html#ae5c8fca60becdb597a0e25a3937c6704" title=" " alt="" coords="780,387,1015,413"/>
+<area shape="poly" id="edge27_Node000011_Node000017" title=" " alt="" coords="1070,368,962,390,961,385,1069,363"/>
+<area shape="rect" id="Node000019" href="$d5/d71/class_s_b_c_1_1_outflow.html#a588e93aff17a561cc0705e806102b3eb" title=" " alt="" coords="790,323,1005,363"/>
+<area shape="poly" id="edge29_Node000011_Node000019" title=" " alt="" coords="1066,345,1005,345,1005,340,1066,340"/>
+<area shape="rect" id="Node000020" href="$dd/d3d/class_sys_boundary.html#aec6729d9522579a2c68ad47249245e3a" title=" " alt="" coords="235,508,449,548"/>
+<area shape="poly" id="edge30_Node000011_Node000020" title=" " alt="" coords="1070,372,1065,377,1051,393,1045,411,1043,448,1041,484,1032,502,1016,518,973,539,913,552,842,559,762,561,596,555,449,543,450,538,596,550,762,556,841,554,913,546,971,533,1013,514,1028,499,1035,483,1038,448,1040,410,1047,391,1061,373,1066,368"/>
+<area shape="rect" id="Node000021" href="$de/d6a/class_s_b_c_1_1_inflow.html#a816e0e82f5ba04e983b234591a5ba4ba" title=" " alt="" coords="807,437,988,462"/>
+<area shape="poly" id="edge32_Node000011_Node000021" title=" " alt="" coords="1076,370,1064,377,1050,389,1041,402,1032,415,1016,428,989,439,987,434,1013,423,1028,411,1037,399,1046,385,1061,372,1074,366"/>
+<area shape="rect" id="Node000022" href="$da/daf/iowrite_8cpp.html#a5c5007bff942122a8c321b0aa16f84bd" title="Write out a restart of the simulation into a vlsv file. All block data in remote cells will be reset." alt="" coords="846,589,949,614"/>
+<area shape="poly" id="edge33_Node000011_Node000022" title=" " alt="" coords="1071,371,1065,376,1048,400,1040,423,1039,447,1041,472,1043,496,1042,521,1034,546,1017,571,1002,583,985,592,950,601,948,596,983,587,999,579,1013,567,1030,544,1037,520,1038,497,1036,472,1034,447,1035,422,1043,397,1061,373,1067,367"/>
+<area shape="poly" id="edge14_Node000012_Node000004" title=" " alt="" coords="533,441,496,428,449,398,408,362,351,300,355,296,412,358,453,394,499,423,535,436"/>
+<area shape="poly" id="edge15_Node000012_Node000005" title=" " alt="" coords="533,447,187,424,187,419,534,441"/>
+<area shape="poly" id="edge22_Node000013_Node000004" title=" " alt="" coords="820,152,781,168,767,177,758,186,748,196,733,205,669,226,578,247,399,279,398,274,577,242,667,221,731,200,745,192,754,182,764,173,779,163,819,147"/>
+<area shape="rect" id="Node000014" href="$d5/d5d/vlasovmover_8cpp.html#a95b050f52235f371f937b7746c575025" title=" " alt="" coords="533,121,696,146"/>
+<area shape="poly" id="edge17_Node000013_Node000014" title=" " alt="" coords="805,136,696,136,696,131,805,131"/>
+<area shape="rect" id="Node000015" href="$d5/d5d/vlasovmover_8cpp.html#a0bc87973dd8041d2d771ff429d3056ab" title=" " alt="" coords="261,95,423,121"/>
+<area shape="poly" id="edge21_Node000013_Node000015" title=" " alt="" coords="811,121,732,112,567,106,424,108,423,102,567,101,732,107,811,116"/>
+<area shape="poly" id="edge19_Node000014_Node000004" title=" " alt="" coords="538,152,499,168,361,275,358,270,496,163,536,147"/>
+<area shape="poly" id="edge20_Node000014_Node000005" title=" " alt="" coords="520,147,452,162,377,185,303,218,268,239,236,263,205,298,181,339,155,407,150,405,177,336,201,295,233,259,265,235,300,213,375,180,451,157,519,142"/>
+<area shape="poly" id="edge18_Node000014_Node000015" title=" " alt="" coords="519,127,424,118,424,113,520,122"/>
+<area shape="poly" id="edge24_Node000016_Node000004" title=" " alt="" coords="505,322,398,300,399,294,506,317"/>
+<area shape="poly" id="edge25_Node000016_Node000005" title=" " alt="" coords="484,366,187,415,186,410,484,361"/>
+<area shape="rect" id="Node000018" href="$d5/d5d/vlasovmover_8cpp.html#aacc4f1870b12e805320d6b001af33133" title=" " alt="" coords="516,387,713,413"/>
+<area shape="poly" id="edge28_Node000017_Node000018" title=" " alt="" coords="766,403,714,403,714,397,766,397"/>
+<area shape="poly" id="edge31_Node000020_Node000005" title=" " alt="" coords="292,503,170,434,172,429,295,499"/>
+<area shape="poly" id="edge34_Node000022_Node000005" title=" " alt="" coords="832,607,691,611,516,610,429,605,349,596,282,582,233,562,200,533,176,497,159,461,150,433,155,431,164,459,180,494,204,530,236,558,284,577,350,591,429,600,516,605,691,606,832,602"/>
+<area shape="poly" id="edge37_Node000024_Node000022" title=" " alt="" coords="1095,638,949,613,950,607,1096,633"/>
+<area shape="rect" id="Node000025" href="$d7/d70/grid_8cpp.html#ae97b2776a7c933e875ee7bb265070b0b" title=" " alt="" coords="842,737,953,762"/>
+<area shape="poly" id="edge38_Node000024_Node000025" title=" " alt="" coords="1147,672,1086,701,1015,728,954,743,952,738,1014,723,1084,696,1144,667"/>
+<area shape="rect" id="Node000026" href="$da/daf/iowrite_8cpp.html#a8ae6af515deaff2069e93b5238dbe9b3" title=" " alt="" coords="790,687,1005,713"/>
+<area shape="poly" id="edge39_Node000024_Node000026" title=" " alt="" coords="1096,668,972,690,971,685,1095,663"/>
+<area shape="rect" id="Node000027" href="$da/daf/iowrite_8cpp.html#ae6d9152d3306ea3c3d03693dcffed0b3" title=" " alt="" coords="824,638,971,663"/>
+<area shape="poly" id="edge40_Node000024_Node000027" title=" " alt="" coords="1062,653,971,653,971,648,1062,648"/>
+<area shape="rect" id="Node000028" href="$da/daf/iowrite_8cpp.html#a6add701f9c8bf34edd0ccd6257b37bfe" title="Write out system into a vlsv file." alt="" coords="301,639,383,665"/>
+<area shape="poly" id="edge41_Node000027_Node000028" title=" " alt="" coords="810,654,383,655,383,649,810,648"/>
+<area shape="poly" id="edge42_Node000028_Node000005" title=" " alt="" coords="286,648,258,638,233,622,212,600,195,575,170,520,155,469,148,432,153,431,160,468,175,518,200,572,216,597,236,618,261,633,288,643"/>
+</map>

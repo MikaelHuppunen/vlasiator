@@ -1,0 +1,20 @@
+<map id="SBC::SphericalTriGrid::calculateConductivityTensor" name="SBC::SphericalTriGrid::calculateConductivityTensor">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,92,219,132"/>
+<area shape="rect" id="Node000002" href="$d4/d8d/struct_s_b_c_1_1_spherical_tri_grid.html#a32bdb96bb10a9a6c43b925e1619831b6" title=" " alt="" coords="271,5,441,45"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="168,89,285,48,287,53,170,94"/>
+<area shape="rect" id="Node000003" href="$de/d31/_dispersion_8m.html#af276a2aede715061015c735080cf65df" title=" " alt="" coords="495,35,542,61"/>
+<area shape="poly" id="edge10_Node000001_Node000003" title=" " alt="" coords="219,93,481,51,482,56,219,98"/>
+<area shape="rect" id="Node000004" href="$d4/d8d/struct_s_b_c_1_1_spherical_tri_grid.html#a1149e867bcb95a11ca47b5092c7fe8e8" title=" " alt="" coords="267,120,445,160"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="219,122,253,126,252,131,219,127"/>
+<area shape="rect" id="Node000008" href="$d8/dbc/vectorclass__fallback_8h.html#a92b2075c51472d120e4ef0a663e3814b" title=" " alt="" coords="493,181,544,206"/>
+<area shape="poly" id="edge8_Node000001_Node000008" title=" " alt="" coords="156,130,209,151,267,169,325,180,383,186,480,191,480,196,382,192,324,185,266,175,207,156,154,135"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="442,35,482,40,481,46,441,40"/>
+<area shape="rect" id="Node000005" href="$d8/dbc/vectorclass__fallback_8h.html#ae83b95cd4defb63faf66a7cbc78801e6" title=" " alt="" coords="493,130,544,155"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="446,139,479,139,479,145,446,144"/>
+<area shape="poly" id="edge5_Node000005_Node000005" title=" " alt="" coords="495,131,490,122,493,112,503,106,519,103,538,107,546,115,542,119,535,112,519,109,504,111,497,115,495,121,500,129"/>
+<area shape="rect" id="Node000006" href="$d7/d8b/class_vec_simple.html#a145923009b9b82410c5a072b8f8127f0" title=" " alt="" coords="592,157,727,182"/>
+<area shape="poly" id="edge6_Node000005_Node000006" title=" " alt="" coords="545,145,579,151,578,157,544,150"/>
+<area shape="rect" id="Node000007" href="$d7/d8b/class_vec_simple.html#ae16798cf2ee14257d0706c60613cd733" title=" " alt="" coords="775,157,941,182"/>
+<area shape="poly" id="edge7_Node000006_Node000007" title=" " alt="" coords="727,167,761,167,761,172,727,172"/>
+<area shape="poly" id="edge9_Node000008_Node000006" title=" " alt="" coords="544,187,578,181,578,186,544,192"/>
+</map>

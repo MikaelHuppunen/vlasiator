@@ -1,0 +1,115 @@
+<map id="max" name="max">
+<area shape="rect" id="Node000001" title=" " alt="" coords="783,1131,833,1156"/>
+<area shape="rect" id="Node000002" href="$db/db8/gpu__acc__map_8cpp.html#a026347c8ae8381613d9d307407944ff2" title="GPU kernel for main task of semi&#45;Lagrangian acceleration. Reads data in from buffer,..." alt="" coords="537,5,683,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="804,1117,803,893,796,551,787,377,774,223,756,106,745,67,733,44,710,28,683,19,685,14,713,23,737,40,750,65,761,105,780,222,793,376,801,551,809,893,809,1117"/>
+<area shape="rect" id="Node000003" href="$d0/d80/cpu__trans__pencils_8cpp.html#a1abcc0d85c2ea47122d3ea278f790e96" title=" " alt="" coords="512,128,708,153"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="804,1117,802,916,792,613,783,459,771,324,754,221,744,187,733,166,707,149,710,144,737,163,749,185,759,220,776,323,788,459,797,613,807,916,809,1117"/>
+<area shape="rect" id="Node000005" href="$d5/d5d/vlasovmover_8cpp.html#a95b050f52235f371f937b7746c575025" title=" " alt="" coords="529,279,691,304"/>
+<area shape="poly" id="edge5_Node000001_Node000005" title=" " alt="" coords="804,1117,799,943,787,688,778,560,766,448,751,362,742,334,733,317,714,303,691,294,692,289,716,298,737,314,747,332,756,361,771,447,783,560,793,688,804,943,809,1117"/>
+<area shape="rect" id="Node000006" href="$d5/d5d/vlasovmover_8cpp.html#a0bc87973dd8041d2d771ff429d3056ab" title=" " alt="" coords="255,228,418,253"/>
+<area shape="poly" id="edge10_Node000001_Node000006" title=" " alt="" coords="804,1117,801,934,791,662,782,526,769,406,753,315,743,285,733,268,712,255,681,245,599,234,505,233,418,237,418,231,505,228,599,229,682,240,714,250,737,264,748,283,758,314,775,405,787,525,796,662,806,934,809,1117"/>
+<area shape="rect" id="Node000010" href="$df/dd2/ldz__electric__field_8cpp.html#abedaf61b47c565113e4351a33906649f" title="Low&#45;level helper function." alt="" coords="541,581,679,607"/>
+<area shape="poly" id="edge11_Node000001_Node000010" title=" " alt="" coords="804,1117,802,1010,792,863,784,789,771,721,754,665,733,628,708,610,679,600,681,595,711,605,737,624,759,663,776,720,789,788,798,863,807,1010,809,1117"/>
+<area shape="rect" id="Node000011" href="$df/dd2/ldz__electric__field_8cpp.html#a57cd880d9d8671f7e84b1102836ec0cf" title="Low&#45;level electric field propagation function." alt="" coords="236,507,437,532"/>
+<area shape="poly" id="edge19_Node000001_Node000011" title=" " alt="" coords="803,1117,796,986,782,801,761,630,747,571,740,551,733,540,693,512,648,494,599,484,549,482,500,485,453,492,378,509,377,504,452,486,499,480,549,477,600,479,649,489,696,507,737,536,745,549,752,569,766,629,787,801,801,985,808,1117"/>
+<area shape="rect" id="Node000015" href="$df/dd2/ldz__electric__field_8cpp.html#aecbbbf19c674c3a1e1e1529ea9374ea6" title="Low&#45;level electric field propagation function." alt="" coords="237,556,437,581"/>
+<area shape="poly" id="edge20_Node000001_Node000015" title=" " alt="" coords="803,1116,795,990,781,816,760,655,747,599,733,571,712,559,681,551,601,545,510,550,424,559,424,553,510,544,601,540,682,546,714,554,737,567,752,597,765,654,786,815,800,990,808,1116"/>
+<area shape="rect" id="Node000016" href="$df/dd2/ldz__electric__field_8cpp.html#a77eb3605f447b90c9e1ec6ba6915583d" title="Low&#45;level electric field propagation function." alt="" coords="236,605,437,631"/>
+<area shape="poly" id="edge21_Node000001_Node000016" title=" " alt="" coords="804,1117,801,1018,792,883,783,816,770,754,754,705,733,672,713,659,685,648,609,632,522,624,438,621,438,615,522,619,610,627,686,643,716,654,737,668,759,702,775,753,788,815,797,883,807,1018,809,1117"/>
+<area shape="rect" id="Node000017" href="$d4/d8d/struct_s_b_c_1_1_spherical_tri_grid.html#a51aa6d27cda7f199b3ef7775d82d6303" title=" " alt="" coords="503,682,717,722"/>
+<area shape="poly" id="edge18_Node000001_Node000017" title=" " alt="" coords="803,1117,798,1030,786,916,765,807,750,764,733,736,716,722,719,718,737,732,755,762,770,805,791,915,803,1030,808,1116"/>
+<area shape="rect" id="Node000018" href="$d0/d80/cpu__trans__pencils_8cpp.html#af177dbf0a610df3cc77c6fd521e60d71" title=" " alt="" coords="540,55,680,80"/>
+<area shape="poly" id="edge22_Node000001_Node000018" title=" " alt="" coords="804,1117,803,902,794,575,786,410,773,263,755,152,745,115,733,93,709,76,679,68,681,63,711,71,737,90,749,113,760,151,778,263,791,409,800,575,808,902,809,1117"/>
+<area shape="rect" id="Node000019" href="$db/d12/struct_node_crd.html#a53eba6739cf79ea927dd773132f4aad8" title=" " alt="" coords="549,747,671,772"/>
+<area shape="poly" id="edge24_Node000001_Node000019" title=" " alt="" coords="802,1117,796,1041,783,940,762,846,749,809,733,785,705,768,671,760,672,755,707,763,737,781,753,807,768,844,788,940,801,1040,808,1117"/>
+<area shape="rect" id="Node000020" href="$dc/d49/readfields_8cpp.html#af1a39fc35fa55ea7d8d0d883fe830c11" title=" " alt="" coords="555,796,665,821"/>
+<area shape="poly" id="edge25_Node000001_Node000020" title=" " alt="" coords="802,1117,793,1050,779,966,759,886,747,856,733,836,718,825,701,817,665,810,666,805,703,812,721,820,737,832,751,853,764,885,785,965,799,1050,807,1117"/>
+<area shape="rect" id="Node000021" href="$dc/d2c/classprojects_1_1_tri_axis_search.html#a10106fe679bbce733a8f5692d667e5ad" title="Find blocks above the threshold centred isotropically around a bulk velocity." alt="" coords="525,846,695,886"/>
+<area shape="poly" id="edge26_Node000001_Node000021" title=" " alt="" coords="804,1117,801,1070,791,1012,769,951,753,924,733,900,715,887,694,878,696,873,718,882,736,896,758,921,774,949,796,1010,806,1070,810,1117"/>
+<area shape="rect" id="Node000022" href="$df/d57/classprojects_1_1_magnetosphere.html#a9acaf047095a308aad9c7cf780a2afe7" title=" " alt="" coords="519,910,701,950"/>
+<area shape="poly" id="edge27_Node000001_Node000022" title=" " alt="" coords="801,1117,794,1083,781,1042,762,1000,733,965,701,946,703,942,736,961,766,998,786,1040,799,1081,806,1116"/>
+<area shape="rect" id="Node000026" href="$d5/d5d/vlasovmover_8cpp.html#aed5ab433f35e38ff18558172a45a962a" title=" " alt="" coords="515,177,705,203"/>
+<area shape="poly" id="edge31_Node000001_Node000026" title=" " alt="" coords="804,1117,800,927,789,642,780,498,768,372,752,275,743,243,733,224,720,212,704,203,706,198,723,207,737,220,748,241,757,274,773,371,785,498,795,642,805,926,809,1117"/>
+<area shape="rect" id="Node000027" href="$d0/dbf/struct_parameters.html#a5879f09fa7ce7453a3c6d45148361089" title="Get the global parameters." alt="" coords="237,379,436,404"/>
+<area shape="poly" id="edge33_Node000001_Node000027" title=" " alt="" coords="803,1117,797,966,784,749,775,641,763,547,749,476,741,452,733,438,696,410,655,389,609,377,562,370,515,369,470,371,393,381,392,376,470,365,515,363,563,365,610,371,656,384,699,405,737,435,746,450,754,474,768,546,780,641,790,749,803,965,809,1117"/>
+<area shape="rect" id="Node000029" href="$d4/de8/namespace_s_b_c.html#acff2a580e1234d2ba50d942108b5c1a4" title=" " alt="" coords="567,975,653,1000"/>
+<area shape="poly" id="edge35_Node000001_Node000029" title=" " alt="" coords="797,1119,774,1065,756,1037,733,1015,715,1004,694,997,653,990,654,985,696,992,717,999,736,1011,760,1034,779,1062,802,1116"/>
+<area shape="rect" id="Node000032" href="$dc/dc7/gpu__base_8cpp.html#ac9e124392e105a6b64f7c88d2ad05c27" title=" " alt="" coords="503,1024,717,1049"/>
+<area shape="poly" id="edge36_Node000001_Node000032" title=" " alt="" coords="789,1121,765,1091,733,1064,705,1052,707,1047,736,1060,769,1087,794,1117"/>
+<area shape="rect" id="Node000036" href="$dc/dc7/gpu__base_8cpp.html#aec03c9710bbd1bb14d074e574e80196f" title=" " alt="" coords="533,1073,687,1099"/>
+<area shape="poly" id="edge37_Node000001_Node000036" title=" " alt="" coords="769,1128,734,1114,686,1101,687,1096,735,1109,771,1123"/>
+<area shape="rect" id="Node000038" href="$d4/d8d/struct_s_b_c_1_1_spherical_tri_grid.html#a0822de8d756442de02e01d252c8ef1c6" title=" " alt="" coords="507,1123,713,1163"/>
+<area shape="poly" id="edge38_Node000001_Node000038" title=" " alt="" coords="769,1146,714,1146,714,1141,769,1141"/>
+<area shape="rect" id="Node000039" href="$d7/d70/grid_8cpp.html#a075a0aeb526f356ca8efcaee6c9a4948" title=" " alt="" coords="545,328,675,353"/>
+<area shape="poly" id="edge39_Node000001_Node000039" title=" " alt="" coords="803,1117,798,955,785,718,775,600,763,496,749,417,741,390,733,374,706,355,674,345,676,340,709,350,737,371,746,388,754,415,769,495,781,599,790,718,803,954,809,1117"/>
+<area shape="rect" id="Node000040" href="$da/d6b/class_s_b_c_1_1_ionosphere.html#a0693f4fad25c7739a9189f9c25162e1f" title=" " alt="" coords="520,1187,700,1227"/>
+<area shape="poly" id="edge41_Node000001_Node000040" title=" " alt="" coords="771,1164,736,1178,697,1190,695,1185,734,1173,769,1159"/>
+<area shape="rect" id="Node000041" href="$dc/da5/sigma_profiles_8cpp.html#a3c04138a5bfe5d72780bb7e82a18e627" title=" " alt="" coords="583,1252,637,1277"/>
+<area shape="poly" id="edge42_Node000001_Node000041" title=" " alt="" coords="797,1170,772,1208,756,1226,736,1242,712,1254,685,1261,638,1267,637,1262,684,1256,710,1249,733,1237,752,1222,768,1204,792,1167"/>
+<area shape="rect" id="Node000042" href="$db/d0f/cpu__acc__map_8cpp.html#ab4ba4dbc0e3448cd62e30e546e347908" title=" " alt="" coords="573,1301,647,1327"/>
+<area shape="poly" id="edge43_Node000001_Node000042" title=" " alt="" coords="804,1170,795,1199,782,1232,763,1265,736,1292,715,1304,692,1312,648,1318,647,1313,691,1307,713,1299,733,1288,758,1262,777,1230,790,1197,799,1169"/>
+<area shape="rect" id="Node000045" href="$d1/d86/namespacefluxfunction.html#a7526fc9f59f07cd6a5446902a4ebea99" title=" " alt="" coords="530,1351,690,1376"/>
+<area shape="poly" id="edge44_Node000001_Node000045" title=" " alt="" coords="808,1170,802,1209,790,1255,769,1302,754,1323,736,1341,715,1355,691,1363,690,1358,713,1350,733,1337,750,1320,764,1299,785,1253,797,1208,802,1170"/>
+<area shape="rect" id="Node000047" href="$d4/d8a/vlsvdiff_8cpp.html#a6e7952b798905864a1b159356548f7b1" title=" " alt="" coords="567,1400,653,1425"/>
+<area shape="poly" id="edge45_Node000001_Node000047" title=" " alt="" coords="810,1170,807,1218,797,1277,775,1338,758,1366,736,1391,718,1403,696,1412,654,1418,653,1412,695,1406,715,1399,733,1387,754,1363,770,1336,792,1276,802,1217,805,1170"/>
+<area shape="rect" id="Node000050" href="$dc/d2e/gpu__pitch__angle__diffusion_8cpp.html#a88e83cb1bbf15b69d1d99d7704e590e0" title=" " alt="" coords="535,1449,685,1475"/>
+<area shape="poly" id="edge46_Node000001_Node000050" title=" " alt="" coords="806,1170,798,1234,784,1315,763,1390,751,1420,737,1440,713,1456,686,1464,684,1459,710,1451,733,1436,746,1417,758,1389,778,1314,793,1233,801,1169"/>
+<area shape="rect" id="Node000051" href="$da/d9e/namespacefun__plot__reconstruction.html#a9bdb2afc38a81f456047bf36d0c553e0" title=" " alt="" coords="508,1499,712,1539"/>
+<area shape="poly" id="edge47_Node000001_Node000051" title=" " alt="" coords="807,1170,800,1244,787,1339,766,1429,752,1465,737,1489,714,1506,711,1502,733,1486,748,1462,761,1428,781,1338,795,1243,802,1169"/>
+<area shape="rect" id="Node000052" href="$de/d55/map__test__3d__openmp_8cpp.html#a4bb548773c06b7661944222f8bac02ef" title=" " alt="" coords="566,1564,654,1589"/>
+<area shape="poly" id="edge48_Node000001_Node000052" title=" " alt="" coords="808,1170,803,1256,792,1371,782,1428,770,1481,755,1524,737,1553,718,1567,697,1575,655,1582,654,1577,696,1570,716,1562,733,1550,751,1521,765,1479,777,1427,786,1370,798,1256,803,1169"/>
+<area shape="rect" id="Node000054" href="$d3/d98/map__test__3d_8cpp.html#ae98ccf3e0a30f5bcc8ed97810538ae89" title=" " alt="" coords="566,1613,654,1639"/>
+<area shape="poly" id="edge49_Node000001_Node000054" title=" " alt="" coords="809,1170,806,1266,795,1396,786,1462,774,1521,757,1570,737,1604,719,1617,698,1626,655,1632,654,1627,696,1621,716,1613,733,1600,753,1568,768,1520,781,1461,790,1395,800,1266,804,1170"/>
+<area shape="rect" id="Node000056" href="$de/d26/acceleration_2map__test_8cpp.html#a89ac0a0389a13be41e7ee9c33d451dcb" title=" " alt="" coords="566,1663,654,1688"/>
+<area shape="poly" id="edge50_Node000001_Node000056" title=" " alt="" coords="809,1170,808,1275,798,1420,789,1493,777,1560,759,1615,737,1653,719,1667,698,1675,655,1681,654,1676,696,1670,716,1662,733,1650,754,1613,771,1559,784,1492,793,1419,802,1275,804,1170"/>
+<area shape="rect" id="Node000058" href="$d1/d9f/acceleration-vlasiator_2map__test_8cpp.html#a37ab49d5e056f48beef521004563daad" title=" " alt="" coords="566,1712,654,1737"/>
+<area shape="poly" id="edge51_Node000001_Node000058" title=" " alt="" coords="810,1170,809,1285,801,1444,793,1526,780,1600,761,1661,750,1684,737,1703,719,1716,698,1725,655,1731,654,1725,696,1720,716,1712,733,1699,745,1682,756,1659,774,1598,787,1525,796,1444,804,1285,805,1170"/>
+<area shape="rect" id="Node000060" href="$d4/d8d/struct_s_b_c_1_1_spherical_tri_grid.html#a4f1ce79a4d7c4a2196beea6b73e08ff3" title=" " alt="" coords="508,1762,712,1802"/>
+<area shape="poly" id="edge52_Node000001_Node000060" title=" " alt="" coords="808,1170,800,1301,785,1485,764,1657,751,1718,737,1752,714,1769,711,1765,733,1748,746,1716,759,1656,780,1484,794,1300,803,1169"/>
+<area shape="rect" id="Node000061" href="$d3/d1c/readfields_8h.html#a980918443a222b89eb2bd74d69b85bbb" title=" " alt="" coords="567,1827,653,1852"/>
+<area shape="poly" id="edge53_Node000001_Node000061" title=" " alt="" coords="808,1170,801,1313,788,1518,766,1710,753,1778,745,1801,737,1816,719,1830,697,1839,654,1845,653,1840,696,1834,716,1825,733,1812,740,1799,748,1777,761,1709,782,1518,796,1313,803,1169"/>
+<area shape="rect" id="Node000064" href="$de/deb/ioread_8cpp.html#af0dba4ad24dc8b0017fb52a6e0dabe4d" title=" " alt="" coords="537,1876,683,1901"/>
+<area shape="poly" id="edge54_Node000001_Node000064" title=" " alt="" coords="809,1170,802,1324,789,1545,768,1752,754,1826,746,1851,737,1866,713,1884,684,1892,683,1887,710,1879,733,1863,741,1849,749,1824,763,1751,784,1544,797,1323,803,1170"/>
+<area shape="rect" id="Node000067" href="$dd/d55/class_d_r_o_1_1_variable_precipitation_diff_flux.html#ab196e65f7820268554e89a1614c82b7b" title=" " alt="" coords="513,1926,707,1966"/>
+<area shape="poly" id="edge55_Node000001_Node000067" title=" " alt="" coords="809,1170,803,1332,790,1569,781,1687,769,1792,754,1871,746,1899,737,1916,709,1936,706,1932,733,1912,741,1896,749,1870,763,1791,775,1687,785,1568,798,1332,803,1170"/>
+<area shape="rect" id="Node000068" href="$db/d62/class_d_r_o_1_1_variable_precipitation_line_diff_flux.html#af93f48e206bc3ea61dc1d10490cd5539" title=" " alt="" coords="513,1990,707,2030"/>
+<area shape="poly" id="edge56_Node000001_Node000068" title=" " alt="" coords="809,1170,804,1345,792,1602,783,1731,771,1845,756,1931,747,1961,737,1980,710,2000,706,1996,733,1976,742,1959,750,1930,765,1844,777,1730,787,1601,799,1345,803,1170"/>
+<area shape="rect" id="Node000069" href="$d4/d8a/vlsvdiff_8cpp.html#a412036586f57bf31e81098156ec22a4d" title=" " alt="" coords="549,2055,671,2080"/>
+<area shape="poly" id="edge57_Node000001_Node000069" title=" " alt="" coords="809,1170,805,1357,795,1634,786,1774,773,1898,757,1992,748,2024,737,2044,723,2056,707,2064,672,2072,670,2067,705,2059,720,2051,733,2040,743,2022,752,1991,768,1897,780,1774,789,1634,800,1357,804,1170"/>
+<area shape="rect" id="Node000070" href="$d4/d8d/struct_s_b_c_1_1_spherical_tri_grid.html#aafc6eaeba1866e6ea6d08341aa2b3d7d" title=" " alt="" coords="531,2105,689,2145"/>
+<area shape="poly" id="edge58_Node000001_Node000070" title=" " alt="" coords="809,1170,806,1366,795,1659,786,1808,774,1939,758,2039,748,2073,737,2094,716,2112,691,2122,689,2117,713,2107,733,2091,743,2071,753,2038,769,1938,781,1807,790,1659,801,1366,804,1170"/>
+<area shape="rect" id="Node000072" href="$d9/dbb/struct_g_p_u_memory_manager.html#ad8325c5f5456b4c5e403b342fbfb7fcf" title=" " alt="" coords="485,2169,735,2195"/>
+<area shape="poly" id="edge59_Node000001_Node000072" title=" " alt="" coords="809,1170,807,1377,798,1691,789,1851,777,1992,760,2099,749,2136,737,2158,722,2171,718,2167,733,2155,744,2134,754,2098,771,1991,784,1851,793,1691,802,1377,804,1170"/>
+<area shape="rect" id="Node000073" href="$df/dbb/namespace_field_tracing.html#ac41050acd4c295d1569259c05b4f1fe6" title="Trace magnetic field lines forward and backward from each DCCRG cell to record the connectivity and d..." alt="" coords="509,2219,711,2259"/>
+<area shape="poly" id="edge60_Node000001_Node000073" title=" " alt="" coords="809,1170,808,1386,799,1716,790,1884,777,2033,760,2146,749,2185,737,2209,713,2228,710,2223,733,2206,744,2183,755,2145,772,2032,785,1884,794,1716,802,1386,804,1170"/>
+<area shape="rect" id="Node000076" href="$d9/d50/unit__testing_8cpp.html#af7b71cb4500f266dc8ebe6ad61985522" title=" " alt="" coords="587,2284,633,2309"/>
+<area shape="poly" id="edge61_Node000001_Node000076" title=" " alt="" coords="810,1169,809,1398,802,1749,793,1928,780,2086,762,2207,750,2248,737,2273,714,2290,686,2299,658,2303,633,2302,634,2297,658,2297,685,2294,711,2286,733,2270,745,2246,757,2205,775,2085,788,1927,796,1749,804,1397,804,1169"/>
+<area shape="rect" id="Node000077" href="$da/daf/iowrite_8cpp.html#a74aed0c404d5ffe2ac37c3f6a02cffeb" title="Write out simulation diagnostics into diagnostic.txt." alt="" coords="275,429,399,455"/>
+<area shape="poly" id="edge62_Node000001_Node000077" title=" " alt="" coords="803,1117,796,976,783,777,761,591,748,526,740,504,733,492,697,463,655,443,611,430,564,423,518,421,473,422,396,432,395,427,473,417,518,415,565,418,612,425,657,438,700,459,737,488,745,502,753,524,767,590,788,776,802,975,808,1116"/>
+<area shape="poly" id="edge3_Node000003_Node000003" title=" " alt="" coords="645,118,635,110,610,107,589,109,578,113,576,119,582,126,577,129,571,120,574,110,588,104,610,101,637,105,648,114"/>
+<area shape="rect" id="Node000004" href="$d0/d80/cpu__trans__pencils_8cpp.html#ab5c17889dcc66decbf29bd18cbe91751" title=" " alt="" coords="239,92,434,117"/>
+<area shape="poly" id="edge4_Node000003_Node000004" title=" " alt="" coords="499,129,433,120,434,115,500,124"/>
+<area shape="poly" id="edge6_Node000005_Node000006" title=" " alt="" coords="527,279,405,256,406,251,528,273"/>
+<area shape="rect" id="Node000007" href="$d7/d70/grid_8cpp.html#a1787e9ee97555055ad3dc0587e460344" title="Initialize DCCRG and fsgrids." alt="" coords="281,329,393,355"/>
+<area shape="poly" id="edge7_Node000005_Node000007" title=" " alt="" coords="528,309,393,334,392,329,527,304"/>
+<area shape="rect" id="Node000008" href="$d4/d5b/vlasiator_8cpp.html#acfd343080edd07ae79384688a7e48693" title=" " alt="" coords="57,355,136,380"/>
+<area shape="poly" id="edge9_Node000005_Node000008" title=" " alt="" coords="515,293,382,299,309,307,237,319,177,337,126,357,124,352,175,332,235,314,308,302,382,294,515,288"/>
+<area shape="poly" id="edge8_Node000007_Node000008" title=" " alt="" coords="267,352,136,366,136,361,267,347"/>
+<area shape="poly" id="edge12_Node000010_Node000011" title=" " alt="" coords="554,580,437,546,392,535,393,529,438,541,556,575"/>
+<area shape="poly" id="edge14_Node000010_Node000015" title=" " alt="" coords="527,589,437,581,437,575,527,584"/>
+<area shape="poly" id="edge16_Node000010_Node000016" title=" " alt="" coords="527,604,438,612,437,607,527,599"/>
+<area shape="rect" id="Node000012" href="$df/dd2/ldz__electric__field_8cpp.html#a499ea7ad7eee3d88c694caf6942537c4" title="Electric field propagation function." alt="" coords="17,556,177,581"/>
+<area shape="poly" id="edge13_Node000011_Node000012" title=" " alt="" coords="262,537,160,559,159,553,260,532"/>
+<area shape="poly" id="edge15_Node000015_Node000012" title=" " alt="" coords="223,571,177,571,177,566,223,566"/>
+<area shape="poly" id="edge17_Node000016_Node000012" title=" " alt="" coords="260,605,159,584,160,579,262,600"/>
+<area shape="poly" id="edge23_Node000018_Node000004" title=" " alt="" coords="527,81,430,95,430,89,526,76"/>
+<area shape="rect" id="Node000023" href="$df/d57/classprojects_1_1_magnetosphere.html#aec1a71d2331bcefb696a27aa419fb030" title=" " alt="" coords="5,909,188,949"/>
+<area shape="poly" id="edge28_Node000022_Node000023" title=" " alt="" coords="505,930,437,929,236,929,188,929,188,924,236,923,437,923,505,925"/>
+<area shape="rect" id="Node000024" href="$df/d57/classprojects_1_1_magnetosphere.html#ac11a05ee6cadabc7f6c638d7033d4269" title="Return a vector containing the velocity coordinate of the centre of each ion population in the distri..." alt="" coords="245,938,428,978"/>
+<area shape="poly" id="edge29_Node000022_Node000024" title=" " alt="" coords="505,943,428,951,428,946,505,938"/>
+<area shape="poly" id="edge30_Node000024_Node000023" title=" " alt="" coords="232,948,188,942,188,937,232,943"/>
+<area shape="poly" id="edge32_Node000026_Node000006" title=" " alt="" coords="528,208,406,231,405,225,527,203"/>
+<area shape="poly" id="edge34_Node000027_Node000008" title=" " alt="" coords="223,383,136,374,137,369,224,377"/>
+<area shape="poly" id="edge40_Node000039_Node000007" title=" " alt="" coords="532,344,393,344,393,339,532,338"/>
+<area shape="poly" id="edge63_Node000077_Node000008" title=" " alt="" coords="271,428,235,418,132,383,133,378,237,413,273,423"/>
+</map>
