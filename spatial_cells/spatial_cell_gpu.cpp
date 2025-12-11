@@ -1094,7 +1094,6 @@ namespace spatial_cell {
     * @return True on success.*/
    bool SpatialCell::shrink_to_fit() {
       bool success = true;
-      return true; // on AMD, shrink_to_fit appears broken.
       size_t largestAmount = 0;
       for (size_t popID=0; popID<populations.size(); ++popID) {
          const vmesh::LocalID amount

@@ -694,9 +694,6 @@ namespace vmesh {
    }
 
    inline bool VelocityBlockContainer::setNewCapacityShrink(const vmesh::LocalID reqCapacity) {
-      #ifdef USE_HIP
-      return setNewCapacity(reqCapacity);
-      #endif
       // Reallocate so that capacity matches requested value.
       vmesh::LocalID numberOfBlocks = block_data.size()/WID3;
       if (reqCapacity < numberOfBlocks) {
@@ -707,7 +704,7 @@ namespace vmesh {
       vmesh::LocalID newCapacity = std::max(reqCapacity, (vmesh::LocalID)2); // At least 2 blocks
 #ifdef USE_GPU
       gpuStream_t stream = gpu_getStream();
-      // Overwrite/swap causing data corruption on LUMI-G, use reallocate method instead.
+      
       block_data.reallocate(newCapacity*WID3, stream);
       parameters.reallocate(newCapacity*BlockParams::N_VELOCITY_BLOCK_PARAMS, stream);
       CHK_ERR( gpuStreamSynchronize(stream) );
