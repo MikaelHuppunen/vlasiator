@@ -336,6 +336,12 @@ void initializeGrids(
    phiprof::Timer setBTimer {"project.setProjectBField"};
    project.setProjectBField(perBGrid, BgBGrid, technicalGrid);
    setBTimer.stop();
+   if (P::isRestart) {
+      // There are projects that have non-uniform and non-zero perturbed B, e.g. Magnetosphere with dipole type 4.
+      // If restarting with reapplyUponRestart active, we need to set PerB again 
+      // in boundary cells after setProjectBField has populated the BGBXVDCORR etc. terms
+      sysBoundaries.applyInitialState(mpiGrid, technicalGrid, perBGrid, BgBGrid, project);
+   }
    phiprof::Timer fsGridGhostTimer {"fsgrid-ghost-updates"};
    perBGrid.updateGhostCells();
    BgBGrid.updateGhostCells();
@@ -1307,8 +1313,8 @@ bool adaptRefinement(dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geometry>& mpiGri
    uint64_t coarsens {mpiGrid.get_cells_to_unrefine_count()};
    ratio_refines = static_cast<double>(refines) / static_cast<double>(cells);
    double ratio_coarsens = static_cast<double>(coarsens) / static_cast<double>(cells);
-   logFile << "(AMR) Refining " << refines << " cells after induces, " << 100.0 * ratio_refines << "% of grid" << std::endl;
-   logFile << "(AMR) Coarsening " << coarsens << " cells after induces, " << 100.0 * ratio_coarsens << "% of grid" << std::endl;
+   logFile << "(AMR) Refining " << refines << " cells to " << refines*8 << " children after induces, " << 100.0 * ratio_refines << "% of grid" << std::endl;
+   logFile << "(AMR) Coarsening " << coarsens << " cells to " << coarsens/8 <<  " parents after induces, " << 100.0 * ratio_coarsens << "% of grid" << std::endl;
 
    double newBytes{0};
    phiprof::Timer estimateMemoryTimer {"Estimate memory usage"};
