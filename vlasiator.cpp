@@ -484,7 +484,13 @@ int simulate(int argn,char* args[]) {
    phiprof::Timer initGridsTimer {"Init grids"};
    dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geometry> mpiGrid;
 
+   // use shrink to fit by default on CPU but not on GPU
+   #if defined(USE_GPU) && !defined(GPU_SHRINK_TO_FIT)
+   bool shrinkToFitEnabled = false;
+   #else
    bool shrinkToFitEnabled = true;
+   #endif
+
    initializeGrids(
       argn,
       args,
