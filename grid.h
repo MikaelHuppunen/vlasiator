@@ -48,7 +48,8 @@ void initializeGrids(
    FsGrid< std::array<Real, fsgrids::volfields::N_VOL>, FS_STENCIL_WIDTH> & volGrid,
    FsGrid< fsgrids::technical, FS_STENCIL_WIDTH> & technicalGrid,
    SysBoundary& sysBoundaries,
-   Project& project
+   Project& project,
+   bool shrinkToFitEnabled
 );
 
 /*!

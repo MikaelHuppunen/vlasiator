@@ -484,6 +484,7 @@ int simulate(int argn,char* args[]) {
    phiprof::Timer initGridsTimer {"Init grids"};
    dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geometry> mpiGrid;
 
+   bool shrinkToFitEnabled = true;
    initializeGrids(
       argn,
       args,
@@ -498,7 +499,8 @@ int simulate(int argn,char* args[]) {
       volGrid,
       technicalGrid,
       sysBoundaryContainer,
-      *project
+      *project,
+      shrinkToFitEnabled
    );
    const std::vector<CellID>& cells = getLocalCells();
 
@@ -1102,10 +1104,12 @@ int simulate(int argn,char* args[]) {
       if(((P::tstep % P::rebalanceInterval == 0 && P::tstep > P::tstep_min) || overrideRebalanceNow)) {
          logFile << "(LB): Start load balance, tstep = " << P::tstep << " t = " << P::t << endl << writeVerbose;
 
-         phiprof::Timer shrinkTimer {"Shrink_to_fit"};
-         // * shrink to fit before LB * //
-         shrink_to_fit_grid_data(mpiGrid);
-         shrinkTimer.stop();
+         if(shrinkToFitEnabled){
+            phiprof::Timer shrinkTimer {"Shrink_to_fit"};
+            // * shrink to fit before LB * //
+            shrink_to_fit_grid_data(mpiGrid);
+            shrinkTimer.stop();
+         }
 
          if (refineNow || (!dtIsChanged && P::adaptRefinement && P::tstep % (P::rebalanceInterval * P::refineCadence) == 0 && P::t > P::refineAfter)) { 
             logFile << "(AMR): Adapting refinement!"  << endl << writeVerbose;

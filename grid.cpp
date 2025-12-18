@@ -103,7 +103,8 @@ void initializeGrids(
    FsGrid< std::array<Real, fsgrids::volfields::N_VOL>, FS_STENCIL_WIDTH> & volGrid,
    FsGrid< fsgrids::technical, FS_STENCIL_WIDTH> & technicalGrid,
    SysBoundary& sysBoundaries,
-   Project& project
+   Project& project,
+   bool shrinkToFitEnabled
 ) {
    int myRank;
    MPI_Comm_rank(MPI_COMM_WORLD,&myRank);
@@ -302,7 +303,9 @@ void initializeGrids(
          }
       }
 
-      shrink_to_fit_grid_data(mpiGrid); //get rid of excess data already here
+      if(shrinkToFitEnabled){
+         shrink_to_fit_grid_data(mpiGrid); //get rid of excess data already here
+      }
 
       /*
       // Apply boundary conditions so that we get correct initial moments
