@@ -266,12 +266,12 @@ void gpu_calculateMoments_R(
 
    gpuMemoryManager.startSession(0,0);
 
-   SESSION_HOST_ALLOCATE(gpuMemoryManager, vmesh::VelocityBlockContainer*, host_VBC, nAllCells*sizeof(vmesh::VelocityBlockContainer*));
-   SESSION_HOST_ALLOCATE(gpuMemoryManager, Real, host_moments1, nAllCells*nMom1*sizeof(Real));
-   SESSION_HOST_ALLOCATE(gpuMemoryManager, Real, host_moments2, nAllCells*nMom2*sizeof(Real));
-   SESSION_ALLOCATE(gpuMemoryManager, vmesh::VelocityBlockContainer*, dev_VBC, nAllCells*sizeof(vmesh::VelocityBlockContainer*));
-   SESSION_ALLOCATE(gpuMemoryManager, Real, dev_moments1, nAllCells*nMom1*sizeof(Real));
-   SESSION_ALLOCATE(gpuMemoryManager, Real, dev_moments2, nAllCells*nMom2*sizeof(Real));
+   SESSION_HOST_ALLOCATE(gpuMemoryManager, host_VBC, vmesh::VelocityBlockContainer*, nAllCells*sizeof(vmesh::VelocityBlockContainer*));
+   SESSION_HOST_ALLOCATE(gpuMemoryManager, host_moments1, Real, nAllCells*nMom1*sizeof(Real));
+   SESSION_HOST_ALLOCATE(gpuMemoryManager, host_moments2, Real, nAllCells*nMom2*sizeof(Real));
+   SESSION_ALLOCATE(gpuMemoryManager, dev_VBC, vmesh::VelocityBlockContainer*, nAllCells*sizeof(vmesh::VelocityBlockContainer*));
+   SESSION_ALLOCATE(gpuMemoryManager, dev_moments1, Real, nAllCells*nMom1*sizeof(Real));
+   SESSION_ALLOCATE(gpuMemoryManager, dev_moments2, Real, nAllCells*nMom2*sizeof(Real));
 
    vmesh::VelocityBlockContainer** host_VBC = GET_SESSION_HOST_POINTER(gpuMemoryManager, vmesh::VelocityBlockContainer*, host_VBC);
    Real* host_moments1 = GET_SESSION_HOST_POINTER(gpuMemoryManager, Real, host_moments1);
@@ -486,12 +486,12 @@ void gpu_calculateMoments_V(
 
    gpuMemoryManager.startSession(0,0);
 
-   SESSION_HOST_ALLOCATE(gpuMemoryManager, vmesh::VelocityBlockContainer*, host_VBC, nAllCells*sizeof(vmesh::VelocityBlockContainer*));
-   SESSION_HOST_ALLOCATE(gpuMemoryManager, Real, host_moments1, nAllCells*nMom1*sizeof(Real));
-   SESSION_HOST_ALLOCATE(gpuMemoryManager, Real, host_moments2, nAllCells*nMom2*sizeof(Real));
-   SESSION_ALLOCATE(gpuMemoryManager, vmesh::VelocityBlockContainer*, dev_VBC, nAllCells*sizeof(vmesh::VelocityBlockContainer*));
-   SESSION_ALLOCATE(gpuMemoryManager, Real, dev_moments1, nAllCells*nMom1*sizeof(Real));
-   SESSION_ALLOCATE(gpuMemoryManager, Real, dev_moments2, nAllCells*nMom2*sizeof(Real));
+   SESSION_HOST_ALLOCATE(gpuMemoryManager, host_VBC, vmesh::VelocityBlockContainer*, nAllCells*sizeof(vmesh::VelocityBlockContainer*));
+   SESSION_HOST_ALLOCATE(gpuMemoryManager, host_moments1, Real, nAllCells*nMom1*sizeof(Real));
+   SESSION_HOST_ALLOCATE(gpuMemoryManager, host_moments2, Real, nAllCells*nMom2*sizeof(Real));
+   SESSION_ALLOCATE(gpuMemoryManager, dev_VBC, vmesh::VelocityBlockContainer*, nAllCells*sizeof(vmesh::VelocityBlockContainer*));
+   SESSION_ALLOCATE(gpuMemoryManager, dev_moments1, Real, nAllCells*nMom1*sizeof(Real));
+   SESSION_ALLOCATE(gpuMemoryManager, dev_moments2, Real, nAllCells*nMom2*sizeof(Real));
 
    vmesh::VelocityBlockContainer** host_VBC = GET_SESSION_HOST_POINTER(gpuMemoryManager, vmesh::VelocityBlockContainer*, host_VBC);
    Real* host_moments1 = GET_SESSION_HOST_POINTER(gpuMemoryManager, Real, host_moments1);

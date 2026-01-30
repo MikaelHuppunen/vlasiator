@@ -84,9 +84,9 @@ namespace spatial_cell {
       // SplitVectors and hashmaps via pointers for unified memory
 
       // create in host instead of unified memory, upload device copy
-      void *buf0 = malloc(sizeof(split::SplitVector<vmesh::GlobalID>));
-      velocity_block_with_content_list = ::new (buf0) split::SplitVector<vmesh::GlobalID>(INIT_VMESH_SIZE);
-      //velocity_block_with_content_list = new split::SplitVector<vmesh::GlobalID>(INIT_VMESH_SIZE);
+      void *buf0 = malloc(sizeof(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>));
+      velocity_block_with_content_list = ::new (buf0) split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>(INIT_VMESH_SIZE);
+      //velocity_block_with_content_list = new split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>(INIT_VMESH_SIZE);
       velocity_block_with_content_list->clear();
       velocity_block_with_content_list_size=0;
       velocity_block_with_content_list_capacity=INIT_VMESH_SIZE;
@@ -105,18 +105,18 @@ namespace spatial_cell {
       vbwncl_sizePower = INIT_MAP_SIZE;
 
       // Lists used in block adjustment
-      void *buf11 = malloc(sizeof(split::SplitVector<vmesh::GlobalID>));
-      void *buf12 = malloc(sizeof(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>));
-      void *buf13 = malloc(sizeof(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>));
-      void *buf14 = malloc(sizeof(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>));
-      list_with_replace_new = ::new (buf11) split::SplitVector<vmesh::GlobalID>(INIT_VMESH_SIZE*acc_reserve_multiplier);
-      list_delete = ::new (buf12) split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>(INIT_VMESH_SIZE);
-      list_to_replace = ::new (buf13) split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>(INIT_VMESH_SIZE);
-      list_with_replace_old = ::new (buf14) split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>(INIT_VMESH_SIZE);
-      // list_with_replace_new = new split::SplitVector<vmesh::GlobalID>(INIT_VMESH_SIZE*acc_reserve_multiplier);
-      // list_delete = new split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>(INIT_VMESH_SIZE);
-      // list_to_replace = new split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>(INIT_VMESH_SIZE);
-      // list_with_replace_old = new split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>(INIT_VMESH_SIZE);
+      void *buf11 = malloc(sizeof(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>));
+      void *buf12 = malloc(sizeof(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>));
+      void *buf13 = malloc(sizeof(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>));
+      void *buf14 = malloc(sizeof(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>));
+      list_with_replace_new = ::new (buf11) split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>(INIT_VMESH_SIZE*acc_reserve_multiplier);
+      list_delete = ::new (buf12) split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>(INIT_VMESH_SIZE);
+      list_to_replace = ::new (buf13) split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>(INIT_VMESH_SIZE);
+      list_with_replace_old = ::new (buf14) split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>(INIT_VMESH_SIZE);
+      // list_with_replace_new = new split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>(INIT_VMESH_SIZE*acc_reserve_multiplier);
+      // list_delete = new split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>(INIT_VMESH_SIZE);
+      // list_to_replace = new split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>(INIT_VMESH_SIZE);
+      // list_with_replace_old = new split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>(INIT_VMESH_SIZE);
       dev_list_with_replace_new = list_with_replace_new->upload<true>();
       dev_list_delete = list_delete->upload<true>();
       dev_list_to_replace = list_to_replace->upload<true>();
@@ -173,9 +173,9 @@ namespace spatial_cell {
       const uint reserveSize = other.velocity_block_with_content_list_capacity;
 
       // create in host instead of unified memory, upload device copy
-      void *buf0 = malloc(sizeof(split::SplitVector<vmesh::GlobalID>));
-      velocity_block_with_content_list = ::new (buf0) split::SplitVector<vmesh::GlobalID>(reserveSize);
-      //velocity_block_with_content_list = new split::SplitVector<vmesh::GlobalID>(reserveSize);
+      void *buf0 = malloc(sizeof(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>));
+      velocity_block_with_content_list = ::new (buf0) split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>(reserveSize);
+      //velocity_block_with_content_list = new split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>(reserveSize);
       velocity_block_with_content_list->clear();
       velocity_block_with_content_list_size = 0;
       velocity_block_with_content_list_capacity = reserveSize;
@@ -192,18 +192,18 @@ namespace spatial_cell {
       vbwncl_sizePower = other.vbwncl_sizePower;
 
       // Lists used in block adjustment
-      void *buf11 = malloc(sizeof(split::SplitVector<vmesh::GlobalID>));
-      void *buf12 = malloc(sizeof(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>));
-      void *buf13 = malloc(sizeof(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>));
-      void *buf14 = malloc(sizeof(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>));
-      list_with_replace_new = ::new (buf11) split::SplitVector<vmesh::GlobalID>(other.list_with_replace_new_capacity);
-      list_delete = ::new (buf12) split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>(other.list_delete_capacity);
-      list_to_replace = ::new (buf13) split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>(other.list_to_replace_capacity);
-      list_with_replace_old = ::new (buf14) split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>(other.list_with_replace_old_capacity);
-      // list_with_replace_new = new split::SplitVector<vmesh::GlobalID>(other.list_with_replace_new_capacity);
-      // list_delete = new split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>(other.list_delete_capacity);
-      // list_to_replace = new split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>(other.list_to_replace_capacity);
-      // list_with_replace_old = new split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>(other.list_with_replace_old_capacity);
+      void *buf11 = malloc(sizeof(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>));
+      void *buf12 = malloc(sizeof(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>));
+      void *buf13 = malloc(sizeof(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>));
+      void *buf14 = malloc(sizeof(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>));
+      list_with_replace_new = ::new (buf11) split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>(other.list_with_replace_new_capacity);
+      list_delete = ::new (buf12) split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>(other.list_delete_capacity);
+      list_to_replace = ::new (buf13) split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>(other.list_to_replace_capacity);
+      list_with_replace_old = ::new (buf14) split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>(other.list_with_replace_old_capacity);
+      // list_with_replace_new = new split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>(other.list_with_replace_new_capacity);
+      // list_delete = new split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>(other.list_delete_capacity);
+      // list_to_replace = new split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>(other.list_to_replace_capacity);
+      // list_with_replace_old = new split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>(other.list_with_replace_old_capacity);
       dev_list_with_replace_new = list_with_replace_new->upload<true>();
       dev_list_delete = list_delete->upload<true>();
       dev_list_to_replace = list_to_replace->upload<true>();
@@ -531,7 +531,7 @@ namespace spatial_cell {
 
       if (doDeleteEmptyBlocks) {
          Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID> *vbwncm = dev_velocity_block_with_no_content_map;
-         split::SplitVector<vmesh::GlobalID> *d_list_add = dev_list_with_replace_new;
+         split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>> *d_list_add = dev_list_with_replace_new;
 
          auto rule_delete_move = [emptybucket, tombstone, vbwncm, d_list_add, dev_vmesh, invalidGID, invalidLID]
             __device__(const Hashinator::hash_pair<vmesh::GlobalID, vmesh::LocalID>& kval) -> bool {

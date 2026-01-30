@@ -113,8 +113,8 @@ namespace vmesh {
       ARCH_DEV void exitInvalidLocalID(const vmesh::LocalID localID) const;
 
 #ifdef USE_GPU
-      split::SplitVector<Realf> block_data;
-      split::SplitVector<Real> parameters;
+      split::SplitVector<Realf, splitGpuMemoryManagerallocator<Realf>> block_data;
+      split::SplitVector<Real, splitGpuMemoryManagerallocator<Real>> parameters;
       size_t cachedCapacity;
       size_t cachedSize;
 #else
@@ -125,8 +125,8 @@ namespace vmesh {
 
    inline VelocityBlockContainer::VelocityBlockContainer() {
 #ifdef USE_GPU
-      block_data = split::SplitVector<Realf>(INIT_VMESH_SIZE*WID3);
-      parameters = split::SplitVector<Real>(INIT_VMESH_SIZE*BlockParams::N_VELOCITY_BLOCK_PARAMS);
+      block_data = split::SplitVector<Realf, splitGpuMemoryManagerallocator<Realf>>(INIT_VMESH_SIZE*WID3);
+      parameters = split::SplitVector<Real, splitGpuMemoryManagerallocator<Real>>(INIT_VMESH_SIZE*BlockParams::N_VELOCITY_BLOCK_PARAMS);
       cachedCapacity = INIT_VMESH_SIZE;
       cachedSize = 0;
 #else
@@ -143,8 +143,8 @@ namespace vmesh {
 
    inline VelocityBlockContainer::VelocityBlockContainer(const VelocityBlockContainer& other) {
 #ifdef USE_GPU
-      block_data = split::SplitVector<Realf>(other.cachedCapacity*WID3);
-      parameters = split::SplitVector<Real>(other.cachedCapacity*BlockParams::N_VELOCITY_BLOCK_PARAMS);
+      block_data = split::SplitVector<Realf, splitGpuMemoryManagerallocator<Realf>>(other.cachedCapacity*WID3);
+      parameters = split::SplitVector<Real, splitGpuMemoryManagerallocator<Real>>(other.cachedCapacity*BlockParams::N_VELOCITY_BLOCK_PARAMS);
       // Overwrite is like a copy assign but takes a stream
       gpuStream_t stream = gpu_getStream();
       block_data.overwrite(other.block_data,stream);
@@ -221,8 +221,8 @@ namespace vmesh {
       cachedSize = 0;
       if (shrink) {
          cachedCapacity = 1;
-         block_data = split::SplitVector<Realf>(WID3);
-         parameters = split::SplitVector<Real>(BlockParams::N_VELOCITY_BLOCK_PARAMS);
+         block_data = split::SplitVector<Realf, splitGpuMemoryManagerallocator<Realf>>(WID3);
+         parameters = split::SplitVector<Real, splitGpuMemoryManagerallocator<Real>>(BlockParams::N_VELOCITY_BLOCK_PARAMS);
       }
 #else
       if (shrink) {

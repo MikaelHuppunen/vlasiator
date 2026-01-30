@@ -69,12 +69,12 @@ __global__ void prefill_probe_kernel(
    const size_t Dother,
    const vmesh::LocalID invalidLID,
    // Pass these for emptying
-   split::SplitVector<vmesh::GlobalID>* *lists_with_replace_new,
-   split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>* *lists_delete,
-   split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>* *lists_to_replace,
-   split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>* *lists_with_replace_old,
+   split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>* *lists_with_replace_new,
+   split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>* *lists_delete,
+   split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>* *lists_to_replace,
+   split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>* *lists_with_replace_old,
    // This one is resized and re-used as a LIDlist
-   split::SplitVector<vmesh::GlobalID> ** dev_vbwcl_vec,
+   split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>> ** dev_vbwcl_vec,
    const uint cumulativeOffset,
    const size_t gpu_probeStride
    ) {
@@ -493,7 +493,7 @@ __global__ void build_column_offsets(
    const size_t flatExtent,
    const vmesh::LocalID invalidLID,
    ColumnOffsets* dev_columnOffsetData,
-   split::SplitVector<vmesh::GlobalID> ** dev_vbwcl_vec, // use as LIDlist
+   split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>> ** dev_vbwcl_vec, // use as LIDlist
    const uint cumulativeOffset,
    const size_t gpu_probeStride
    ) {
@@ -666,7 +666,7 @@ __global__ void __launch_bounds__(WID3) reorder_blocks_by_dimension_kernel(
    vmesh::VelocityBlockContainer** __restrict__ blockContainers,
    Realf** dev_blockDataOrdered,
    const uint* __restrict__ gpu_cell_indices_to_id,
-   split::SplitVector<vmesh::GlobalID> ** dev_vbwcl_vec, // use as LIDlist
+   split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>> ** dev_vbwcl_vec, // use as LIDlist
    ColumnOffsets* dev_columnOffsetData,
    vmesh::LocalID* dev_nColumns,
    const uint cumulativeOffset
@@ -747,7 +747,7 @@ __global__ void __launch_bounds__(WID3) reorder_blocks_by_dimension_kernel(
    const uint dimension,
    vmesh::VelocityMesh** __restrict__ vmeshes,
    ColumnOffsets* dev_columnOffsetData,
-   split::SplitVector<vmesh::GlobalID>* *lists_with_replace_new,
+   split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>* *lists_with_replace_new,
    Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>* *allMaps,
    const uint* __restrict__ gpu_block_indices_to_id,
    const Realf* dev_intersections,
@@ -774,7 +774,7 @@ __global__ void __launch_bounds__(WID3) reorder_blocks_by_dimension_kernel(
 
    Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID> *dev_map_require = allMaps[2*cellOffset];
    Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID> *dev_map_remove = allMaps[2*cellOffset+1];
-   split::SplitVector<vmesh::GlobalID> *list_with_replace_new = lists_with_replace_new[cellOffset];
+   split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>> *list_with_replace_new = lists_with_replace_new[cellOffset];
    const vmesh::VelocityMesh* __restrict__ vmesh = vmeshes[cellOffset];
    // Shared within all threads in one block (one columnSet)
    __shared__ int isTargetBlock[MAX_BLOCKS_PER_DIM];
@@ -1293,7 +1293,7 @@ __host__ bool gpu_acc_map_1d(
    gpu_calculateProbeAllocation(nLaunchCells);
    gpuMemoryManager.startSession(0,0);
    
-   SESSION_ALLOCATE(gpuMemoryManager, vmesh::LocalID, dev_probeCubeData, gpu_getAllocationCount()*gpu_probeStride*sizeof(vmesh::LocalID));
+   SESSION_ALLOCATE(gpuMemoryManager, dev_probeCubeData, vmesh::LocalID, gpu_getAllocationCount()*gpu_probeStride*sizeof(vmesh::LocalID));
 
    // probe cube and flattened version now re-use gpu_probeCubeData[cpuThreadID].
    // Due to alignment, Flattened version is at start of buffer, followed by the cube.
@@ -1311,11 +1311,11 @@ __host__ bool gpu_acc_map_1d(
       Dother,
       invalidLocalID,
       // Pass vectors for clearing
-      GET_POINTER(gpuMemoryManager, split::SplitVector<vmesh::GlobalID>*, dev_lists_with_replace_new),
-      GET_POINTER(gpuMemoryManager, SINGLE_ARG(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>*), dev_lists_delete),
-      GET_POINTER(gpuMemoryManager, SINGLE_ARG(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>*), dev_lists_to_replace),
-      GET_POINTER(gpuMemoryManager, SINGLE_ARG(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>*), dev_lists_with_replace_old),
-      GET_POINTER(gpuMemoryManager, split::SplitVector<vmesh::GlobalID>*, dev_vbwcl_vec), // dev_velocity_block_with_content_list, // Resize to use as LIDlist
+      GET_POINTER(gpuMemoryManager, SINGLE_ARG(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>*), dev_lists_with_replace_new),
+      GET_POINTER(gpuMemoryManager, SINGLE_ARG(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>*), dev_lists_delete),
+      GET_POINTER(gpuMemoryManager, SINGLE_ARG(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>*), dev_lists_to_replace),
+      GET_POINTER(gpuMemoryManager, SINGLE_ARG(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>*), dev_lists_with_replace_old),
+      GET_POINTER(gpuMemoryManager, SINGLE_ARG(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>*), dev_vbwcl_vec), // dev_velocity_block_with_content_list, // Resize to use as LIDlist
       cumulativeOffset,
       gpu_probeStride
       );
@@ -1367,10 +1367,10 @@ __host__ bool gpu_acc_map_1d(
      but here we do an iterative loop processing MAX_BLOCKSIZE elements at once.
      Not as efficient but simpler, and will be parallelized over spatial cells.
    */
-   SESSION_HOST_ALLOCATE(gpuMemoryManager, vmesh::LocalID, host_nColumns, nLaunchCells*sizeof(vmesh::LocalID));
-   SESSION_HOST_ALLOCATE(gpuMemoryManager, vmesh::LocalID, host_nColumnSets, nLaunchCells*sizeof(vmesh::LocalID));
-   SESSION_ALLOCATE(gpuMemoryManager, vmesh::LocalID, dev_nColumns, nLaunchCells*sizeof(vmesh::LocalID));
-   SESSION_ALLOCATE(gpuMemoryManager, vmesh::LocalID, dev_nColumnSets, nLaunchCells*sizeof(vmesh::LocalID));
+   SESSION_HOST_ALLOCATE(gpuMemoryManager, host_nColumns, vmesh::LocalID, nLaunchCells*sizeof(vmesh::LocalID));
+   SESSION_HOST_ALLOCATE(gpuMemoryManager, host_nColumnSets, vmesh::LocalID, nLaunchCells*sizeof(vmesh::LocalID));
+   SESSION_ALLOCATE(gpuMemoryManager, dev_nColumns, vmesh::LocalID, nLaunchCells*sizeof(vmesh::LocalID));
+   SESSION_ALLOCATE(gpuMemoryManager, dev_nColumnSets, vmesh::LocalID, nLaunchCells*sizeof(vmesh::LocalID));
 
    phiprof::Timer scanTimer {"scan probe cube"};
    const dim3 grid_scan(1,nLaunchCells,1);
@@ -1425,7 +1425,7 @@ __host__ bool gpu_acc_map_1d(
       flatExtent,
       invalidLocalID,
       GET_POINTER(gpuMemoryManager, ColumnOffsets, dev_columnOffsetData),
-      GET_POINTER(gpuMemoryManager, split::SplitVector<vmesh::GlobalID>*, dev_vbwcl_vec), //dev_velocity_block_with_content_list, // use as LIDlist
+      GET_POINTER(gpuMemoryManager, SINGLE_ARG(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>*), dev_vbwcl_vec), //dev_velocity_block_with_content_list, // use as LIDlist
       cumulativeOffset,
       gpu_probeStride
       );
@@ -1460,7 +1460,7 @@ __host__ bool gpu_acc_map_1d(
       GET_POINTER(gpuMemoryManager, vmesh::VelocityBlockContainer*, dev_VBCs),
       GET_POINTER(gpuMemoryManager, Realf*, dev_blockDataOrdered),
       GET_POINTER(gpuMemoryManager, uint, gpu_cell_indices_to_id),
-      GET_POINTER(gpuMemoryManager, split::SplitVector<vmesh::GlobalID>*, dev_vbwcl_vec), //dev_velocity_block_with_content_list, // use as LIDlist
+      GET_POINTER(gpuMemoryManager, SINGLE_ARG(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>*), dev_vbwcl_vec), //dev_velocity_block_with_content_list, // use as LIDlist
       GET_POINTER(gpuMemoryManager, ColumnOffsets, dev_columnOffsetData),
       GET_SESSION_POINTER(gpuMemoryManager, vmesh::LocalID, dev_nColumns),
       cumulativeOffset
@@ -1482,7 +1482,7 @@ __host__ bool gpu_acc_map_1d(
       dimension,
       GET_POINTER(gpuMemoryManager, vmesh::VelocityMesh*, dev_vmeshes),
       GET_POINTER(gpuMemoryManager, ColumnOffsets, dev_columnOffsetData),
-      GET_POINTER(gpuMemoryManager, split::SplitVector<vmesh::GlobalID>*, dev_lists_with_replace_new),
+      GET_POINTER(gpuMemoryManager, SINGLE_ARG(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>*), dev_lists_with_replace_new),
       GET_POINTER(gpuMemoryManager, SINGLE_ARG(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>*), dev_allMaps),
       GET_POINTER(gpuMemoryManager, uint, gpu_block_indices_to_id),
       GET_POINTER(gpuMemoryManager, Realf, dev_intersections),
@@ -1524,13 +1524,13 @@ __host__ bool gpu_acc_map_1d(
       CHK_ERR( gpuMemsetAsync(GET_POINTER(gpuMemoryManager, vmesh::LocalID, dev_resizeSuccess)+cumulativeOffset, 0, nLaunchCells*sizeof(vmesh::LocalID), baseStream) );
       CHK_ERR( gpuMemsetAsync(GET_POINTER(gpuMemoryManager, vmesh::LocalID, dev_overflownElements)+cumulativeOffset, 0, nLaunchCells*sizeof(vmesh::LocalID), baseStream) );
       // Think this might not be actually needed, but let's play safe
-      CHK_ERR( gpuMemcpyAsync(GET_POINTER(gpuMemoryManager, split::SplitVector<vmesh::GlobalID>*, dev_lists_with_replace_new)+cumulativeOffset, GET_POINTER(gpuMemoryManager, split::SplitVector<vmesh::GlobalID>*, host_lists_with_replace_new)+cumulativeOffset, nLaunchCells*sizeof(split::SplitVector<vmesh::GlobalID>*), gpuMemcpyHostToDevice, baseStream) );
+      CHK_ERR( gpuMemcpyAsync(GET_POINTER(gpuMemoryManager, SINGLE_ARG(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>*), dev_lists_with_replace_new)+cumulativeOffset, GET_POINTER(gpuMemoryManager, SINGLE_ARG(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>*), host_lists_with_replace_new)+cumulativeOffset, nLaunchCells*sizeof(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>*), gpuMemcpyHostToDevice, baseStream) );
       // Launch kernel a second time (now capacity should be sufficient)
       evaluate_column_extents_kernel<<<grid_column_extents, GPUTHREADS, 0, baseStream>>> (
          dimension,
          GET_POINTER(gpuMemoryManager, vmesh::VelocityMesh*, dev_vmeshes),
          GET_POINTER(gpuMemoryManager, ColumnOffsets, dev_columnOffsetData),
-         GET_POINTER(gpuMemoryManager, split::SplitVector<vmesh::GlobalID>*, dev_lists_with_replace_new),
+         GET_POINTER(gpuMemoryManager, SINGLE_ARG(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>*), dev_lists_with_replace_new),
          GET_POINTER(gpuMemoryManager, SINGLE_ARG(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>*), dev_allMaps),
          GET_POINTER(gpuMemoryManager, uint, gpu_block_indices_to_id),
          GET_POINTER(gpuMemoryManager, Realf, dev_intersections),
@@ -1586,33 +1586,33 @@ __host__ bool gpu_acc_map_1d(
    // Finds Blocks (GID,LID) to be rescued from end of v-space
    extract_to_delete_or_move_caller(
       GET_POINTER(gpuMemoryManager, SINGLE_ARG(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>*), dev_allMaps)+2*cumulativeOffset, //dev_has_content_maps, // input maps
-      GET_POINTER(gpuMemoryManager, SINGLE_ARG(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>*), dev_lists_with_replace_old)+cumulativeOffset, // output vecs
+      GET_POINTER(gpuMemoryManager, SINGLE_ARG(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>*), dev_lists_with_replace_old)+cumulativeOffset, // output vecs
       NULL, // pass null to not store vector lengths
       GET_POINTER(gpuMemoryManager, vmesh::VelocityMesh*, dev_vmeshes)+cumulativeOffset, // rule_meshes
       GET_POINTER(gpuMemoryManager, SINGLE_ARG(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>*), dev_allMaps)+2*cumulativeOffset+1, //dev_has_no_content_maps// rule_maps
-      GET_POINTER(gpuMemoryManager, split::SplitVector<vmesh::GlobalID>*, dev_lists_with_replace_new)+cumulativeOffset, // rule_vectors
+      GET_POINTER(gpuMemoryManager, SINGLE_ARG(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>*), dev_lists_with_replace_new)+cumulativeOffset, // rule_vectors
       nLaunchCells,
       baseStream
       );
    // Find Blocks (GID,LID) to be outright deleted
    extract_to_delete_or_move_caller(
       GET_POINTER(gpuMemoryManager, SINGLE_ARG(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>*), dev_allMaps)+2*cumulativeOffset+1,//dev_has_no_content_maps, // input maps
-      GET_POINTER(gpuMemoryManager, SINGLE_ARG(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>*), dev_lists_delete)+cumulativeOffset, // output vecs
+      GET_POINTER(gpuMemoryManager, SINGLE_ARG(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>*), dev_lists_delete)+cumulativeOffset, // output vecs
       NULL, // pass null to not store vector lengths
       GET_POINTER(gpuMemoryManager, vmesh::VelocityMesh*, dev_vmeshes)+cumulativeOffset, // rule_meshes
       GET_POINTER(gpuMemoryManager, SINGLE_ARG(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>*), dev_allMaps)+2*cumulativeOffset+1, //dev_has_no_content_maps, // rule_maps
-      GET_POINTER(gpuMemoryManager, split::SplitVector<vmesh::GlobalID>*, dev_lists_with_replace_new)+cumulativeOffset, // rule_vectors
+      GET_POINTER(gpuMemoryManager, SINGLE_ARG(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>*), dev_lists_with_replace_new)+cumulativeOffset, // rule_vectors
       nLaunchCells,
       baseStream
       );
    // Find Blocks (GID,LID) to be replaced with new ones
    extract_to_replace_caller(
       GET_POINTER(gpuMemoryManager, SINGLE_ARG(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>*), dev_allMaps)+2*cumulativeOffset+1,//dev_has_no_content_maps, // input maps
-      GET_POINTER(gpuMemoryManager, SINGLE_ARG(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>*), dev_lists_to_replace)+cumulativeOffset, // output vecs
+      GET_POINTER(gpuMemoryManager, SINGLE_ARG(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>*), dev_lists_to_replace)+cumulativeOffset, // output vecs
       NULL, // pass null to not store vector lengths
       GET_POINTER(gpuMemoryManager, vmesh::VelocityMesh*, dev_vmeshes)+cumulativeOffset, // rule_meshes
       GET_POINTER(gpuMemoryManager, SINGLE_ARG(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>*), dev_allMaps)+2*cumulativeOffset+1,//dev_has_no_content_maps, // rule_maps
-      GET_POINTER(gpuMemoryManager, split::SplitVector<vmesh::GlobalID>*, dev_lists_with_replace_new)+cumulativeOffset, // rule_vectors
+      GET_POINTER(gpuMemoryManager, SINGLE_ARG(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>*), dev_lists_with_replace_new)+cumulativeOffset, // rule_vectors
       nLaunchCells,
       baseStream
       );

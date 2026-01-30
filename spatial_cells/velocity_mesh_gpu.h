@@ -76,7 +76,7 @@ namespace vmesh {
       ARCH_HOSTDEV vmesh::GlobalID getGlobalID(const Real* coords) const;
       ARCH_HOSTDEV vmesh::GlobalID getGlobalID(const vmesh::LocalID indices[3]) const;
       ARCH_HOSTDEV vmesh::GlobalID getGlobalID(const vmesh::LocalID i,const vmesh::LocalID j,const vmesh::LocalID k) const;
-      ARCH_HOSTDEV split::SplitVector<vmesh::GlobalID>* getGrid();
+      ARCH_HOSTDEV split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>* getGrid();
       ARCH_HOSTDEV const vmesh::LocalID* getGridLength() const;
       ARCH_HOSTDEV void getIndices(const vmesh::GlobalID globalID,vmesh::LocalID& i,vmesh::LocalID& j,vmesh::LocalID& k) const;
       ARCH_HOSTDEV void getIndicesX(const vmesh::GlobalID globalID,vmesh::LocalID& i) const;
@@ -97,8 +97,8 @@ namespace vmesh {
       ARCH_HOSTDEV bool push_back(const vmesh::GlobalID globalID);
       ARCH_DEV bool warpPush_back(const vmesh::GlobalID globalID, const size_t b_tid);
       vmesh::LocalID push_back(const std::vector<vmesh::GlobalID>& blocks);
-      ARCH_HOSTDEV vmesh::LocalID push_back(split::SplitVector<vmesh::GlobalID>* blocks);
-      ARCH_DEV vmesh::LocalID warpPush_back(const split::SplitVector<vmesh::GlobalID>& blocks, const size_t b_tid);
+      ARCH_HOSTDEV vmesh::LocalID push_back(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>* blocks);
+      ARCH_DEV vmesh::LocalID warpPush_back(const split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>& blocks, const size_t b_tid);
       ARCH_DEV void replaceBlock(const vmesh::GlobalID GIDold,const vmesh::LocalID LID,const vmesh::GlobalID GIDnew);
       ARCH_DEV void warpReplaceBlock(const vmesh::GlobalID GIDold,const vmesh::LocalID LID,const vmesh::GlobalID GIDnew, const size_t b_tid);
       ARCH_DEV void placeBlock(const vmesh::GlobalID GID,const vmesh::LocalID LID);
@@ -107,7 +107,7 @@ namespace vmesh {
       ARCH_DEV void warpDeleteBlock(const vmesh::GlobalID GID,const vmesh::LocalID LID, const size_t b_tid);
       void setGrid();
       bool setGrid(const std::vector<vmesh::GlobalID>& globalIDs);
-      bool setGrid(const split::SplitVector<vmesh::GlobalID>& globalIDs);
+      bool setGrid(const split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>& globalIDs);
       bool setMesh(const size_t meshID);
       size_t getMeshID();
       void setNewSize(const vmesh::LocalID newSize);
@@ -134,7 +134,7 @@ namespace vmesh {
       size_t ltg_size=0, ltg_capacity=0, gtl_sizepower=0; // host-cached values
 
       Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID> globalToLocalMap;
-      split::SplitVector<vmesh::GlobalID> localToGlobalMap;
+      split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>> localToGlobalMap;
    };
 
    // ***** DEFINITIONS OF MEMBER FUNCTIONS ***** //
@@ -144,7 +144,7 @@ namespace vmesh {
       meshID = std::numeric_limits<size_t>::max();
       // Set sizepower to 10 (1024 blocks) straight away so there's enough room to grow?
       globalToLocalMap = Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>(INIT_MAP_SIZE);
-      localToGlobalMap = split::SplitVector<vmesh::GlobalID>(INIT_VMESH_SIZE);
+      localToGlobalMap = split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>(INIT_VMESH_SIZE);
       localToGlobalMap.clear();
       ltg_size = 0;
       ltg_capacity = INIT_VMESH_SIZE;
@@ -158,7 +158,7 @@ namespace vmesh {
       meshID = other.meshID;
       if (other.localToGlobalMap.size() > 0) {
          globalToLocalMap = Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>(other.globalToLocalMap);
-         localToGlobalMap = split::SplitVector<vmesh::GlobalID>(other.localToGlobalMap.capacity());
+         localToGlobalMap = split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>(other.localToGlobalMap.capacity());
          // Overwrite is like a copy assign but takes a stream
          localToGlobalMap.overwrite(other.localToGlobalMap,stream);
          ltg_size = other.ltg_size;
@@ -166,7 +166,7 @@ namespace vmesh {
          gtl_sizepower = globalToLocalMap.getSizePower();
       } else {
          globalToLocalMap = Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>(INIT_MAP_SIZE);
-         localToGlobalMap = split::SplitVector<vmesh::GlobalID>(INIT_VMESH_SIZE);
+         localToGlobalMap = split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>(INIT_VMESH_SIZE);
          localToGlobalMap.clear();
          ltg_size = 0;
          ltg_capacity = INIT_VMESH_SIZE;
@@ -325,7 +325,7 @@ namespace vmesh {
          ltg_capacity = 1;
          gtl_sizepower = 4;
          globalToLocalMap = Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>(ltg_capacity);
-         localToGlobalMap = split::SplitVector<vmesh::GlobalID>(gtl_sizepower);
+         localToGlobalMap = split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>(gtl_sizepower);
          localToGlobalMap.clear();
       } else {
          gpuStream_t stream = gpu_getStream();
@@ -514,7 +514,7 @@ namespace vmesh {
          * (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[0];
    }
 
-   ARCH_HOSTDEV inline split::SplitVector<vmesh::GlobalID>* VelocityMesh::getGrid() {
+   ARCH_HOSTDEV inline split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>* VelocityMesh::getGrid() {
       return &localToGlobalMap;
    }
 
@@ -706,7 +706,7 @@ namespace vmesh {
       }
    }
 
-   ARCH_HOSTDEV inline vmesh::LocalID VelocityMesh::push_back(split::SplitVector<vmesh::GlobalID>* blocks) {
+   ARCH_HOSTDEV inline vmesh::LocalID VelocityMesh::push_back(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>* blocks) {
       #if !(defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__))
       gpuStream_t stream = gpu_getStream();
       localToGlobalMap.optimizeCPU(stream); // insert one-by-one on CPU
@@ -1050,7 +1050,7 @@ namespace vmesh {
       __syncthreads();
       return inserted;
    }
-   ARCH_DEV inline vmesh::LocalID VelocityMesh::warpPush_back(const split::SplitVector<vmesh::GlobalID>& blocks, const size_t b_tid) {
+   ARCH_DEV inline vmesh::LocalID VelocityMesh::warpPush_back(const split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>& blocks, const size_t b_tid) {
       //GPUTODO: ADD debugs
       const vmesh::LocalID mySize = size();
       const vmesh::LocalID blocksSize = blocks.size();
@@ -1327,7 +1327,7 @@ namespace vmesh {
       gtl_sizepower = globalToLocalMap.getSizePower();
       return true;
    }
-   inline bool VelocityMesh::setGrid(const split::SplitVector<vmesh::GlobalID>& globalIDs) {
+   inline bool VelocityMesh::setGrid(const split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>& globalIDs) {
       printf("Warning! Slow version of VelocityMesh::setGrid.\n");
       gpuStream_t stream = gpu_getStream();
       globalToLocalMap.clear<false>(Hashinator::targets::device,stream,std::pow(2,gtl_sizepower));

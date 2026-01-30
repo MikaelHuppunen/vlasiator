@@ -397,10 +397,10 @@ bool trans_map_1d_amr(const dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geometry>&
    // Ensure allocation for allPencilsMeshes, allPencilsContainers
    gpuMemoryManager.startSession(0,0);
 
-   SESSION_HOST_ALLOCATE(gpuMemoryManager, vmesh::VelocityMesh*, host_allPencilsMeshes, sumOfLengths*sizeof(vmesh::VelocityMesh*));
-   SESSION_HOST_ALLOCATE(gpuMemoryManager, vmesh::VelocityBlockContainer*, host_allPencilsContainers, sumOfLengths*sizeof(vmesh::VelocityBlockContainer*));
-   SESSION_ALLOCATE(gpuMemoryManager, vmesh::VelocityMesh*, dev_allPencilsMeshes, sumOfLengths*sizeof(vmesh::VelocityMesh*));
-   SESSION_ALLOCATE(gpuMemoryManager, vmesh::VelocityBlockContainer*, dev_allPencilsContainers, sumOfLengths*sizeof(vmesh::VelocityBlockContainer*));
+   SESSION_HOST_ALLOCATE(gpuMemoryManager, host_allPencilsMeshes, vmesh::VelocityMesh*, sumOfLengths*sizeof(vmesh::VelocityMesh*));
+   SESSION_HOST_ALLOCATE(gpuMemoryManager, host_allPencilsContainers, vmesh::VelocityBlockContainer*, sumOfLengths*sizeof(vmesh::VelocityBlockContainer*));
+   SESSION_ALLOCATE(gpuMemoryManager, dev_allPencilsMeshes, vmesh::VelocityMesh*, sumOfLengths*sizeof(vmesh::VelocityMesh*));
+   SESSION_ALLOCATE(gpuMemoryManager, dev_allPencilsContainers, vmesh::VelocityBlockContainer*, sumOfLengths*sizeof(vmesh::VelocityBlockContainer*));
 
    vmesh::VelocityMesh **host_allPencilsMeshes = GET_SESSION_HOST_POINTER(gpuMemoryManager, vmesh::VelocityMesh*, host_allPencilsMeshes);
    vmesh::VelocityBlockContainer **host_allPencilsContainers = GET_SESSION_HOST_POINTER(gpuMemoryManager, vmesh::VelocityBlockContainer*, host_allPencilsContainers);
@@ -554,8 +554,8 @@ bool trans_map_1d_amr(const dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geometry>&
    // (dev_pencilBlockData and dev_pencilBlocksCount)
    allocateTimer.start();
 
-   SESSION_ALLOCATE(gpuMemoryManager, Realf*, dev_pencilBlockData, sumOfLengths*nGpuBlocks*numAllocations * sizeof(Realf*));
-   SESSION_ALLOCATE(gpuMemoryManager, uint, dev_pencilBlocksCount, sumOfLengths*nGpuBlocks*numAllocations * sizeof(uint));
+   SESSION_ALLOCATE(gpuMemoryManager, dev_pencilBlockData, Realf*, sumOfLengths*nGpuBlocks*numAllocations * sizeof(Realf*));
+   SESSION_ALLOCATE(gpuMemoryManager, dev_pencilBlocksCount, uint, sumOfLengths*nGpuBlocks*numAllocations * sizeof(uint));
 
    Realf **dev_pencilBlockData = GET_SESSION_POINTER(gpuMemoryManager, Realf*, dev_pencilBlockData); // Array of pointers into actual block data
    uint *dev_pencilBlocksCount = GET_SESSION_POINTER(gpuMemoryManager, uint, dev_pencilBlocksCount);

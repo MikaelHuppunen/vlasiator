@@ -27,8 +27,8 @@ for file in **/*.cpp **/*.h **/*.hpp; do
       grep -oP 'CREATE_SUBPOINTERS\s*\(\s*[A-Za-z_][A-Za-z0-9_]*\s*,\s*[A-Za-z_][A-Za-z0-9_]*\s*,[^)]*\)' "$file" 2>/dev/null |
       sed -E 's/.*CREATE_SUBPOINTERS\s*\(\s*[A-Za-z_][A-Za-z0-9_]*\s*,\s*([A-Za-z_][A-Za-z0-9_]*)\s*,.*/\1/'
 
-      grep -oP 'SESSION(_HOST)?_ALLOCATE\s*\(\s*[A-Za-z_][A-Za-z0-9_]*\s*,\s*[A-Za-z_][A-Za-z0-9_:<>* ]*\s*,\s*[A-Za-z_][A-Za-z0-9_]*\s*,[^)]*\)' "$file" 2>/dev/null |
-      sed -E 's/.*SESSION(_HOST)?_ALLOCATE\s*\(\s*[A-Za-z_][A-Za-z0-9_]*\s*,\s*[A-Za-z_][A-Za-z0-9_:<>* ]*\s*,\s*([A-Za-z_][A-Za-z0-9_]*)\s*,.*/\2/'
+      grep -oE 'SESSION(_HOST)?_ALLOCATE[[:space:]]*\([[:space:]]*[A-Za-z_][A-Za-z0-9_]*[[:space:]]*,[[:space:]]*[A-Za-z_][A-Za-z0-9_]*' "$file" |
+      sed -E 's/.*,\s*([A-Za-z_][A-Za-z0-9_]*)$/\1/'
 
    )
 done
