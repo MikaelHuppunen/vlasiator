@@ -226,7 +226,7 @@ OBJS += cpu_acc_intersections.o cpu_acc_transform.o \
 
 # Only build GPU version object files if active
 ifeq ($(USE_GPU),1)
-	OBJS += gpu_acc_map.o gpu_acc_semilag.o gpu_base.o gpu_dt.o \
+	OBJS += gpu_acc_map.o gpu_acc_semilag.o gpu_base.o arch_dt.o \
 		gpu_trans_map_amr.o gpu_moments.o gpu_pitch_angle_diffusion.o
 else
 # if *not* building GPU version, build regular CPU/ARCH version

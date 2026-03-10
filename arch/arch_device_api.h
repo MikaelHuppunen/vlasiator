@@ -42,6 +42,13 @@ namespace arch{
       arch::parallel_reduce_driver<Op, NReductions, NDim>(limits, loop_body, &sum, NReductions);
    }
 
+/* Parallel reduce interface function - specialization for 1 reduction variable */
+   template <reduce_op Op, uint NDim, typename Lambda, typename T>
+   inline static void parallel_reduce_test(const uint (&blockDimensions)[2], const uint (&limitDimensions)[NDim], const uint* (&limits)[NDim], Lambda loop_body, T &sum) {
+      constexpr uint NReductions = 1;
+      arch::parallel_reduce_driver_test<Op, NReductions, NDim>(blockDimensions, limitDimensions, limits, loop_body, &sum[0], NReductions);
+   }
+
 /* Parallel reduce interface function - specialization for a reduction variable array */
    template <reduce_op Op, uint NDim, uint NReductions, typename Lambda, typename T>
    inline static void parallel_reduce(const uint (&limits)[NDim], Lambda loop_body, T (&sum)[NReductions]) {

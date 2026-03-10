@@ -48,6 +48,18 @@ void reduce_vlasov_dt(dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geometry>& mpiGr
                       const vector<CellID>& cells,
                       Real (&dtMaxLocal)[3]);
 
+// Vlasov timestep reduction
+// found in either arch_dt.cpp or gpu_dt.cpp
+void reduce_vlasov_dt_test(dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geometry>& mpiGrid,
+                      const vector<CellID>& cells,
+                      Real (&dtMaxLocal)[3]);
+
+// Vlasov timestep reduction
+// found in either arch_dt.cpp or gpu_dt.cpp
+void reduce_vlasov_dt_test_test(dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geometry>& mpiGrid,
+                      const vector<CellID>& cells,
+                      Real (&dtMaxLocal)[3]);
+
 /** Calculate velocity moments for the given spatial cell.
  * This function is defined in the arch_moments.cpp file.*/
 void calculateCellMoments(

@@ -95,3 +95,194 @@ void reduce_vlasov_dt(dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geometry>& mpiGr
       }
    }
 }
+
+/*
+void reduce_vlasov_dt_test(dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geometry>& mpiGrid,
+                      const vector<CellID>& cells,
+                      Real (&dtMaxLocal)[3]) {
+
+   phiprof::Timer computeTimestepTimer {"compute-vlasov-timestep"};
+   const Real HALF = 0.5;
+
+   for (vector<CellID>::const_iterator cell_id = cells.begin(); cell_id != cells.end(); ++cell_id) {
+      SpatialCell* cell = mpiGrid[*cell_id];
+      const Real dx = cell->parameters[CellParams::DX];
+      const Real dy = cell->parameters[CellParams::DY];
+      const Real dz = cell->parameters[CellParams::DZ];
+      cell->parameters[CellParams::MAXRDT] = numeric_limits<Real>::max();
+
+      for (uint popID = 0; popID < getObjectWrapper().particleSpecies.size(); ++popID) {
+         cell->set_max_r_dt(popID, numeric_limits<Real>::max());
+         const Real EPS = numeric_limits<Real>::min() * 1000;
+
+         const uint nBlocks = cell->get_number_of_velocity_blocks(popID);
+         if (nBlocks==0) {
+            continue;
+         }
+         #ifdef USE_GPU
+         const vmesh::VelocityBlockContainer *blockContainer = cell->dev_get_velocity_blocks(popID);
+         #else
+         const vmesh::VelocityBlockContainer *blockContainer = cell->get_velocity_blocks(popID);
+         #endif
+
+         Real threadMin = std::numeric_limits<Real>::max();
+         arch::parallel_reduce_test<arch::min>({2, nBlocks},
+            ARCH_LOOP_LAMBDA (uint i, const uint blockLID, Real *lthreadMin) -> void{
+               i = i * (WID - 1); // ie, i == 0, i == WID - 1
+               const Real* blockParams = blockContainer->getParameters(popID);
+               const Real Vx =
+                   blockParams[blockLID * BlockParams::N_VELOCITY_BLOCK_PARAMS + BlockParams::VXCRD] +
+                   (i + HALF) * blockParams[blockLID * BlockParams::N_VELOCITY_BLOCK_PARAMS + BlockParams::DVX] + EPS;
+               const Real Vy =
+                   blockParams[blockLID * BlockParams::N_VELOCITY_BLOCK_PARAMS + BlockParams::VYCRD] +
+                   (i + HALF) * blockParams[blockLID * BlockParams::N_VELOCITY_BLOCK_PARAMS + BlockParams::DVY] + EPS;
+               const Real Vz =
+                   blockParams[blockLID * BlockParams::N_VELOCITY_BLOCK_PARAMS + BlockParams::VZCRD] +
+                   (i + HALF) * blockParams[blockLID * BlockParams::N_VELOCITY_BLOCK_PARAMS + BlockParams::DVZ] + EPS;
+
+               const Real dt_max_cell = min({dx / fabs(Vx), dy / fabs(Vy), dz / fabs(Vz)});
+               lthreadMin[0] = min(dt_max_cell,lthreadMin[0]);
+         }, threadMin);
+         cell->set_max_r_dt(popID, threadMin);
+         cell->parameters[CellParams::MAXRDT] = min(cell->get_max_r_dt(popID), cell->parameters[CellParams::MAXRDT]);
+      } // end loop over popID
+
+      if (cell->sysBoundaryFlag == sysboundarytype::NOT_SYSBOUNDARY ||
+          (cell->sysBoundaryLayer == 1 && cell->sysBoundaryFlag != sysboundarytype::NOT_SYSBOUNDARY)) {
+         // spatial fluxes computed also for boundary cells
+         dtMaxLocal[0] = min(dtMaxLocal[0], cell->parameters[CellParams::MAXRDT]);
+      }
+
+      if (cell->parameters[CellParams::MAXVDT] != 0 &&
+          (cell->sysBoundaryFlag == sysboundarytype::NOT_SYSBOUNDARY ||
+           (P::vlasovAccelerateMaxwellianBoundaries && cell->sysBoundaryFlag == sysboundarytype::MAXWELLIAN))) {
+         // acceleration only done on non-boundary cells
+         dtMaxLocal[1] = min(dtMaxLocal[1], cell->parameters[CellParams::MAXVDT]);
+      }
+   }
+}
+*/
+
+void reduce_vlasov_dt_test_test(dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geometry>& mpiGrid,
+                      const vector<CellID>& cells,
+                      Real (&dtMaxLocal)[3]) {
+
+   phiprof::Timer computeGpuTimestepTimer {"compute-vlasov-gpu-timestep"};
+   // Does not use streams
+   const uint nAllCells = cells.size();
+   const uint nPOP = getObjectWrapper().particleSpecies.size();
+
+   // Resize dev_vmeshes, one for each cell and each pop
+   gpu_trans_allocate(nAllCells*nPOP,0,0);
+
+   gpuMemoryManager.startSession(0,0);
+
+   SESSION_HOST_ALLOCATE(gpuMemoryManager, Real, host_max_dt, nAllCells*nPOP*sizeof(Real));
+   SESSION_HOST_ALLOCATE(gpuMemoryManager, Real, host_dxdydz, nAllCells*nPOP*3*sizeof(Real));
+   SESSION_HOST_ALLOCATE(gpuMemoryManager, uint, host_nBlocks, nAllCells*nPOP*sizeof(uint));
+   SESSION_ALLOCATE(gpuMemoryManager, Real, dev_max_dt, nAllCells*nPOP*sizeof(Real));
+   SESSION_ALLOCATE(gpuMemoryManager, Real, dev_dxdydz, nAllCells*nPOP*3*sizeof(Real));
+   SESSION_ALLOCATE(gpuMemoryManager, uint, dev_nBlocks, nAllCells*nPOP*sizeof(uint));
+   
+   Real* host_max_dt = GET_SESSION_HOST_POINTER(gpuMemoryManager, Real, host_max_dt);
+   Real* host_dxdydz = GET_SESSION_HOST_POINTER(gpuMemoryManager, Real, host_dxdydz);
+   uint* host_nBlocks = GET_SESSION_HOST_POINTER(gpuMemoryManager, uint, host_nBlocks);
+   Real* dev_max_dt = GET_SESSION_POINTER(gpuMemoryManager, Real, dev_max_dt);
+   Real* dev_dxdydz = GET_SESSION_POINTER(gpuMemoryManager, Real, dev_dxdydz);
+   uint* dev_nBlocks = GET_SESSION_POINTER(gpuMemoryManager, uint, dev_nBlocks);
+
+   // Gather vmeshes
+   #pragma omp parallel for schedule(static)
+   for(uint celli = 0; celli < nAllCells; celli++){
+      SpatialCell* cell = mpiGrid[cells[celli]];
+      cell->parameters[CellParams::MAXRDT] = numeric_limits<Real>::max();
+      //cell->parameters[CellParams::MAXRDT] = numeric_limits<Real>::max();
+      for (uint popID = 0; popID < nPOP; ++popID) {
+         host_dxdydz[3*celli*nPOP + 3*popID + 0] = cell->parameters[CellParams::DX];
+         host_dxdydz[3*celli*nPOP + 3*popID + 1] = cell->parameters[CellParams::DY];
+         host_dxdydz[3*celli*nPOP + 3*popID + 2] = cell->parameters[CellParams::DZ];
+         (GET_POINTER(gpuMemoryManager, vmesh::VelocityMesh*, host_vmeshes))[celli*nPOP + popID] = cell->dev_get_velocity_mesh(popID); // GPU-side vmesh
+         host_nBlocks[celli*nPOP + popID] = cell->get_number_of_velocity_blocks(popID);
+         host_max_dt[celli*nPOP + popID] = numeric_limits<Real>::max();
+      }
+   }
+   CHK_ERR( gpuMemcpy(dev_dxdydz, host_dxdydz, nAllCells*nPOP*3*sizeof(Real), gpuMemcpyHostToDevice) );
+   CHK_ERR( gpuMemcpy(GET_POINTER(gpuMemoryManager, vmesh::VelocityMesh*, dev_vmeshes), GET_POINTER(gpuMemoryManager, vmesh::VelocityMesh*, host_vmeshes), nAllCells*nPOP*sizeof(vmesh::VelocityMesh*), gpuMemcpyHostToDevice) );
+   CHK_ERR( gpuMemcpy(dev_nBlocks, host_nBlocks, nAllCells*nPOP*sizeof(uint), gpuMemcpyHostToDevice) );
+   CHK_ERR( gpuMemcpy(dev_max_dt, host_max_dt, nAllCells*nPOP*sizeof(Real), gpuMemcpyHostToDevice) );
+
+   /*
+   // Launch kernel gathering largest allowed dt for velocity
+   reduce_v_dt_kernel<<<nAllCells, GPUTHREADS*WARPSPERBLOCK, 0, 0>>> (
+      GET_POINTER(gpuMemoryManager, vmesh::VelocityMesh*, dev_vmeshes),
+      dev_max_dt,
+      dev_dxdydz,
+      nAllCells*nPOP
+      );
+   */
+   const Real EPS = numeric_limits<Real>::min() * 1000;
+   const Real HALF = 0.5;
+   uint dim1 = 2;
+   const uint* limits[2]={&dim1, host_nBlocks};
+   vmesh::VelocityMesh **blockContainers = GET_POINTER(gpuMemoryManager, vmesh::VelocityMesh*, dev_vmeshes);
+   
+   arch::parallel_reduce_test<arch::min>({nAllCells, nPOP}, {1, nAllCells*nPOP}, limits,
+      ARCH_LOOP_LAMBDA (uint i, const uint blockLID, const uint cellIndex, const uint popID, Real *lthreadMin) -> void{
+         const Real dx = dev_dxdydz[3*cellIndex*nPOP + 3*popID + 0];
+         const Real dy = dev_dxdydz[3*cellIndex*nPOP + 3*popID + 1];
+         const Real dz = dev_dxdydz[3*cellIndex*nPOP + 3*popID + 2];
+
+         i = i * (WID - 1); // ie, i == 0, i == WID - 1
+         Real blockParams[6];
+         const vmesh::VelocityMesh* thisVmesh = blockContainers[cellIndex*nPOP + popID];
+         const uint thisVmeshSize = thisVmesh->size();
+
+         if (blockLID < thisVmeshSize) {
+            const vmesh::GlobalID GID = thisVmesh->getGlobalID(blockLID);
+            thisVmesh->getBlockInfo(GID,blockParams);
+
+            const Real Vx = blockParams[0] + (i + HALF) * blockParams[3] + EPS;
+            const Real Vy = blockParams[1] + (i + HALF) * blockParams[4] + EPS;
+            const Real Vz = blockParams[2] + (i + HALF) * blockParams[5] + EPS;
+
+            const Real dt_max_cell = min({dx / fabs(Vx), dy / fabs(Vy), dz / fabs(Vz)});
+            lthreadMin[0] = min(dt_max_cell,lthreadMin[0]);
+         }
+   }, dev_max_dt);
+
+   CHK_ERR( gpuPeekAtLastError() );
+   CHK_ERR( gpuMemcpy(host_max_dt, dev_max_dt, nAllCells*nPOP*sizeof(Real), gpuMemcpyDeviceToHost) );
+   // CHK_ERR( gpuStreamSynchronize(bgStream) );
+
+   #pragma omp parallel for schedule(static)
+   for(uint celli = 0; celli < nAllCells; celli++){
+      SpatialCell* cell = mpiGrid[cells[celli]];
+      for (uint popID = 0; popID < nPOP; ++popID) {
+         cell->set_max_r_dt(popID, host_max_dt[celli*nPOP + popID]);
+         cell->parameters[CellParams::MAXRDT] = min(cell->get_max_r_dt(popID), cell->parameters[CellParams::MAXRDT]);
+      }
+   }
+   computeGpuTimestepTimer.stop();
+
+   gpuMemoryManager.endSession();
+
+   // GPUTODO thread this?
+   phiprof::Timer computeRestTimestepTimer {"compute-vlasov-rest-timestep"};
+   for (vector<CellID>::const_iterator cell_id = cells.begin(); cell_id != cells.end(); ++cell_id) {
+      SpatialCell* cell = mpiGrid[*cell_id];
+
+      if (cell->sysBoundaryFlag == sysboundarytype::NOT_SYSBOUNDARY ||
+          (cell->sysBoundaryLayer == 1 && cell->sysBoundaryFlag != sysboundarytype::NOT_SYSBOUNDARY)) {
+         // spatial fluxes computed also for L1 boundary cells
+         dtMaxLocal[0] = min(dtMaxLocal[0], cell->parameters[CellParams::MAXRDT]);
+      }
+
+      if (cell->parameters[CellParams::MAXVDT] != 0 &&
+          (cell->sysBoundaryFlag == sysboundarytype::NOT_SYSBOUNDARY ||
+           (P::vlasovAccelerateMaxwellianBoundaries && cell->sysBoundaryFlag == sysboundarytype::MAXWELLIAN))) {
+         // acceleration only done on non-boundary cells
+         dtMaxLocal[1] = min(dtMaxLocal[1], cell->parameters[CellParams::MAXVDT]);
+      }
+   }
+   computeRestTimestepTimer.stop();
+}
