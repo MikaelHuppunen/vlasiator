@@ -96,7 +96,7 @@ void reduce_vlasov_dt(dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geometry>& mpiGr
    }
 }
 
-void reduce_vlasov_dt_test_test(dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geometry>& mpiGrid,
+void reduce_vlasov_dt_multi_cell(dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geometry>& mpiGrid,
                       const vector<CellID>& cells,
                       Real (&dtMaxLocal)[3]) {
 
@@ -179,7 +179,7 @@ void reduce_vlasov_dt_test_test(dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geomet
    const uint* limits[2]={&dim1, host_nBlocks};
    const uint maxLimits[2]={dim1, maxNBlocks};
    
-   arch::parallel_reduce_test<arch::min>({nAllCells, nPOP}, {1, nAllCells*nPOP}, limits, maxLimits,
+   arch::parallel_reduce<arch::min>({nAllCells, nPOP}, {1, nAllCells*nPOP}, limits, maxLimits,
       ARCH_LOOP_LAMBDA (uint i, const uint blockLID, const uint cellIndex, const uint popID, Real *lthreadMin) -> void{
          const Real dx = dxdydz[3*cellIndex*nPOP + 3*popID + 0];
          const Real dy = dxdydz[3*cellIndex*nPOP + 3*popID + 1];

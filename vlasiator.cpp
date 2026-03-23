@@ -148,7 +148,7 @@ void computeNewTimeStep(dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geometry>& mpi
    dtMaxLocal[2] = numeric_limits<Real>::max();
 
    // Compute max dt for Vlasov solver
-   reduce_vlasov_dt_test_test(mpiGrid, cells, dtMaxLocal);
+   reduce_vlasov_dt_multi_cell(mpiGrid, cells, dtMaxLocal);
 
    // compute max dt for fieldsolver
    const std::array<FsGridTools::FsIndex_t, 3> gridDims(technicalGrid.getLocalSize());

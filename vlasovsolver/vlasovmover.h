@@ -50,13 +50,7 @@ void reduce_vlasov_dt(dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geometry>& mpiGr
 
 // Vlasov timestep reduction
 // found in either arch_dt.cpp or gpu_dt.cpp
-void reduce_vlasov_dt_test(dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geometry>& mpiGrid,
-                      const vector<CellID>& cells,
-                      Real (&dtMaxLocal)[3]);
-
-// Vlasov timestep reduction
-// found in either arch_dt.cpp or gpu_dt.cpp
-void reduce_vlasov_dt_test_test(dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geometry>& mpiGrid,
+void reduce_vlasov_dt_multi_cell(dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geometry>& mpiGrid,
                       const vector<CellID>& cells,
                       Real (&dtMaxLocal)[3]);
 

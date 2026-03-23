@@ -332,16 +332,16 @@ namespace arch{
    __device__ __forceinline__ static void lambda_eval(const uint (&idx)[4], T * __restrict__ thread_data, Lambda loop_body) { loop_body(idx[0], idx[1], idx[2], idx[3], thread_data); }
 
    template <typename Lambda, typename T>
-   __device__ __forceinline__ static void lambda_eval_test(const uint (&idx)[1], T * __restrict__ thread_data, Lambda loop_body, const uint cellIndex, const uint popID) { loop_body(idx[0], cellIndex, popID, thread_data); }
+   __device__ __forceinline__ static void lambda_eval(const uint (&idx)[1], T * __restrict__ thread_data, Lambda loop_body, const uint cellIndex, const uint popID) { loop_body(idx[0], cellIndex, popID, thread_data); }
 
    template <typename Lambda, typename T>
-   __device__ __forceinline__ static void lambda_eval_test(const uint (&idx)[2], T * __restrict__ thread_data, Lambda loop_body, const uint cellIndex, const uint popID) { loop_body(idx[0], idx[1], cellIndex, popID, thread_data); }
+   __device__ __forceinline__ static void lambda_eval(const uint (&idx)[2], T * __restrict__ thread_data, Lambda loop_body, const uint cellIndex, const uint popID) { loop_body(idx[0], idx[1], cellIndex, popID, thread_data); }
 
    template <typename Lambda, typename T>
-   __device__ __forceinline__ static void lambda_eval_test(const uint (&idx)[3], T * __restrict__ thread_data, Lambda loop_body, const uint cellIndex, const uint popID) { loop_body(idx[0], idx[1], idx[2], cellIndex, popID, thread_data); }
+   __device__ __forceinline__ static void lambda_eval(const uint (&idx)[3], T * __restrict__ thread_data, Lambda loop_body, const uint cellIndex, const uint popID) { loop_body(idx[0], idx[1], idx[2], cellIndex, popID, thread_data); }
 
    template <typename Lambda, typename T>
-   __device__ __forceinline__ static void lambda_eval_test(const uint (&idx)[4], T * __restrict__ thread_data, Lambda loop_body, const uint cellIndex, const uint popID) { loop_body(idx[0], idx[1], idx[2], idx[3], cellIndex, popID, thread_data); }
+   __device__ __forceinline__ static void lambda_eval(const uint (&idx)[4], T * __restrict__ thread_data, Lambda loop_body, const uint cellIndex, const uint popID) { loop_body(idx[0], idx[1], idx[2], idx[3], cellIndex, popID, thread_data); }
 
 /* Get the index for the underlying dimension, and call the respective lambda wrapper */
    template <uint NDim, typename Lambda, typename T>
@@ -368,7 +368,7 @@ namespace arch{
 
 /* Get the index for the underlying dimension, and call the respective lambda wrapper */
    template <uint NDim, typename Lambda, typename T>
-   __device__ __forceinline__ static void loop_eval_test(const uint index, const uint cellIndex, const uint popID, const uint idx_glob, const uint *__restrict__ limitDimensions, const uint* * __restrict__ lims, T * __restrict__ thread_data, Lambda loop_body) {
+   __device__ __forceinline__ static void loop_eval(const uint index, const uint cellIndex, const uint popID, const uint idx_glob, const uint *__restrict__ limitDimensions, const uint* * __restrict__ lims, T * __restrict__ thread_data, Lambda loop_body) {
       uint idx[NDim];
       uint indices[NDim];
       switch (NDim)
@@ -401,7 +401,7 @@ namespace arch{
          default:
             assert( 0 && "incorrect reduction dimensions, abort!\n");
       }
-      lambda_eval_test(idx, thread_data, loop_body, cellIndex, popID);
+      lambda_eval(idx, thread_data, loop_body, cellIndex, popID);
    }
 
 /* A general device kernel for reductions */
@@ -490,7 +490,7 @@ namespace arch{
 /* A general device kernel for reductions */
    template <uint Blocksize, reduce_op Op, uint NDim, uint NReduStatic, typename Lambda, typename T>
    __global__ static void __launch_bounds__(ARCH_BLOCKSIZE_R)
-      reduction_kernel_test(Lambda loop_body, const T * __restrict__ init_val, T * __restrict__ rslt, const uint *__restrict__ limitDimensions, const uint* * __restrict__ lims, const uint n_redu_dynamic, T *thread_data_dynamic)
+      reduction_kernel(Lambda loop_body, const T * __restrict__ init_val, T * __restrict__ rslt, const uint *__restrict__ limitDimensions, const uint* * __restrict__ lims, const uint n_redu_dynamic, T *thread_data_dynamic)
    {
       /* Get the global 1D thread index*/
       const uint idx_glob = blockIdx.x * blockDim.x + threadIdx.x;
@@ -511,7 +511,7 @@ namespace arch{
          T *thread_data = 0;
          /* Check the loop limits and evaluate the loop body */
          if (idx_glob < n_total) {
-            loop_eval_test<NDim>(index, cellIndex, popID, idx_glob, limitDimensions, lims, thread_data, loop_body);
+            loop_eval<NDim>(index, cellIndex, popID, idx_glob, limitDimensions, lims, thread_data, loop_body);
          }
          return;
       }
@@ -549,7 +549,7 @@ namespace arch{
 
       /* Check the loop limits and evaluate the loop body */
       if (idx_glob < n_total) {
-         loop_eval_test<NDim>(index, cellIndex, popID, idx_glob, limitDimensions, lims, thread_data, loop_body);
+         loop_eval<NDim>(index, cellIndex, popID, idx_glob, limitDimensions, lims, thread_data, loop_body);
       }
 
       /* Perform reductions */
@@ -716,7 +716,7 @@ namespace arch{
 
 /* Parallel reduce driver function for the CUDA reductions */
    template <reduce_op Op, uint NReduStatic, uint NDim, typename Lambda, typename T>
-   __forceinline__ static void parallel_reduce_driver_test(const uint (&blockDimensions)[2], const uint (&limitDimensions)[NDim], const uint* (&limits)[NDim], const uint (&maxLimits)[NDim], Lambda loop_body, T *sum, const uint n_redu_dynamic) {
+   __forceinline__ static void parallel_reduce_driver(const uint (&blockDimensions)[2], const uint (&limitDimensions)[NDim], const uint* (&limits)[NDim], const uint (&maxLimits)[NDim], Lambda loop_body, T *sum, const uint n_redu_dynamic) {
 
       /* Get the CPU thread id */
 #ifdef _OPENMP
@@ -756,7 +756,7 @@ namespace arch{
          dim3 gridsize(gridsize_x, blockDimensions[0], blockDimensions[1]);
          /* Call the kernel (the number of reductions known at compile time) */
          if(gridsize_x > 0) {
-            reduction_kernel_test<ARCH_BLOCKSIZE_R, Op, NDim, NReduStatic><<<gridsize, blocksize, 0, gpuStreamList[thread_id]>>>(
+            reduction_kernel<ARCH_BLOCKSIZE_R, Op, NDim, NReduStatic><<<gridsize, blocksize, 0, gpuStreamList[thread_id]>>>(
                loop_body, d_const_buf, d_buf, dev_limitDimensions, d_limits, n_reductions, d_thread_data_dynamic);
          }
          /* Check for kernel launch errors */
@@ -811,10 +811,10 @@ namespace arch{
          /* Call the kernel (the number of reductions not known at compile time) */
          if(gridsize_x > 0){
             if(blocksize == ARCH_BLOCKSIZE_R){
-               reduction_kernel_test<ARCH_BLOCKSIZE_R, Op, NDim, 0><<<gridsize, blocksize, shared_mem_bytes_per_block_request, gpuStreamList[thread_id]>>>(loop_body, d_const_buf, d_buf, dev_limitDimensions, d_limits, n_reductions, d_thread_data_dynamic);
+               reduction_kernel<ARCH_BLOCKSIZE_R, Op, NDim, 0><<<gridsize, blocksize, shared_mem_bytes_per_block_request, gpuStreamList[thread_id]>>>(loop_body, d_const_buf, d_buf, dev_limitDimensions, d_limits, n_reductions, d_thread_data_dynamic);
             }
             else if(blocksize == ARCH_BLOCKSIZE_R_SMALL){
-               reduction_kernel_test<ARCH_BLOCKSIZE_R_SMALL, Op, NDim, 0><<<gridsize, blocksize, shared_mem_bytes_per_block_request, gpuStreamList[thread_id]>>>(loop_body, d_const_buf, d_buf, dev_limitDimensions, d_limits, n_reductions, d_thread_data_dynamic);
+               reduction_kernel<ARCH_BLOCKSIZE_R_SMALL, Op, NDim, 0><<<gridsize, blocksize, shared_mem_bytes_per_block_request, gpuStreamList[thread_id]>>>(loop_body, d_const_buf, d_buf, dev_limitDimensions, d_limits, n_reductions, d_thread_data_dynamic);
             }
             else{
                printf("The blocksize (%u) does not match with any of the predetermined block sizes! The error occurred in %s at line %d\n", blocksize, __FILE__, __LINE__);
@@ -834,7 +834,7 @@ namespace arch{
          dim3 gridsize(gridsize_x, blockDimensions[0], blockDimensions[1]);
          /* Call the kernel (the number of reductions known at compile time) */
          if(gridsize_x > 0) {
-            reduction_kernel_test<ARCH_BLOCKSIZE_R, Op, NDim, NReduStatic><<<gridsize, blocksize, 0, gpuStreamList[thread_id]>>>(loop_body, d_const_buf, d_buf, dev_limitDimensions, d_limits, n_reductions, d_thread_data_dynamic);
+            reduction_kernel<ARCH_BLOCKSIZE_R, Op, NDim, NReduStatic><<<gridsize, blocksize, 0, gpuStreamList[thread_id]>>>(loop_body, d_const_buf, d_buf, dev_limitDimensions, d_limits, n_reductions, d_thread_data_dynamic);
          }
          /* Check for kernel launch errors */
          CHK_ERR(cudaPeekAtLastError());
