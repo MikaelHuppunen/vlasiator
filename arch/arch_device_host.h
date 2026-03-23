@@ -127,6 +127,52 @@ namespace arch{
       }
    }
 
+/* Parallel reduce driver function - specialization for 2D case */
+   template <reduce_op Op, uint NReductions, uint NDim, typename Lambda, typename T, typename = typename std::enable_if<std::is_void<typename std::invoke_result<Lambda, uint, uint, uint, uint, T*>::type>::value>::type>
+   inline static void parallel_reduce_driver_test(const uint (&blockDimensions)[2], const uint (&limitDimensions)[NDim], const uint* (&limits)[2], const uint (&maxLimits)[NDim], Lambda loop_body, T *sum, const uint n_redu_dynamic) {
+      uint indices[NDim];
+
+      for(uint cellIndex = 0; cellIndex < blockDimensions[0]; cellIndex++){
+         for (uint popID = 0; popID < blockDimensions[1]; ++popID) {
+            const uint index = cellIndex*blockDimensions[1] + popID;
+            indices[0] = limitDimensions[0] == 1 ? 0 : index;
+            indices[1] = limitDimensions[1] == 1 ? 0 : index;
+
+            if(Op == reduce_op::sum) {
+#pragma omp parallel for collapse(2) reduction(+:sum[:n_redu_dynamic])
+               for (uint idx1 = 0; idx1 < limits[1][indices[1]]; ++idx1) {
+                  for (uint idx0 = 0; idx0 < limits[0][indices[0]]; ++idx0) {
+                     loop_body(idx0, idx1, cellIndex, popID, sum);
+                  }
+               }
+            } else if (Op == reduce_op::max) {
+#pragma omp parallel for collapse(2) reduction(max:sum[:n_redu_dynamic])
+               for (uint idx1 = 0; idx1 < limits[1][indices[1]]; ++idx1) {
+                  for (uint idx0 = 0; idx0 < limits[0][indices[0]]; ++idx0) {
+                     loop_body(idx0, idx1, cellIndex, popID, sum);
+                  }
+               }
+            } else if (Op == reduce_op::min) {
+#pragma omp parallel for collapse(2) reduction(min:sum[:n_redu_dynamic])
+               for (uint idx1 = 0; idx1 < limits[1][indices[1]]; ++idx1) {
+                  for (uint idx0 = 0; idx0 < limits[0][indices[0]]; ++idx0) {
+                     loop_body(idx0, idx1, cellIndex, popID, sum);
+                  }
+               }
+            } else if (Op == reduce_op::null) {
+#pragma omp parallel for collapse(2)
+               for (uint idx1 = 0; idx1 < limits[1][indices[1]]; ++idx1) {
+                  for (uint idx0 = 0; idx0 < limits[0][indices[0]]; ++idx0) {
+                     loop_body(idx0, idx1, cellIndex, popID, sum);
+                  }
+               }
+            } else {
+               printf("ERROR at %s:%d: Invalid reduction identifier \"Op\".", __FILE__, __LINE__);
+            }
+         }
+      }
+   }
+
 /* Parallel reduce driver function - specialization for 2D case with nested bodies */
    template <reduce_op Op, uint NReductions, uint NDim, typename Lambda, typename T, typename = typename std::enable_if<!std::is_void<typename std::invoke_result<Lambda, uint, uint, T*>::type>::value>::type, typename = void>
    inline static void parallel_reduce_driver(const uint (&limits)[2], Lambda loop_body, T *sum, const uint n_redu_dynamic) {
