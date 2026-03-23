@@ -192,7 +192,7 @@ void reduce_vlasov_dt_test_test(dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geomet
    uint* dev_nBlocks = GET_SESSION_POINTER(gpuMemoryManager, uint, dev_nBlocks);
 
    // Gather vmeshes
-   #pragma omp parallel for schedule(static)
+   uint maxNBlocks = 0;
    for(uint celli = 0; celli < nAllCells; celli++){
       SpatialCell* cell = mpiGrid[cells[celli]];
       cell->parameters[CellParams::MAXRDT] = numeric_limits<Real>::max();
@@ -203,6 +203,7 @@ void reduce_vlasov_dt_test_test(dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geomet
          host_dxdydz[3*celli*nPOP + 3*popID + 2] = cell->parameters[CellParams::DZ];
          (GET_POINTER(gpuMemoryManager, vmesh::VelocityMesh*, host_vmeshes))[celli*nPOP + popID] = cell->dev_get_velocity_mesh(popID); // GPU-side vmesh
          host_nBlocks[celli*nPOP + popID] = cell->get_number_of_velocity_blocks(popID);
+         maxNBlocks = std::min(maxNBlocks, host_nBlocks[celli*nPOP + popID]);
          host_max_dt[celli*nPOP + popID] = numeric_limits<Real>::max();
       }
    }
@@ -224,9 +225,10 @@ void reduce_vlasov_dt_test_test(dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geomet
    const Real HALF = 0.5;
    uint dim1 = 2;
    const uint* limits[2]={&dim1, host_nBlocks};
+   const uint maxLimits[2]={dim1, maxNBlocks};
    vmesh::VelocityMesh **blockContainers = GET_POINTER(gpuMemoryManager, vmesh::VelocityMesh*, dev_vmeshes);
    
-   arch::parallel_reduce_test<arch::min>({nAllCells, nPOP}, {1, nAllCells*nPOP}, limits,
+   arch::parallel_reduce_test<arch::min>({nAllCells, nPOP}, {1, nAllCells*nPOP}, limits, maxLimits,
       ARCH_LOOP_LAMBDA (uint i, const uint blockLID, const uint cellIndex, const uint popID, Real *lthreadMin) -> void{
          const Real dx = dev_dxdydz[3*cellIndex*nPOP + 3*popID + 0];
          const Real dy = dev_dxdydz[3*cellIndex*nPOP + 3*popID + 1];

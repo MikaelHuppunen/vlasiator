@@ -490,10 +490,22 @@ namespace arch{
 /* A general device kernel for reductions */
    template <uint Blocksize, reduce_op Op, uint NDim, uint NReduStatic, typename Lambda, typename T>
    __global__ static void __launch_bounds__(ARCH_BLOCKSIZE_R)
-      reduction_kernel_test(const uint index, const uint cellIndex, const uint popID, Lambda loop_body, const T * __restrict__ init_val, T * __restrict__ rslt, const uint *__restrict__ limitDimensions, const uint* * __restrict__ lims, const uint n_total, const uint n_redu_dynamic, T *thread_data_dynamic)
+      reduction_kernel_test(Lambda loop_body, const T * __restrict__ init_val, T * __restrict__ rslt, const uint *__restrict__ limitDimensions, const uint* * __restrict__ lims, const uint n_redu_dynamic, T *thread_data_dynamic)
    {
       /* Get the global 1D thread index*/
       const uint idx_glob = blockIdx.x * blockDim.x + threadIdx.x;
+      const uint cellIndex = blockIdx.y;
+      const uint popID = blockIdx.z;
+      const uint index = cellIndex*gridDim.z + popID;
+
+      uint n_total = 1;
+      for(uint i = 0; i < NDim; i++) {
+         if(limitDimensions[i] == 1){
+            n_total *= lims[i][0];
+         }else{
+            n_total *= lims[i][index];
+         }
+      }
 
       if (Op == reduce_op::null) {
          T *thread_data = 0;
@@ -547,19 +559,19 @@ namespace arch{
             T aggregate = BlockReduce(temp_storage[i]).Sum(thread_data[i]);
             /* The first thread of each block stores the block-wide aggregate atomically */
             if(threadIdx.x == 0) {
-               atomicAdd(&rslt[i], aggregate);
+               atomicAdd(&rslt[n_reductions*index+i], aggregate);
             }
          }
          else if(Op == reduce_op::max){
             T aggregate = BlockReduce(temp_storage[i]).Reduce(thread_data[i], cub::Max());
             if(threadIdx.x == 0) {
-               atomicMax(&rslt[i], aggregate);
+               atomicMax(&rslt[n_reductions*index+i], aggregate);
             }
          }
          else if(Op == reduce_op::min){
             T aggregate = BlockReduce(temp_storage[i]).Reduce(thread_data[i], cub::Min());
             if(threadIdx.x == 0) {
-               atomicMin(&rslt[i], aggregate);
+               atomicMin(&rslt[n_reductions*index+i], aggregate);
             }
          } else {
             /* Other reduction operations are not supported - print an error message */
@@ -704,7 +716,7 @@ namespace arch{
 
 /* Parallel reduce driver function for the CUDA reductions */
    template <reduce_op Op, uint NReduStatic, uint NDim, typename Lambda, typename T>
-   __forceinline__ static void parallel_reduce_driver_test(const uint (&blockDimensions)[2], const uint (&limitDimensions)[NDim], const uint* (&limits)[NDim], Lambda loop_body, T *sum, const uint n_redu_dynamic) {
+   __forceinline__ static void parallel_reduce_driver_test(const uint (&blockDimensions)[2], const uint (&limitDimensions)[NDim], const uint* (&limits)[NDim], const uint (&maxLimits)[NDim], Lambda loop_body, T *sum, const uint n_redu_dynamic) {
 
       /* Get the CPU thread id */
 #ifdef _OPENMP
@@ -716,130 +728,122 @@ namespace arch{
       /* Get the number of reductions (may be known at compile time or not) */
       const uint n_reductions = NReduStatic ? NReduStatic : n_redu_dynamic;
 
+      /* Calculate the required size for the 1D kernel */
+      uint n_total = 1;
+      for(uint i = 0; i < NDim; i++) {
+         n_total *= maxLimits[i];
+      }
 
-      for(uint cellIndex = 0; cellIndex < blockDimensions[0]; cellIndex++){
-         for (uint popID = 0; popID < blockDimensions[1]; ++popID) {
-            const uint index = cellIndex*blockDimensions[1] + popID;
-            
-            /* Calculate the required size for the 1D kernel */
-            uint n_total = 1;
-            for(uint i = 0; i < NDim; i++) {
-               if(limitDimensions[i] == 1){
-                  n_total *= limits[i][0];
-               }else{
-                  n_total *= limits[i][index];
-               }
+      /* Check the CUDA default mempool settings and correct if wrong */
+      device_mempool_check(UINT64_MAX);
+
+      /* Create a device buffer to transfer the loop limits of each dimension to device */
+      const uint** d_limits;
+      uint *dev_limitDimensions;
+      CHK_ERR(cudaMallocAsync(&d_limits, NDim*sizeof(uint*), gpuStreamList[thread_id]));
+      CHK_ERR(cudaMallocAsync(&dev_limitDimensions, NDim*sizeof(uint), gpuStreamList[thread_id]));
+      CHK_ERR(cudaMemcpyAsync(d_limits, limits, NDim*sizeof(uint*), cudaMemcpyHostToDevice,gpuStreamList[thread_id]));
+      CHK_ERR(cudaMemcpyAsync(dev_limitDimensions, limitDimensions, NDim*sizeof(uint), cudaMemcpyHostToDevice,gpuStreamList[thread_id]));
+
+      /* Simple action for non-reducing call */
+      if (Op == reduce_op::null) {
+         T *d_const_buf = 0;
+         T *d_buf = 0;
+         T *d_thread_data_dynamic = 0;
+         /* Set the kernel dimensions */
+         const uint blocksize = ARCH_BLOCKSIZE_R;
+         const uint gridsize_x = (n_total - 1 + blocksize) / blocksize;
+         dim3 gridsize(gridsize_x, blockDimensions[0], blockDimensions[1]);
+         /* Call the kernel (the number of reductions known at compile time) */
+         if(gridsize_x > 0) {
+            reduction_kernel_test<ARCH_BLOCKSIZE_R, Op, NDim, NReduStatic><<<gridsize, blocksize, 0, gpuStreamList[thread_id]>>>(
+               loop_body, d_const_buf, d_buf, dev_limitDimensions, d_limits, n_reductions, d_thread_data_dynamic);
+         }
+         /* Check for kernel launch errors */
+         CHK_ERR(cudaPeekAtLastError());
+         /* Synchronize after kernel call */
+         CHK_ERR(cudaStreamSynchronize(gpuStreamList[thread_id]));
+         CHK_ERR(cudaFreeAsync(d_limits, gpuStreamList[thread_id]));
+         return;
+      }
+
+      /* Create a device buffer for the reduction results */
+      T* d_buf = &sum[0];
+
+      /* Create a device buffer to transfer the initial values to device */
+      T* d_const_buf;
+      CHK_ERR(cudaMallocAsync(&d_const_buf, n_reductions*blockDimensions[0]*blockDimensions[1]*sizeof(T), gpuStreamList[thread_id]));
+      CHK_ERR(cudaMemcpyAsync(d_const_buf, d_buf, n_reductions*blockDimensions[0]*blockDimensions[1]*sizeof(T), cudaMemcpyDeviceToDevice, gpuStreamList[thread_id]));
+
+      /* Call the reduction kernel with different arguments depending
+      * on if the number of reductions is known at the compile time
+      */
+      T* d_thread_data_dynamic = 0; // declared zero to suppress unitialized use warning
+      if(NReduStatic == 0) {
+         /* Get the cub temp storage sizes for the dynamic shared memory kernel argument */
+         constexpr auto cub_temp_storage_type_size = sizeof(typename cub::BlockReduce<T, ARCH_BLOCKSIZE_R, cub::BLOCK_REDUCE_RAKING_COMMUTATIVE_ONLY, 1, 1>::TempStorage);
+         constexpr auto cub_temp_storage_type_size_small = sizeof(typename cub::BlockReduce<T, ARCH_BLOCKSIZE_R_SMALL, cub::BLOCK_REDUCE_RAKING_COMMUTATIVE_ONLY, 1, 1>::TempStorage);
+         /* Query device properties */
+         int device_id;
+         CHK_ERR(cudaGetDevice(&device_id));
+         cudaDeviceProp deviceProp;
+         CHK_ERR(cudaGetDeviceProperties(&deviceProp, device_id));
+         /* Make sure there is enough shared memory for the used block size */
+         uint blocksize;
+         size_t shared_mem_bytes_per_block_request;
+         if(n_reductions * cub_temp_storage_type_size <= deviceProp.sharedMemPerBlock){
+         blocksize = ARCH_BLOCKSIZE_R;
+         shared_mem_bytes_per_block_request = n_reductions * cub_temp_storage_type_size;
+         }
+         else if(n_reductions * cub_temp_storage_type_size_small <= deviceProp.sharedMemPerBlock){
+         blocksize = ARCH_BLOCKSIZE_R_SMALL;
+         shared_mem_bytes_per_block_request = n_reductions * cub_temp_storage_type_size_small;
+         }
+         else{
+         printf("The device %d (%s) does not have enough shared memory even for the small blocksize (%d)! The error occurred in %s at line %d\n", device_id, deviceProp.name, ARCH_BLOCKSIZE_R_SMALL, __FILE__, __LINE__);
+         exit(1);
+         }
+         /* Set the kernel grid dimensions */
+         const uint gridsize_x = (n_total - 1 + blocksize) / blocksize;
+         dim3 gridsize(gridsize_x, blockDimensions[0], blockDimensions[1]);
+         /* Allocate memory for the thread data values */
+         CHK_ERR(cudaMallocAsync(&d_thread_data_dynamic, n_reductions * blocksize * gridsize_x * sizeof(T), gpuStreamList[thread_id]));
+         /* Call the kernel (the number of reductions not known at compile time) */
+         if(gridsize_x > 0){
+            if(blocksize == ARCH_BLOCKSIZE_R){
+               reduction_kernel_test<ARCH_BLOCKSIZE_R, Op, NDim, 0><<<gridsize, blocksize, shared_mem_bytes_per_block_request, gpuStreamList[thread_id]>>>(loop_body, d_const_buf, d_buf, dev_limitDimensions, d_limits, n_reductions, d_thread_data_dynamic);
             }
-
-            /* Check the CUDA default mempool settings and correct if wrong */
-            device_mempool_check(UINT64_MAX);
-
-            /* Create a device buffer to transfer the loop limits of each dimension to device */
-            const uint** d_limits;
-            uint *dev_limitDimensions;
-            CHK_ERR(cudaMallocAsync(&d_limits, NDim*sizeof(uint*), gpuStreamList[thread_id]));
-            CHK_ERR(cudaMallocAsync(&dev_limitDimensions, NDim*sizeof(uint), gpuStreamList[thread_id]));
-            CHK_ERR(cudaMemcpyAsync(d_limits, limits, NDim*sizeof(uint*), cudaMemcpyHostToDevice,gpuStreamList[thread_id]));
-            CHK_ERR(cudaMemcpyAsync(dev_limitDimensions, limitDimensions, NDim*sizeof(uint), cudaMemcpyHostToDevice,gpuStreamList[thread_id]));
-
-            /* Simple action for non-reducing call */
-            if (Op == reduce_op::null) {
-               T *d_const_buf = 0;
-               T *d_buf = 0;
-               T *d_thread_data_dynamic = 0;
-               /* Set the kernel dimensions */
-               const uint blocksize = ARCH_BLOCKSIZE_R;
-               const uint gridsize = (n_total - 1 + blocksize) / blocksize;
-               /* Call the kernel (the number of reductions known at compile time) */
-               if(gridsize > 0) {
-                  reduction_kernel_test<ARCH_BLOCKSIZE_R, Op, NDim, NReduStatic><<<gridsize, blocksize, 0, gpuStreamList[thread_id]>>>(
-                     index, cellIndex, popID, loop_body, d_const_buf, d_buf, dev_limitDimensions, d_limits, n_total, n_reductions, d_thread_data_dynamic);
-               }
-               /* Check for kernel launch errors */
-               CHK_ERR(cudaPeekAtLastError());
-               /* Synchronize after kernel call */
-               CHK_ERR(cudaStreamSynchronize(gpuStreamList[thread_id]));
-               CHK_ERR(cudaFreeAsync(d_limits, gpuStreamList[thread_id]));
-               return;
-            }
-
-            /* Create a device buffer for the reduction results */
-            T* d_buf = &sum[index];
-
-            /* Create a device buffer to transfer the initial values to device */
-            T* d_const_buf;
-            CHK_ERR(cudaMallocAsync(&d_const_buf, n_reductions*sizeof(T), gpuStreamList[thread_id]));
-            CHK_ERR(cudaMemcpyAsync(d_const_buf, d_buf, n_reductions*sizeof(T), cudaMemcpyDeviceToDevice, gpuStreamList[thread_id]));
-
-            /* Call the reduction kernel with different arguments depending
-            * on if the number of reductions is known at the compile time
-            */
-            T* d_thread_data_dynamic = 0; // declared zero to suppress unitialized use warning
-            if(NReduStatic == 0) {
-               /* Get the cub temp storage sizes for the dynamic shared memory kernel argument */
-               constexpr auto cub_temp_storage_type_size = sizeof(typename cub::BlockReduce<T, ARCH_BLOCKSIZE_R, cub::BLOCK_REDUCE_RAKING_COMMUTATIVE_ONLY, 1, 1>::TempStorage);
-               constexpr auto cub_temp_storage_type_size_small = sizeof(typename cub::BlockReduce<T, ARCH_BLOCKSIZE_R_SMALL, cub::BLOCK_REDUCE_RAKING_COMMUTATIVE_ONLY, 1, 1>::TempStorage);
-               /* Query device properties */
-               int device_id;
-               CHK_ERR(cudaGetDevice(&device_id));
-               cudaDeviceProp deviceProp;
-               CHK_ERR(cudaGetDeviceProperties(&deviceProp, device_id));
-               /* Make sure there is enough shared memory for the used block size */
-               uint blocksize;
-               size_t shared_mem_bytes_per_block_request;
-               if(n_reductions * cub_temp_storage_type_size <= deviceProp.sharedMemPerBlock){
-               blocksize = ARCH_BLOCKSIZE_R;
-               shared_mem_bytes_per_block_request = n_reductions * cub_temp_storage_type_size;
-               }
-               else if(n_reductions * cub_temp_storage_type_size_small <= deviceProp.sharedMemPerBlock){
-               blocksize = ARCH_BLOCKSIZE_R_SMALL;
-               shared_mem_bytes_per_block_request = n_reductions * cub_temp_storage_type_size_small;
-               }
-               else{
-               printf("The device %d (%s) does not have enough shared memory even for the small blocksize (%d)! The error occurred in %s at line %d\n", device_id, deviceProp.name, ARCH_BLOCKSIZE_R_SMALL, __FILE__, __LINE__);
-               exit(1);
-               }
-               /* Set the kernel grid dimensions */
-               const uint gridsize = (n_total - 1 + blocksize) / blocksize;
-               /* Allocate memory for the thread data values */
-               CHK_ERR(cudaMallocAsync(&d_thread_data_dynamic, n_reductions * blocksize * gridsize * sizeof(T), gpuStreamList[thread_id]));
-               /* Call the kernel (the number of reductions not known at compile time) */
-               if(gridsize > 0){
-                  if(blocksize == ARCH_BLOCKSIZE_R){
-                     reduction_kernel_test<ARCH_BLOCKSIZE_R, Op, NDim, 0><<<gridsize, blocksize, shared_mem_bytes_per_block_request, gpuStreamList[thread_id]>>>(index, cellIndex, popID, loop_body, d_const_buf, d_buf, dev_limitDimensions, d_limits, n_total, n_reductions, d_thread_data_dynamic);
-                  }
-                  else if(blocksize == ARCH_BLOCKSIZE_R_SMALL){
-                     reduction_kernel_test<ARCH_BLOCKSIZE_R_SMALL, Op, NDim, 0><<<gridsize, blocksize, shared_mem_bytes_per_block_request, gpuStreamList[thread_id]>>>(index, cellIndex, popID, loop_body, d_const_buf, d_buf, dev_limitDimensions, d_limits, n_total, n_reductions, d_thread_data_dynamic);
-                  }
-                  else{
-                     printf("The blocksize (%u) does not match with any of the predetermined block sizes! The error occurred in %s at line %d\n", blocksize, __FILE__, __LINE__);
-                     exit(1);
-                  }
-               }      
-               /* Check for kernel launch errors */
-               CHK_ERR(cudaPeekAtLastError());
-               /* Synchronize and free the thread data allocation */
-               CHK_ERR(cudaStreamSynchronize(gpuStreamList[thread_id]));
-               CHK_ERR(cudaFreeAsync(d_thread_data_dynamic, gpuStreamList[thread_id]));
+            else if(blocksize == ARCH_BLOCKSIZE_R_SMALL){
+               reduction_kernel_test<ARCH_BLOCKSIZE_R_SMALL, Op, NDim, 0><<<gridsize, blocksize, shared_mem_bytes_per_block_request, gpuStreamList[thread_id]>>>(loop_body, d_const_buf, d_buf, dev_limitDimensions, d_limits, n_reductions, d_thread_data_dynamic);
             }
             else{
-               /* Set the kernel dimensions */
-               const uint blocksize = ARCH_BLOCKSIZE_R;
-               const uint gridsize = (n_total - 1 + blocksize) / blocksize;
-               /* Call the kernel (the number of reductions known at compile time) */
-               if(gridsize > 0) {
-                  reduction_kernel_test<ARCH_BLOCKSIZE_R, Op, NDim, NReduStatic><<<gridsize, blocksize, 0, gpuStreamList[thread_id]>>>(index, cellIndex, popID, loop_body, d_const_buf, d_buf, dev_limitDimensions, d_limits, n_total, n_reductions, d_thread_data_dynamic);
-               }
-               /* Check for kernel launch errors */
-               CHK_ERR(cudaPeekAtLastError());
-               /* Synchronize after kernel call */
-               CHK_ERR(cudaStreamSynchronize(gpuStreamList[thread_id]));
+               printf("The blocksize (%u) does not match with any of the predetermined block sizes! The error occurred in %s at line %d\n", blocksize, __FILE__, __LINE__);
+               exit(1);
             }
-            /* Copy the results back to host and free the allocated memory back to pool*/
-            CHK_ERR(cudaFreeAsync(d_const_buf, gpuStreamList[thread_id]));
-            CHK_ERR(cudaFreeAsync(d_limits, gpuStreamList[thread_id]));
-         }
+         }      
+         /* Check for kernel launch errors */
+         CHK_ERR(cudaPeekAtLastError());
+         /* Synchronize and free the thread data allocation */
+         CHK_ERR(cudaStreamSynchronize(gpuStreamList[thread_id]));
+         CHK_ERR(cudaFreeAsync(d_thread_data_dynamic, gpuStreamList[thread_id]));
       }
+      else{
+         /* Set the kernel dimensions */
+         const uint blocksize = ARCH_BLOCKSIZE_R;
+         const uint gridsize_x = (n_total - 1 + blocksize) / blocksize;
+         dim3 gridsize(gridsize_x, blockDimensions[0], blockDimensions[1]);
+         /* Call the kernel (the number of reductions known at compile time) */
+         if(gridsize_x > 0) {
+            reduction_kernel_test<ARCH_BLOCKSIZE_R, Op, NDim, NReduStatic><<<gridsize, blocksize, 0, gpuStreamList[thread_id]>>>(loop_body, d_const_buf, d_buf, dev_limitDimensions, d_limits, n_reductions, d_thread_data_dynamic);
+         }
+         /* Check for kernel launch errors */
+         CHK_ERR(cudaPeekAtLastError());
+         /* Synchronize after kernel call */
+         CHK_ERR(cudaStreamSynchronize(gpuStreamList[thread_id]));
+      }
+      /* Copy the results back to host and free the allocated memory back to pool*/
+      CHK_ERR(cudaFreeAsync(d_const_buf, gpuStreamList[thread_id]));
+      CHK_ERR(cudaFreeAsync(d_limits, gpuStreamList[thread_id]));
    }
 }
 
