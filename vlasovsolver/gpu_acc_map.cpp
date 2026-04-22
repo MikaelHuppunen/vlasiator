@@ -1003,10 +1003,6 @@ __global__ void __launch_bounds__(WID3, ACCELERATION_KERNEl_MIN_BLOCKS) accelera
    {
       const uint setIndex = dev_columnSetIdxArray[totalBlockIndex];
 
-      if (setIndex >= columnData->dev_sizeColSets()) {
-         return;
-      }
-
       if (ti == 0) {
          minValue = (Realf)dev_minValues[cellOffset];
          setColumnOffset = columnData->setColumnOffsets[setIndex];
@@ -1436,7 +1432,14 @@ __host__ bool gpu_acc_map_1d(
    CHK_ERR( gpuStreamSynchronize(baseStream) );
    scanTimer.stop();
 
+   SESSION_HOST_ALLOCATE(gpuMemoryManager, size_t, host_cellIdxStartCutoff, nLaunchCells*sizeof(size_t));
+   SESSION_ALLOCATE(gpuMemoryManager, size_t, dev_cellIdxStartCutoff, nLaunchCells*sizeof(size_t));
+
+   size_t *host_cellIdxStartCutoff = GET_SESSION_HOST_POINTER(gpuMemoryManager, size_t, host_cellIdxStartCutoff);
+   size_t *dev_cellIdxStartCutoff = GET_SESSION_POINTER(gpuMemoryManager, size_t, dev_cellIdxStartCutoff);
+
    phiprof::Timer allocTimer {"ensure allocations"};
+   int totalColumnSets = 0;
    // Ensure allocations (faster without threading)
    for (size_t cellIndex = 0; cellIndex < nLaunchCells; cellIndex++) {
       uint cellOffset = cellIndex + cumulativeOffset;
@@ -1446,11 +1449,13 @@ __host__ bool gpu_acc_map_1d(
       vmesh::LocalID host_recapacitateVectors = (GET_POINTER(gpuMemoryManager, vmesh::LocalID, host_resizeSuccess))[cellOffset]; // resize of columnData vectors
       largest_totalColumns = std::max(largest_totalColumns,host_totalColumns);
       largest_totalColumnSets = std::max(largest_totalColumnSets,host_totalColumnSets);
+      host_cellIdxStartCutoff[cellIndex] = totalColumnSets;
       if (host_recapacitateVectors) {
          // Can't call CPU reallocation directly as then copies go out of sync.
          // This function updates both CPU and GPU copies correctly.
          gpu_acc_allocate_perthread(cellIndex, host_totalColumns, host_totalColumnSets);
       }
+      totalColumnSets += host_totalColumnSets;
    } // end parallel region
    allocTimer.stop();
 
@@ -1702,20 +1707,6 @@ __host__ bool gpu_acc_map_1d(
    CHK_ERR( gpuPeekAtLastError() );
    CHK_ERR( gpuStreamSynchronize(baseStream) );
    zeroTimer.stop();
-
-   SESSION_HOST_ALLOCATE(gpuMemoryManager, size_t, host_cellIdxStartCutoff, nLaunchCells*sizeof(size_t));
-   SESSION_ALLOCATE(gpuMemoryManager, size_t, dev_cellIdxStartCutoff, nLaunchCells*sizeof(size_t));
-
-   size_t *host_cellIdxStartCutoff = GET_SESSION_HOST_POINTER(gpuMemoryManager, size_t, host_cellIdxStartCutoff);
-   size_t *dev_cellIdxStartCutoff = GET_SESSION_POINTER(gpuMemoryManager, size_t, dev_cellIdxStartCutoff);
-
-   int totalColumnSets = 0;
-   for (size_t cellIndex = 0; cellIndex < nLaunchCells; cellIndex++) {
-      uint cellOffset = cellIndex + cumulativeOffset;
-      vmesh::LocalID host_totalColumnSets = (GET_SESSION_HOST_POINTER(gpuMemoryManager, vmesh::LocalID, host_nColumnSets))[cellIndex];
-      host_cellIdxStartCutoff[cellIndex] = totalColumnSets;
-      totalColumnSets += host_totalColumnSets;
-   } // End spatial cell loop
 
    SESSION_ALLOCATE(gpuMemoryManager, size_t, dev_cellIdxArray, totalColumnSets*sizeof(size_t));
    SESSION_ALLOCATE(gpuMemoryManager, size_t, dev_columnSetIdxArray, totalColumnSets*sizeof(size_t));
