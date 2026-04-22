@@ -963,9 +963,13 @@ __global__ void __launch_bounds__(WID3, ACCELERATION_KERNEl_MIN_BLOCKS) accelera
    const Realf dv,
    const Real *dev_minValues, // indexing: cellOffset
    const size_t invalidLID,
-   const uint cumulativeOffset
+   const uint cumulativeOffset,
+   size_t *dev_cellIdxArray,
+   size_t *dev_columnSetIdxArray
 ) {
-   const uint parallelOffsetIndex = blockIdx.y; // which vlasov buffer allocation to access
+   int totalBlockIndex = blockIdx.x; // Corresponds to index spatial and columnSet blocks
+
+   const uint parallelOffsetIndex = dev_cellIdxArray[totalBlockIndex]; // which vlasov buffer allocation to access
    const uint cellOffset = parallelOffsetIndex + cumulativeOffset;
 
    // This is launched with block size (WID,WID,WID)
@@ -997,7 +1001,7 @@ __global__ void __launch_bounds__(WID3, ACCELERATION_KERNEl_MIN_BLOCKS) accelera
    __shared__ int loopN[WID3/GPUTHREADS];
 
    {
-      const uint setIndex = blockIdx.x;
+      const uint setIndex = dev_columnSetIdxArray[totalBlockIndex];
 
       if (setIndex >= columnData->dev_sizeColSets()) {
          return;
@@ -1180,6 +1184,42 @@ __global__ void __launch_bounds__(WID3, ACCELERATION_KERNEl_MIN_BLOCKS) accelera
    } // End this column
 } // end semilag acc kernel
 
+
+
+__global__ void __launch_bounds__(Hashinator::defaults::MAX_BLOCKSIZE/2) getCellIndexArray_kernel2(
+   size_t *dev_cellIdxArray,
+   size_t *dev_columnSetIdxArray,
+   size_t *dev_cellIdxStartCutoff,
+   int numberOfComputedVelocityBlocks,
+   int maxCellIndex
+   ){
+   
+   size_t totalBlockIndex = blockIdx.x*blockDim.x + threadIdx.x;
+   
+   if(totalBlockIndex >= (size_t)numberOfComputedVelocityBlocks){return;}
+   
+   // Binary search
+   int left = 0;
+   int right = maxCellIndex - 1;
+   int cellIndex = 0;
+
+#ifdef DEBUG_SOLVERS
+   assert(right>=left);
+#endif
+
+   while (left <= right) {
+      int mid = (left + right) >> 1;
+      if (dev_cellIdxStartCutoff[mid] <= (size_t)totalBlockIndex) {
+         cellIndex = mid;
+         left = mid + 1;
+      } else {
+         right = mid - 1;
+      }
+   }
+
+   dev_cellIdxArray[totalBlockIndex] = cellIndex;
+   dev_columnSetIdxArray[totalBlockIndex] = totalBlockIndex - dev_cellIdxStartCutoff[cellIndex];
+}
 
 /*!
   \brief This function performs the semi-Lagrangian acceleration for a provided list of
@@ -1469,8 +1509,6 @@ __host__ bool gpu_acc_map_1d(
    CHK_ERR( gpuStreamSynchronize(baseStream) );
    reorderTimer.stop();
 
-   gpuMemoryManager.endSession();
-
    phiprof::Timer extentsTimer {"column extents"};
    // Reset counters used for verifying sufficient vector capacities and not overflowing v-space
    CHK_ERR( gpuMemset(GET_POINTER(gpuMemoryManager, vmesh::LocalID, dev_resizeSuccess)+cumulativeOffset, 0, nLaunchCells*sizeof(vmesh::LocalID)) );
@@ -1665,11 +1703,48 @@ __host__ bool gpu_acc_map_1d(
    CHK_ERR( gpuStreamSynchronize(baseStream) );
    zeroTimer.stop();
 
+   SESSION_HOST_ALLOCATE(gpuMemoryManager, size_t, host_cellIdxStartCutoff, nLaunchCells*sizeof(size_t));
+   SESSION_ALLOCATE(gpuMemoryManager, size_t, dev_cellIdxStartCutoff, nLaunchCells*sizeof(size_t));
+
+   size_t *host_cellIdxStartCutoff = GET_SESSION_HOST_POINTER(gpuMemoryManager, size_t, host_cellIdxStartCutoff);
+   size_t *dev_cellIdxStartCutoff = GET_SESSION_POINTER(gpuMemoryManager, size_t, dev_cellIdxStartCutoff);
+
+   int totalColumnSets = 0;
+   for (size_t cellIndex = 0; cellIndex < nLaunchCells; cellIndex++) {
+      uint cellOffset = cellIndex + cumulativeOffset;
+      vmesh::LocalID host_totalColumnSets = (GET_SESSION_HOST_POINTER(gpuMemoryManager, vmesh::LocalID, host_nColumnSets))[cellIndex];
+      host_cellIdxStartCutoff[cellIndex] = totalColumnSets;
+      totalColumnSets += host_totalColumnSets;
+   } // End spatial cell loop
+
+   SESSION_ALLOCATE(gpuMemoryManager, size_t, dev_cellIdxArray, totalColumnSets*sizeof(size_t));
+   SESSION_ALLOCATE(gpuMemoryManager, size_t, dev_columnSetIdxArray, totalColumnSets*sizeof(size_t));
+
+   size_t *dev_cellIdxArray = GET_SESSION_POINTER(gpuMemoryManager, size_t, dev_cellIdxArray);
+   size_t *dev_columnSetIdxArray = GET_SESSION_POINTER(gpuMemoryManager, size_t, dev_columnSetIdxArray);
+
+   // Copy data to device
+   CHK_ERR( gpuMemcpy(dev_cellIdxStartCutoff, host_cellIdxStartCutoff, nLaunchCells*sizeof(size_t), gpuMemcpyHostToDevice) );
+
+   int totalThreadsPerBlock_getCellIndexArray = Hashinator::defaults::MAX_BLOCKSIZE/2; //Using Hashinator::defaults::MAX_BLOCKSIZE/2 = 512 blocks can lead to better streaming multiprocessor occupancy
+   int maxThreadIndex_getCellIndexArray = totalColumnSets;
+   int blocksPerGrid_getCellIndexArray = (maxThreadIndex_getCellIndexArray+totalThreadsPerBlock_getCellIndexArray-1)/totalThreadsPerBlock_getCellIndexArray;
+
+   // Find spatial and velocity cell indices corresponding to each GPU block based on cutoffs,
+   // so that each block will know the correct indeces in later kernels
+   getCellIndexArray_kernel2<<<blocksPerGrid_getCellIndexArray, totalThreadsPerBlock_getCellIndexArray>>>(
+      dev_cellIdxArray,
+      dev_columnSetIdxArray,
+      dev_cellIdxStartCutoff,
+      totalColumnSets,
+      nLaunchCells
+   );
+
    // Launch actual acceleration kernel performing Semi-Lagrangian re-mapping
    phiprof::Timer accTimer {"acceleration kernel"};
-   const dim3 grid_acc(largest_totalColumnSets,nLaunchCells,1);
+   int blocksPerGrid_acceleration = totalColumnSets;
    const dim3 block_acc(WID,WID,WID); // Calculates a whole block at a time
-   acceleration_kernel<<<grid_acc, block_acc, 0, baseStream>>> (
+   acceleration_kernel<<<blocksPerGrid_acceleration, block_acc, 0, baseStream>>> (
       GET_POINTER(gpuMemoryManager, vmesh::VelocityMesh*, dev_vmeshes), // indexing: cellOffset
       GET_POINTER(gpuMemoryManager, vmesh::VelocityBlockContainer*, dev_VBCs), // indexing: cellOffset
       GET_POINTER(gpuMemoryManager, Realf*, dev_blockDataOrdered), //indexing: blockIdx.y
@@ -1682,11 +1757,15 @@ __host__ bool gpu_acc_map_1d(
       dv,
       GET_POINTER(gpuMemoryManager, Real, dev_minValues), // indexing: cellOffset, used by slope limiters
       invalidLocalID,
-      cumulativeOffset
+      cumulativeOffset,
+      dev_cellIdxArray,
+      dev_columnSetIdxArray
       );
    CHK_ERR( gpuPeekAtLastError() );
    CHK_ERR( gpuStreamSynchronize(baseStream) );
    accTimer.stop();
+
+   gpuMemoryManager.endSession();
 
    return true;
 }
