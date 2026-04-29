@@ -37,6 +37,22 @@
 #include "../vlasovsolver/vec.h"
 #include "../velocity_mesh_parameters.h"
 #include <phiprof.hpp>
+#include <execinfo.h>
+#include <sstream>
+#include <stdexcept>
+
+inline std::string getStackTrace() {
+    void* buffer[64];
+    int n = backtrace(buffer, 64);
+    char** symbols = backtrace_symbols(buffer, n);
+
+    std::ostringstream oss;
+    for (int i = 0; i < n; i++)
+        oss << symbols[i] << "\n";
+
+    free(symbols);
+    return oss.str();
+}
 
 #ifndef THREADS_PER_MP
 #define THREADS_PER_MP 2048
@@ -286,7 +302,7 @@ struct GPUMemoryManager {
    , or SESSION_HOST_ALLOCATE are listed here.
    */
    #define DEFINITIONS_HERE
-   size_t dev_allMaps, dev_allPencilsContainers, dev_allPencilsMeshes, dev_blockDataOrdered, dev_bulkVX, dev_bulkVY, dev_bulkVZ, dev_bValues, dev_cellIdxArray, dev_cellIdxKeys, dev_cellIdxStartCutoff, dev_columnOffsetData, dev_Ddt, dev_densityPostAdjust, dev_densityPreAdjust, dev_dfdt_mu, dev_dxdydz, dev_fcount, dev_fmu, dev_intersections, dev_lists_delete, dev_lists_to_replace, dev_lists_with_replace_new, dev_lists_with_replace_old, dev_mass, dev_massLoss, dev_max_dt, dev_minValues, dev_moments1, dev_moments2, dev_nAfter, dev_nBefore, dev_nBlocksToChange, dev_nColumns, dev_nColumnSets, dev_nu0Values, dev_nWithContent, dev_overflownElements, dev_pencilBlockData, dev_pencilBlocksCount, dev_potentialDdtValues, dev_probeCubeData, dev_remappedCellIdxArray, dev_resizeSuccess, dev_smallCellIdxArray, dev_sparsity, dev_VBC, dev_VBCs, dev_vbwcl_neigh, dev_vbwcl_vec, dev_velocityIdxArray, dev_vmeshes, gpu_block_indices_to_id, gpu_block_indices_to_probe, gpu_cell_indices_to_id, host_allMaps, host_allPencilsContainers, host_allPencilsMeshes, host_blockDataOrdered, host_bulkVX, host_bulkVY, host_bulkVZ, host_bValues, host_cellIdxStartCutoff, host_Ddt, host_dxdydz, host_intersections, host_lists_delete, host_lists_to_replace, host_lists_with_replace_new, host_lists_with_replace_old, host_mass, host_massLoss, host_max_dt, host_minValues, host_moments1, host_moments2, host_nAfter, host_nBefore, host_nBlocksToChange, host_nColumns, host_nColumnSets, host_nu0Values, host_nWithContent, host_overflownElements, host_remappedCellIdxArray, host_resizeSuccess, host_returnLID, host_returnReal, host_returnRealf, host_smallCellIdxArray, host_sparsity, host_VBC, host_VBCs, host_vbwcl_neigh, host_vbwcl_vec, host_vmeshes, member, my_test_pointer, returnLID, returnReal, returnRealf;
+   size_t dev_allMaps, dev_allPencilsContainers, dev_allPencilsMeshes, dev_blockDataOrdered, dev_bulkVX, dev_bulkVY, dev_bulkVZ, dev_bValues, dev_cellIdxArray, dev_cellIdxKeys, dev_cellIdxStartCutoff, dev_columnOffsetData, dev_columnSetIdxArray, dev_Ddt, dev_densityPostAdjust, dev_densityPreAdjust, dev_dfdt_mu, dev_dxdydz, dev_fcount, dev_fmu, dev_intersections, dev_lists_delete, dev_lists_to_replace, dev_lists_with_replace_new, dev_lists_with_replace_old, dev_mass, dev_massLoss, dev_max_dt, dev_minValues, dev_moments1, dev_moments2, dev_nAfter, dev_nBefore, dev_nBlocksToChange, dev_nColumns, dev_nColumnSets, dev_nu0Values, dev_nWithContent, dev_overflownElements, dev_pencilBlockData, dev_pencilBlocksCount, dev_potentialDdtValues, dev_probeCubeData, dev_remappedCellIdxArray, dev_resizeSuccess, dev_smallCellIdxArray, dev_sparsity, dev_VBC, dev_VBCs, dev_vbwcl_neigh, dev_vbwcl_vec, dev_velocityIdxArray, dev_vmeshes, gpu_block_indices_to_id, gpu_block_indices_to_probe, gpu_cell_indices_to_id, host_allMaps, host_allPencilsContainers, host_allPencilsMeshes, host_blockDataOrdered, host_bulkVX, host_bulkVY, host_bulkVZ, host_bValues, host_cellIdxStartCutoff, host_Ddt, host_dxdydz, host_intersections, host_lists_delete, host_lists_to_replace, host_lists_with_replace_new, host_lists_with_replace_old, host_mass, host_massLoss, host_max_dt, host_minValues, host_moments1, host_moments2, host_nAfter, host_nBefore, host_nBlocksToChange, host_nColumns, host_nColumnSets, host_nu0Values, host_nWithContent, host_overflownElements, host_remappedCellIdxArray, host_resizeSuccess, host_returnLID, host_returnReal, host_returnRealf, host_smallCellIdxArray, host_sparsity, host_VBC, host_VBCs, host_vbwcl_neigh, host_vbwcl_vec, host_vmeshes, member, my_test_pointer, returnLID, returnReal, returnRealf;
    #define DEFINITIONS_END
    #undef DEFINITIONS_HERE
    #undef DEFINITIONS_END
@@ -762,7 +778,10 @@ struct GPUMemoryManager {
       size_t pointerIndex = firstPointerIndex + index;
 
       if (firstPointerIndex == 0 || pointerIndex > maxPointerIndex) {
-         throw std::runtime_error("Unknown pointer name at gpuMemoryManager.getSubPointer!\n");
+         throw std::runtime_error(
+            std::string("Unknown pointer name at gpuMemoryManager.getSubPointer!\n")
+            + getStackTrace()
+         );
       }
 
       return getPointer<T>(pointerIndex);
