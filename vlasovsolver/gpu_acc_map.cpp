@@ -1459,6 +1459,29 @@ __host__ bool gpu_acc_map_1d(
    } // end parallel region
    allocTimer.stop();
 
+   SESSION_ALLOCATE(gpuMemoryManager, size_t, dev_cellIdxArray, totalColumnSets*sizeof(size_t));
+   SESSION_ALLOCATE(gpuMemoryManager, size_t, dev_columnSetIdxArray, totalColumnSets*sizeof(size_t));
+
+   size_t *dev_cellIdxArray = GET_SESSION_POINTER(gpuMemoryManager, size_t, dev_cellIdxArray);
+   size_t *dev_columnSetIdxArray = GET_SESSION_POINTER(gpuMemoryManager, size_t, dev_columnSetIdxArray);
+
+   // Copy data to device
+   CHK_ERR( gpuMemcpy(dev_cellIdxStartCutoff, host_cellIdxStartCutoff, nLaunchCells*sizeof(size_t), gpuMemcpyHostToDevice) );
+
+   int totalThreadsPerBlock_getCellIndexArray = Hashinator::defaults::MAX_BLOCKSIZE/2; //Using Hashinator::defaults::MAX_BLOCKSIZE/2 = 512 blocks can lead to better streaming multiprocessor occupancy
+   int maxThreadIndex_getCellIndexArray = totalColumnSets;
+   int blocksPerGrid_getCellIndexArray = (maxThreadIndex_getCellIndexArray+totalThreadsPerBlock_getCellIndexArray-1)/totalThreadsPerBlock_getCellIndexArray;
+
+   // Find spatial and velocity cell indices corresponding to each GPU block based on cutoffs,
+   // so that each block will know the correct indeces in later kernels
+   getCellIndexArray_kernel2<<<blocksPerGrid_getCellIndexArray, totalThreadsPerBlock_getCellIndexArray>>>(
+      dev_cellIdxArray,
+      dev_columnSetIdxArray,
+      dev_cellIdxStartCutoff,
+      totalColumnSets,
+      nLaunchCells
+   );
+
    // Now we have gathered all the required offsets into probeFlattened, and can
    // now launch a kernel which constructs the columns offsets in parallel.
    phiprof::Timer columnsTimer {"build columns"};
@@ -1707,29 +1730,6 @@ __host__ bool gpu_acc_map_1d(
    CHK_ERR( gpuPeekAtLastError() );
    CHK_ERR( gpuStreamSynchronize(baseStream) );
    zeroTimer.stop();
-
-   SESSION_ALLOCATE(gpuMemoryManager, size_t, dev_cellIdxArray, totalColumnSets*sizeof(size_t));
-   SESSION_ALLOCATE(gpuMemoryManager, size_t, dev_columnSetIdxArray, totalColumnSets*sizeof(size_t));
-
-   size_t *dev_cellIdxArray = GET_SESSION_POINTER(gpuMemoryManager, size_t, dev_cellIdxArray);
-   size_t *dev_columnSetIdxArray = GET_SESSION_POINTER(gpuMemoryManager, size_t, dev_columnSetIdxArray);
-
-   // Copy data to device
-   CHK_ERR( gpuMemcpy(dev_cellIdxStartCutoff, host_cellIdxStartCutoff, nLaunchCells*sizeof(size_t), gpuMemcpyHostToDevice) );
-
-   int totalThreadsPerBlock_getCellIndexArray = Hashinator::defaults::MAX_BLOCKSIZE/2; //Using Hashinator::defaults::MAX_BLOCKSIZE/2 = 512 blocks can lead to better streaming multiprocessor occupancy
-   int maxThreadIndex_getCellIndexArray = totalColumnSets;
-   int blocksPerGrid_getCellIndexArray = (maxThreadIndex_getCellIndexArray+totalThreadsPerBlock_getCellIndexArray-1)/totalThreadsPerBlock_getCellIndexArray;
-
-   // Find spatial and velocity cell indices corresponding to each GPU block based on cutoffs,
-   // so that each block will know the correct indeces in later kernels
-   getCellIndexArray_kernel2<<<blocksPerGrid_getCellIndexArray, totalThreadsPerBlock_getCellIndexArray>>>(
-      dev_cellIdxArray,
-      dev_columnSetIdxArray,
-      dev_cellIdxStartCutoff,
-      totalColumnSets,
-      nLaunchCells
-   );
 
    // Launch actual acceleration kernel performing Semi-Lagrangian re-mapping
    phiprof::Timer accTimer {"acceleration kernel"};
