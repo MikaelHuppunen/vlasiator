@@ -663,7 +663,6 @@ __global__ void build_column_offsets(
    @param dev_vbwcl_vec pointer to buffer of pointers to SplitVectors, re-cast to use as an (ordered) LID list
    @param dev_columnOffsetData pointer to a buffer of ColumnOffsets structs (see arch/gpu_base.hpp) where
     per-cell information on all built columns and columnSets is stored
-   @param dev_nColumns pointer to buffer of data indicating how many columns each cell has
    @param cumulativeOffset the current cumulative offset at which to index the aforementioned buffers, using
     the grid index of this kernel on top of this provided offset.
  */
@@ -673,9 +672,10 @@ __global__ void __launch_bounds__(WID3) reorder_blocks_by_dimension_kernel(
    const uint* __restrict__ gpu_cell_indices_to_id,
    split::SplitVector<vmesh::GlobalID> ** dev_vbwcl_vec, // use as LIDlist
    ColumnOffsets* dev_columnOffsetData,
-   vmesh::LocalID* dev_nColumns,
-   const uint cumulativeOffset
+   const uint cumulativeOffset,
+   const BlockIndex* __restrict__ dev_blockIndex
    ) {
+   const BlockIndex blockIndex = dev_blockIndex[blockIdx.x]; // Corresponds to index spatial and columnSet blocks
    // This is launched with block size (WID,WID,WID)
    const uint ti = threadIdx.z*blockDim.x*blockDim.y + threadIdx.y*blockDim.x + threadIdx.x;
    // Acceleration direction becomes "z"
@@ -683,13 +683,10 @@ __global__ void __launch_bounds__(WID3) reorder_blocks_by_dimension_kernel(
       + threadIdx.y*gpu_cell_indices_to_id[1]
       + threadIdx.z*gpu_cell_indices_to_id[2];
 
-   const uint iColumn = blockIdx.x;
-   const uint parallelOffsetIndex = blockIdx.y;
+   const uint iColumn = blockIndex.setIndex;
+   const uint parallelOffsetIndex = blockIndex.cellIndex;
    const uint cellOffset = parallelOffsetIndex + cumulativeOffset;
-   // Early return if already dealt with all columns
-   if (iColumn >= dev_nColumns[parallelOffsetIndex]) {
-      return;
-   }
+
    const vmesh::VelocityBlockContainer* __restrict__ blockContainer = blockContainers[cellOffset];
    ColumnOffsets* columnData = dev_columnOffsetData + parallelOffsetIndex;
    Realf *gpu_blockDataOrdered = dev_blockDataOrdered[parallelOffsetIndex];
@@ -1184,38 +1181,34 @@ __global__ void __launch_bounds__(WID3, ACCELERATION_KERNEl_MIN_BLOCKS) accelera
    } // End this column
 } // end semilag acc kernel
 
-__global__ void __launch_bounds__(Hashinator::defaults::MAX_BLOCKSIZE/2) getCellIndexArray_kernel2(
-   BlockIndex *dev_blockIndex,
+__global__ void __launch_bounds__(Hashinator::defaults::MAX_BLOCKSIZE/2) geBlockIndexArray_kernel(
+   BlockIndex *dev_blockIndex1,
+   BlockIndex *dev_blockIndex2,
    size_t *dev_cellIdxStartCutoff,
-   int numberOfComputedVelocityBlocks,
-   int maxCellIndex
-   ){
-   
-   size_t totalBlockIndex = blockIdx.x*blockDim.x + threadIdx.x;
-   
-   if(totalBlockIndex >= (size_t)numberOfComputedVelocityBlocks){return;}
-   
-   // Binary search
-   int left = 0;
-   int right = maxCellIndex - 1;
-   int cellIndex = 0;
+   size_t maxCellIndex,
+   size_t stride,
+   size_t cutoffStride
+){
+   const size_t index = blockIdx.x*blockDim.x + threadIdx.x;
+   const size_t cellIndex = index/stride;
+   const size_t setIndex = index%stride;
 
-#ifdef DEBUG_SOLVERS
-   assert(right>=left);
-#endif
-
-   while (left <= right) {
-      int mid = (left + right) >> 1;
-      if (dev_cellIdxStartCutoff[mid] <= (size_t)totalBlockIndex) {
-         cellIndex = mid;
-         left = mid + 1;
-      } else {
-         right = mid - 1;
-      }
+   if(cellIndex >= maxCellIndex){
+      return;
    }
 
-   dev_blockIndex[totalBlockIndex].cellIndex = cellIndex;
-   dev_blockIndex[totalBlockIndex].setIndex = totalBlockIndex - dev_cellIdxStartCutoff[cellIndex];
+   const size_t totalBlockIndex1 = dev_cellIdxStartCutoff[cellIndex] + setIndex;
+   const size_t totalBlockIndex2 = dev_cellIdxStartCutoff[cutoffStride+cellIndex] + setIndex;
+
+   if(totalBlockIndex1 < dev_cellIdxStartCutoff[cellIndex+1]) {
+      dev_blockIndex1[totalBlockIndex1].cellIndex = cellIndex;
+      dev_blockIndex1[totalBlockIndex1].setIndex = setIndex;
+   }
+
+   if(totalBlockIndex2 < dev_cellIdxStartCutoff[cutoffStride+cellIndex+1]) {
+      dev_blockIndex2[totalBlockIndex2].cellIndex = cellIndex;
+      dev_blockIndex2[totalBlockIndex2].setIndex = setIndex;
+   }
 }
 
 /*!
@@ -1432,14 +1425,17 @@ __host__ bool gpu_acc_map_1d(
    CHK_ERR( gpuStreamSynchronize(baseStream) );
    scanTimer.stop();
 
-   SESSION_HOST_ALLOCATE(gpuMemoryManager, size_t, host_cellIdxStartCutoff, nLaunchCells*sizeof(size_t));
-   SESSION_ALLOCATE(gpuMemoryManager, size_t, dev_cellIdxStartCutoff, nLaunchCells*sizeof(size_t));
+   SESSION_HOST_ALLOCATE(gpuMemoryManager, size_t, host_cellIdxStartCutoff, 2*(nLaunchCells+1)*sizeof(size_t));
+   SESSION_ALLOCATE(gpuMemoryManager, size_t, dev_cellIdxStartCutoff, 2*(nLaunchCells+1)*sizeof(size_t));
 
    size_t *host_cellIdxStartCutoff = GET_SESSION_HOST_POINTER(gpuMemoryManager, size_t, host_cellIdxStartCutoff);
    size_t *dev_cellIdxStartCutoff = GET_SESSION_POINTER(gpuMemoryManager, size_t, dev_cellIdxStartCutoff);
 
    phiprof::Timer allocTimer {"ensure allocations"};
    int totalColumnSets = 0;
+   int totalColumns = 0;
+   int cutoffStride = nLaunchCells+1;
+   vmesh::LocalID largest_totalColumnSet = 0;
    // Ensure allocations (faster without threading)
    for (size_t cellIndex = 0; cellIndex < nLaunchCells; cellIndex++) {
       uint cellOffset = cellIndex + cumulativeOffset;
@@ -1448,34 +1444,43 @@ __host__ bool gpu_acc_map_1d(
       vmesh::LocalID host_totalColumnSets = (GET_SESSION_HOST_POINTER(gpuMemoryManager, vmesh::LocalID, host_nColumnSets))[cellIndex];
       vmesh::LocalID host_recapacitateVectors = (GET_POINTER(gpuMemoryManager, vmesh::LocalID, host_resizeSuccess))[cellOffset]; // resize of columnData vectors
       largest_totalColumns = std::max(largest_totalColumns,host_totalColumns);
+      largest_totalColumnSet = std::max(largest_totalColumnSet,host_totalColumnSets);
       host_cellIdxStartCutoff[cellIndex] = totalColumnSets;
+      host_cellIdxStartCutoff[cutoffStride+cellIndex] = totalColumns;
       if (host_recapacitateVectors) {
          // Can't call CPU reallocation directly as then copies go out of sync.
          // This function updates both CPU and GPU copies correctly.
          gpu_acc_allocate_perthread(cellIndex, host_totalColumns, host_totalColumnSets);
       }
       totalColumnSets += host_totalColumnSets;
+      totalColumns += host_totalColumns;
    } // end parallel region
    allocTimer.stop();
+   host_cellIdxStartCutoff[nLaunchCells] = totalColumnSets;
+   host_cellIdxStartCutoff[cutoffStride+nLaunchCells] = totalColumns;
 
-   SESSION_ALLOCATE(gpuMemoryManager, BlockIndex, dev_blockIndex, totalColumnSets*sizeof(BlockIndex));
+   SESSION_ALLOCATE(gpuMemoryManager, BlockIndex, dev_blockIndexColumnSets, totalColumnSets*sizeof(BlockIndex));
+   SESSION_ALLOCATE(gpuMemoryManager, BlockIndex, dev_blockIndexColumns, totalColumns*sizeof(BlockIndex));
 
-   BlockIndex *dev_blockIndex = GET_SESSION_POINTER(gpuMemoryManager, BlockIndex, dev_blockIndex);
+   BlockIndex *dev_blockIndexColumnSets = GET_SESSION_POINTER(gpuMemoryManager, BlockIndex, dev_blockIndexColumnSets);
+   BlockIndex *dev_blockIndexColumns = GET_SESSION_POINTER(gpuMemoryManager, BlockIndex, dev_blockIndexColumns);
 
    // Copy data to device
-   CHK_ERR( gpuMemcpy(dev_cellIdxStartCutoff, host_cellIdxStartCutoff, nLaunchCells*sizeof(size_t), gpuMemcpyHostToDevice) );
+   CHK_ERR( gpuMemcpy(dev_cellIdxStartCutoff, host_cellIdxStartCutoff, 2*(nLaunchCells+1)*sizeof(size_t), gpuMemcpyHostToDevice) );
 
-   int totalThreadsPerBlock_getCellIndexArray = Hashinator::defaults::MAX_BLOCKSIZE/2; //Using Hashinator::defaults::MAX_BLOCKSIZE/2 = 512 blocks can lead to better streaming multiprocessor occupancy
-   int maxThreadIndex_getCellIndexArray = totalColumnSets;
-   int blocksPerGrid_getCellIndexArray = (maxThreadIndex_getCellIndexArray+totalThreadsPerBlock_getCellIndexArray-1)/totalThreadsPerBlock_getCellIndexArray;
+   int threadsPerBlock_getBlockIndex = Hashinator::defaults::MAX_BLOCKSIZE/2; //Using Hashinator::defaults::MAX_BLOCKSIZE/2 = 512 blocks can lead to better streaming multiprocessor occupancy
+   int maxThreadIndex_getBlockIndex = max(largest_totalColumnSet, largest_totalColumns)*nLaunchCells;
+   int blocksPerGrid_getBlockIndex = (maxThreadIndex_getBlockIndex+threadsPerBlock_getBlockIndex-1)/threadsPerBlock_getBlockIndex;
 
    // Find spatial and velocity cell indices corresponding to each GPU block based on cutoffs,
    // so that each block will know the correct indeces in later kernels
-   getCellIndexArray_kernel2<<<blocksPerGrid_getCellIndexArray, totalThreadsPerBlock_getCellIndexArray>>>(
-      dev_blockIndex,
+   geBlockIndexArray_kernel<<<blocksPerGrid_getBlockIndex, threadsPerBlock_getBlockIndex>>>(
+      dev_blockIndexColumnSets,
+      dev_blockIndexColumns,
       dev_cellIdxStartCutoff,
-      totalColumnSets,
-      nLaunchCells
+      nLaunchCells,
+      max(largest_totalColumnSet, largest_totalColumns),
+      cutoffStride
    );
 
    // Now we have gathered all the required offsets into probeFlattened, and can
@@ -1518,16 +1523,16 @@ __host__ bool gpu_acc_map_1d(
 
    // Launch kernels for transposing and ordering velocity space data into columns
    phiprof::Timer reorderTimer {"reorder blocks"};
-   const dim3 grid_reorder(largest_totalColumns,nLaunchCells,1);
+   int blocksPerGrid_reorder = totalColumns;
    const dim3 block_reorder(WID,WID,WID);
-   reorder_blocks_by_dimension_kernel<<<grid_reorder, block_reorder, 0, baseStream>>> (
+   reorder_blocks_by_dimension_kernel<<<blocksPerGrid_reorder, block_reorder, 0, baseStream>>> (
       GET_POINTER(gpuMemoryManager, vmesh::VelocityBlockContainer*, dev_VBCs),
       GET_POINTER(gpuMemoryManager, Realf*, dev_blockDataOrdered),
       GET_POINTER(gpuMemoryManager, uint, gpu_cell_indices_to_id),
       GET_POINTER(gpuMemoryManager, split::SplitVector<vmesh::GlobalID>*, dev_vbwcl_vec), //dev_velocity_block_with_content_list, // use as LIDlist
       GET_POINTER(gpuMemoryManager, ColumnOffsets, dev_columnOffsetData),
-      GET_SESSION_POINTER(gpuMemoryManager, vmesh::LocalID, dev_nColumns),
-      cumulativeOffset
+      cumulativeOffset,
+      dev_blockIndexColumns
       );
    CHK_ERR( gpuPeekAtLastError() );
    CHK_ERR( gpuStreamSynchronize(baseStream) );
@@ -1555,7 +1560,7 @@ __host__ bool gpu_acc_map_1d(
       GET_POINTER(gpuMemoryManager, vmesh::LocalID, dev_resizeSuccess), // bailout flag: splitvector list_with_replace_new capacity error
       GET_POINTER(gpuMemoryManager, vmesh::LocalID, dev_overflownElements), // bailout flag: touching velspace wall
       cumulativeOffset,
-      dev_blockIndex
+      dev_blockIndexColumnSets
       );
    CHK_ERR( gpuPeekAtLastError() );
    // Check whether we exceeded the column data splitVectors on the way or if we need to bailout due to hitting v-space edge
@@ -1604,7 +1609,7 @@ __host__ bool gpu_acc_map_1d(
          GET_POINTER(gpuMemoryManager, vmesh::LocalID, dev_resizeSuccess), // bailout flag: splitvector list_with_replace_new capacity error
          GET_POINTER(gpuMemoryManager, vmesh::LocalID, dev_overflownElements), // bailout flag: touching velspace wall
          cumulativeOffset,
-         dev_blockIndex
+         dev_blockIndexColumnSets
          );
       CHK_ERR( gpuPeekAtLastError() );
       // Check whether we exceeded the column data splitVectors on the way and ensure capacity was now sufficient.
@@ -1747,7 +1752,7 @@ __host__ bool gpu_acc_map_1d(
       GET_POINTER(gpuMemoryManager, Real, dev_minValues), // indexing: cellOffset, used by slope limiters
       invalidLocalID,
       cumulativeOffset,
-      dev_blockIndex
+      dev_blockIndexColumnSets
       );
    CHK_ERR( gpuPeekAtLastError() );
    CHK_ERR( gpuStreamSynchronize(baseStream) );
