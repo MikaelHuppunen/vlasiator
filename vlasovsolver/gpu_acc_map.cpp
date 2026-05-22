@@ -171,11 +171,13 @@ __global__ void fill_probe_ordered(
    const uint flatExtent,
    const uint* __restrict__ gpu_block_indices_to_probe,
    const uint cumulativeOffset,
-   const size_t gpu_probeStride
+   const size_t gpu_probeStride,
+   const BlockIndex* __restrict__ dev_blockIndex
    ) {
+   const BlockIndex blockIndex = dev_blockIndex[blockIdx.x];
    const int ti = threadIdx.x; // [0,Hashinator::defaults::MAX_BLOCKSIZE)
-   const vmesh::LocalID LID = blockDim.x * blockIdx.x + ti;
-   const uint parallelOffsetIndex = blockIdx.y;
+   const vmesh::LocalID LID = blockDim.x * blockIndex.setIndex + ti;
+   const uint parallelOffsetIndex = blockIndex.cellIndex;
    const uint cellOffset = parallelOffsetIndex + cumulativeOffset;
    const vmesh::VelocityMesh* __restrict__ vmesh = vmeshes[cellOffset];
    const vmesh::LocalID nBlocks = vmesh->size();
@@ -1182,6 +1184,28 @@ __global__ void __launch_bounds__(WID3, ACCELERATION_KERNEl_MIN_BLOCKS) accelera
 } // end semilag acc kernel
 
 __global__ void __launch_bounds__(Hashinator::defaults::MAX_BLOCKSIZE/2) geBlockIndexArray_kernel(
+   BlockIndex *dev_blockIndex,
+   size_t *dev_cellIdxStartCutoff,
+   size_t maxCellIndex,
+   size_t stride
+){
+   const size_t index = blockIdx.x*blockDim.x + threadIdx.x;
+   const size_t cellIndex = index/stride;
+   const size_t setIndex = index%stride;
+
+   if(cellIndex >= maxCellIndex){
+      return;
+   }
+
+   const size_t totalBlockIndex = dev_cellIdxStartCutoff[cellIndex] + setIndex;
+
+   if(totalBlockIndex < dev_cellIdxStartCutoff[cellIndex+1]) {
+      dev_blockIndex[totalBlockIndex].cellIndex = cellIndex;
+      dev_blockIndex[totalBlockIndex].setIndex = setIndex;
+   }
+}
+
+__global__ void __launch_bounds__(Hashinator::defaults::MAX_BLOCKSIZE/2) geBlockIndexArray_kernel(
    BlockIndex *dev_blockIndex1,
    BlockIndex *dev_blockIndex2,
    size_t *dev_cellIdxStartCutoff,
@@ -1305,22 +1329,54 @@ __host__ bool gpu_acc_map_1d(
    size_t largestNBefore = 0;
    vmesh::LocalID largest_totalColumns = 0;
    vmesh::LocalID largest_nAfter = 0;
+   const size_t threadsPerBlock_fillProbe = Hashinator::defaults::MAX_BLOCKSIZE/2;
+   gpuMemoryManager.startSession(0,0);
 
+   SESSION_HOST_ALLOCATE(gpuMemoryManager, size_t, host_cellIdxStartCutoffNbefore, (nLaunchCells+1)*sizeof(size_t));
+   SESSION_ALLOCATE(gpuMemoryManager, size_t, dev_cellIdxStartCutoffNbefore, (nLaunchCells+1)*sizeof(size_t));
+
+   size_t *host_cellIdxStartCutoffNbefore = GET_SESSION_HOST_POINTER(gpuMemoryManager, size_t, host_cellIdxStartCutoffNbefore);
+   size_t *dev_cellIdxStartCutoffNbefore = GET_SESSION_POINTER(gpuMemoryManager, size_t, dev_cellIdxStartCutoffNbefore);
+
+   int totalNbeforeBlocks = 0;
    for (size_t cellIndex = 0; cellIndex < nLaunchCells; cellIndex++) {
       const CellID cid = launchCells[cellIndex];
       const SpatialCell* SC = mpiGrid[cid];
       largestSizePower = std::max(largestSizePower, (size_t)SC->vbwcl_sizePower);
       largestSizePower = std::max(largestSizePower, (size_t)SC->vbwncl_sizePower);
       largestNBefore = std::max(largestNBefore, (size_t)SC->get_number_of_velocity_blocks(popID));
+      host_cellIdxStartCutoffNbefore[cellIndex] = totalNbeforeBlocks;
+      totalNbeforeBlocks += ((size_t)SC->get_number_of_velocity_blocks(popID)+threadsPerBlock_fillProbe-1)/threadsPerBlock_fillProbe;
    }
    prepTimer.stop();
+   host_cellIdxStartCutoffNbefore[nLaunchCells] = totalNbeforeBlocks;
+
+   int threadsPerBlock_getBlockIndex = Hashinator::defaults::MAX_BLOCKSIZE/2; //Using Hashinator::defaults::MAX_BLOCKSIZE/2 = 512 blocks can lead to better streaming multiprocessor occupancy
+   int largestNBeforeBlock = (largestNBefore+threadsPerBlock_fillProbe-1)/threadsPerBlock_fillProbe;
+   int maxThreadIndex_getBlockIndex = largestNBeforeBlock*nLaunchCells;
+   int blocksPerGrid_getBlockIndex = (maxThreadIndex_getBlockIndex+threadsPerBlock_getBlockIndex-1)/threadsPerBlock_getBlockIndex;
+
+   SESSION_ALLOCATE(gpuMemoryManager, BlockIndex, dev_blockIndexNBefore, totalNbeforeBlocks*sizeof(BlockIndex));
+
+   BlockIndex *dev_blockIndexNBefore = GET_SESSION_POINTER(gpuMemoryManager, BlockIndex, dev_blockIndexNBefore);
+
+   // Copy data to device
+   CHK_ERR( gpuMemcpy(dev_cellIdxStartCutoffNbefore, host_cellIdxStartCutoffNbefore, (nLaunchCells+1)*sizeof(size_t), gpuMemcpyHostToDevice) );
+
+   // Find spatial and velocity cell indices corresponding to each GPU block based on cutoffs,
+   // so that each block will know the correct indeces in later kernels
+   geBlockIndexArray_kernel<<<blocksPerGrid_getBlockIndex, threadsPerBlock_getBlockIndex>>>(
+      dev_blockIndexNBefore,
+      dev_cellIdxStartCutoffNbefore,
+      nLaunchCells,
+      largestNBeforeBlock
+   );
 
    phiprof::Timer clearTimer {"clear and prepare probe buffers"};
    // Clear hash maps used to evaluate block updates
    clear_maps_caller(nLaunchCells,largestSizePower,0,cumulativeOffset);
 
    gpu_calculateProbeAllocation(nLaunchCells);
-   gpuMemoryManager.startSession(0,0);
    
    SESSION_ALLOCATE(gpuMemoryManager, vmesh::LocalID, dev_probeCubeData, gpu_getAllocationCount()*gpu_probeStride*sizeof(vmesh::LocalID));
 
@@ -1355,15 +1411,14 @@ __host__ bool gpu_acc_map_1d(
    phiprof::Timer fillTimer {"fill probe cube"};
    // Read in GID list from vmesh, store LID values into probe cube in correct order
    // Launch params, fast ceil for positive ints
-   const size_t n_fill_ord = 1 + ((largestNBefore - 1) / Hashinator::defaults::MAX_BLOCKSIZE);
-   const dim3 grid_fill_ord(n_fill_ord,nLaunchCells,1);
-   fill_probe_ordered<<<grid_fill_ord,Hashinator::defaults::MAX_BLOCKSIZE,0,baseStream>>>(
+   fill_probe_ordered<<<totalNbeforeBlocks,threadsPerBlock_fillProbe,0,baseStream>>>(
       GET_POINTER(gpuMemoryManager, vmesh::VelocityMesh*, dev_vmeshes),
       GET_SESSION_POINTER(gpuMemoryManager, vmesh::LocalID, dev_probeCubeData), // recast to vmesh::LocalID *probeCube
       flatExtent,
       GET_POINTER(gpuMemoryManager, uint, gpu_block_indices_to_probe),
       cumulativeOffset,
-      gpu_probeStride
+      gpu_probeStride,
+      dev_blockIndexNBefore
       );
    CHK_ERR( gpuPeekAtLastError() );
    CHK_ERR( gpuStreamSynchronize(baseStream) );
@@ -1458,6 +1513,7 @@ __host__ bool gpu_acc_map_1d(
    allocTimer.stop();
    host_cellIdxStartCutoff[nLaunchCells] = totalColumnSets;
    host_cellIdxStartCutoff[cutoffStride+nLaunchCells] = totalColumns;
+   int cellStride = max(largest_totalColumnSet, largest_totalColumns);
 
    SESSION_ALLOCATE(gpuMemoryManager, BlockIndex, dev_blockIndexColumnSets, totalColumnSets*sizeof(BlockIndex));
    SESSION_ALLOCATE(gpuMemoryManager, BlockIndex, dev_blockIndexColumns, totalColumns*sizeof(BlockIndex));
@@ -1468,9 +1524,8 @@ __host__ bool gpu_acc_map_1d(
    // Copy data to device
    CHK_ERR( gpuMemcpy(dev_cellIdxStartCutoff, host_cellIdxStartCutoff, 2*(nLaunchCells+1)*sizeof(size_t), gpuMemcpyHostToDevice) );
 
-   int threadsPerBlock_getBlockIndex = Hashinator::defaults::MAX_BLOCKSIZE/2; //Using Hashinator::defaults::MAX_BLOCKSIZE/2 = 512 blocks can lead to better streaming multiprocessor occupancy
-   int maxThreadIndex_getBlockIndex = max(largest_totalColumnSet, largest_totalColumns)*nLaunchCells;
-   int blocksPerGrid_getBlockIndex = (maxThreadIndex_getBlockIndex+threadsPerBlock_getBlockIndex-1)/threadsPerBlock_getBlockIndex;
+   maxThreadIndex_getBlockIndex = cellStride*nLaunchCells;
+   blocksPerGrid_getBlockIndex = (maxThreadIndex_getBlockIndex+threadsPerBlock_getBlockIndex-1)/threadsPerBlock_getBlockIndex;
 
    // Find spatial and velocity cell indices corresponding to each GPU block based on cutoffs,
    // so that each block will know the correct indeces in later kernels
@@ -1479,7 +1534,7 @@ __host__ bool gpu_acc_map_1d(
       dev_blockIndexColumns,
       dev_cellIdxStartCutoff,
       nLaunchCells,
-      max(largest_totalColumnSet, largest_totalColumns),
+      cellStride,
       cutoffStride
    );
 
