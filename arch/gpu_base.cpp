@@ -100,6 +100,21 @@ unsigned int nextPowerOfTwo(unsigned int n) {
    return n + 1;
 }
 
+unsigned int nextPowerOfTwoExponent(unsigned int n) {
+   if (n <= 1) return 0;
+
+   n--; // Handle exact powers of two
+
+   unsigned int exponent = 0;
+
+   while (n > 0) {
+      n >>= 1;
+      exponent++;
+   }
+
+   return exponent;
+}
+
 __host__ void gpu_init_device() {
    const uint maxNThreads = gpu_getMaxThreads();
    int deviceCount;

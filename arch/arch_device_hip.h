@@ -107,6 +107,7 @@
 /* values used by kernels */
 #ifndef GPUTHREADS
 #define GPUTHREADS (64)
+#define GPUTHREADS_EXPONENT (6)
 #endif
 #ifndef WARPSPERBLOCK
 #define WARPSPERBLOCK (16)
