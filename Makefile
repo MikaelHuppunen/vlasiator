@@ -162,10 +162,15 @@ ifdef VPREC
 endif
 
 # Set compiler flags
+ifndef CXXFLAGSHOST
+CXXFLAGSHOST := $(CXXFLAGS)
+endif
+CXXFLAGSHOST += ${COMPFLAGS}
 CXXFLAGS += ${COMPFLAGS}
 #also for testpackage (due to makefile order this needs to be done also separately for targets)
+testpackage: CXXFLAGSHOST += ${COMPFLAGS}
 testpackage: CXXFLAGS += ${COMPFLAGS}
-CXXEXTRAFLAGS = ${CXXFLAGS} -DTOOL_NOT_PARALLEL
+CXXEXTRAFLAGS = ${CXXFLAGSHOST} -DTOOL_NOT_PARALLEL
 
 default: vlasiator
 
@@ -272,7 +277,7 @@ COMMIT_PROFILE=$(shell cd ${subst -isystem,,${subst -I,,${INC_PROFILE}}} && git 
 # Build version description file
 version.cpp: FORCE
 	@echo "[GENERATE] version.cpp"
-	$(SILENT)./generate_version.sh "${CMP}" "${CXXFLAGS}" "${FLAGS}" "${INC_MPI}" "${INC_ZOLTAN}" "${INC_BOOST}" "${INC_DCCRG}" "${COMMIT_DCCRG}" "${INC_FSGRID}" "${COMMIT_FSGRID}"  "${INC_VLSV}" "${COMMIT_VLSV}" "${INC_HASHINATOR}" "${COMMIT_HASHINATOR}" "${INC_PROFILE}" "${COMMIT_PROFILE}"
+	$(SILENT)./generate_version.sh "${CMP}" "${CXXFLAGSHOST}" "${FLAGS}" "${INC_MPI}" "${INC_ZOLTAN}" "${INC_BOOST}" "${INC_DCCRG}" "${COMMIT_DCCRG}" "${INC_FSGRID}" "${COMMIT_FSGRID}"  "${INC_VLSV}" "${COMMIT_VLSV}" "${INC_HASHINATOR}" "${COMMIT_HASHINATOR}" "${INC_PROFILE}" "${COMMIT_PROFILE}"
 
 # Do not autobuild sub-versions of spatial_cell
 %.o: spatial_cells/%.cpp
@@ -316,7 +321,7 @@ endif
 # for all files in the backgroundfield/ dir
 %.o: backgroundfield/%.cpp  backgroundfield/constantfield.hpp backgroundfield/fieldfunction.hpp backgroundfield/functions.hpp backgroundfield/backgroundfield.h
 	@echo [CC] $<
-	$(SILENT)${CMP} ${CXXFLAGS} ${MATHFLAGS} ${FLAGS} -c $< ${INC_DCCRG} ${INC_ZOLTAN} ${INC_FSGRID}
+	$(SILENT)${CMP} ${CXXFLAGSHOST} ${MATHFLAGS} ${FLAGS} -c $< ${INC_DCCRG} ${INC_ZOLTAN} ${INC_FSGRID}
 
 # for all files in the datareduction/ dir
 %.o: datareduction/%.cpp ${DEPS_COMMON} datareduction/datareductionoperator.h fieldtracing/fieldtracing.h sysboundary/ionosphere.h datareduction/dro_populations.h
@@ -373,11 +378,11 @@ OBJS_PARTICLES = particles/physconst.o particles/particles.o particles/readfield
 
 # todo: verify compilation and working of tools other than vlsvdiff
 vlsvextract: ${DEPS_VLSVREADER} ${DEPS_VLSVREADERINTERFACE} tools/vlsvextract.h tools/vlsvextract.cpp ${OBJS_VLSVREADER} ${OBJS_VLSVREADERINTERFACE}
-	${CMP} ${CXXFLAGS} ${FLAGS} -c tools/vlsvextract.cpp ${INC_BOOST} ${INC_DCCRG} ${INC_EIGEN} ${INC_VLSV} -I$(CURDIR)
+	${CMP} ${CXXFLAGSHOST} ${FLAGS} -c tools/vlsvextract.cpp ${INC_BOOST} ${INC_DCCRG} ${INC_EIGEN} ${INC_VLSV} -I$(CURDIR)
 	${LNK} -o vlsvextract_${FP_PRECISION} vlsvextract.o  ${OBJS_VLSVREADERINTERFACE} ${LIB_BOOST} ${LIB_DCCRG}  ${LIB_VLSV} ${LDFLAGS}
 
 vlsv2silo:  ${DEPS_VLSVREADERINTERFACE} tools/vlsv2silo.cpp  ${OBJS_VLSVREADERINTERFACE}
-	${CMP} ${CXXFLAGS} ${FLAGS} -c tools/vlsv2silo.cpp ${INC_SILO} ${INC_VLSV} -I$(CURDIR)
+	${CMP} ${CXXFLAGSHOST} ${FLAGS} -c tools/vlsv2silo.cpp ${INC_SILO} ${INC_VLSV} -I$(CURDIR)
 	${LNK} -o vlsv2silo_${FP_PRECISION} vlsv2silo.o  ${OBJS_VLSVREADERINTERFACE} ${LIB_SILO} ${LIB_VLSV} ${LDFLAGS}
 
 vlsvdiff: ${DEPS_VLSVREADERINTERFACE} tools/vlsvdiff.cpp ${OBJS_VLSVREADEREXTRA} ${OBJS_VLSVREADERINTERFACE}
@@ -386,38 +391,38 @@ vlsvdiff: ${DEPS_VLSVREADERINTERFACE} tools/vlsvdiff.cpp ${OBJS_VLSVREADEREXTRA}
 	$(SILENT)${LNK} ${LDFLAGS} -o vlsvdiff_${FP_PRECISION} vlsvdiff.o ${OBJS_VLSVREADERINTERFACE} ${LIB_VLSV} ${LIBS}
 
 vlsvreaderinterface.o:  tools/vlsvreaderinterface.h tools/vlsvreaderinterface.cpp
-	${CMP} ${CXXFLAGS} ${FLAGS} -c tools/vlsvreaderinterface.cpp ${INC_VLSV} -I$(CURDIR)
+	${CMP} ${CXXFLAGSHOST} ${FLAGS} -c tools/vlsvreaderinterface.cpp ${INC_VLSV} -I$(CURDIR)
 
 vlsv_util.o: tools/vlsv_util.h tools/vlsv_util.cpp
-	${CMP} ${CXXFLAGS} ${FLAGS} -c tools/vlsv_util.cpp
+	${CMP} ${CXXFLAGSHOST} ${FLAGS} -c tools/vlsv_util.cpp
 
 particles/particleparameters.o: ${DEPS_PARTICLES}  ${OBJS_VLSVREADERINTERFACE} particles/particleparameters.cpp
-	${CMP} ${CXXFLAGS} ${FLAGS} -c particles/particleparameters.cpp ${INC_VLSV} ${INC_EIGEN} ${INC_BOOST} -I$(CURDIR) -Itools -o $@
+	${CMP} ${CXXFLAGSHOST} ${FLAGS} -c particles/particleparameters.cpp ${INC_VLSV} ${INC_EIGEN} ${INC_BOOST} -I$(CURDIR) -Itools -o $@
 
 particles/readfields.o: ${DEPS_PARTICLES}  ${OBJS_VLSVREADERINTERFACE} particles/readfields.cpp
-	${CMP} ${CXXFLAGS} ${FLAGS} -c particles/readfields.cpp ${INC_VLSV} ${INC_EIGEN} ${INC_FSGRID} -I$(CURDIR) -Itools -o $@
+	${CMP} ${CXXFLAGSHOST} ${FLAGS} -c particles/readfields.cpp ${INC_VLSV} ${INC_EIGEN} ${INC_FSGRID} -I$(CURDIR) -Itools -o $@
 
 particles/particles.o: ${DEPS_PARTICLES}  ${OBJS_VLSVREADERINTERFACE} particles/particles.cpp
-	${CMP} ${CXXFLAGS} ${FLAGS} -c particles/particles.cpp ${INC_VLSV} ${INC_EIGEN} -I$(CURDIR) -Itools -o $@
+	${CMP} ${CXXFLAGSHOST} ${FLAGS} -c particles/particles.cpp ${INC_VLSV} ${INC_EIGEN} -I$(CURDIR) -Itools -o $@
 
 particles/distribution.o: ${DEPS_PARTICLES}  ${OBJS_VLSVREADERINTERFACE} particles/distribution.cpp
-	${CMP} ${CXXFLAGS} ${FLAGS} -c particles/distribution.cpp ${INC_VLSV} ${INC_EIGEN} -I$(CURDIR) -Itools -o $@
+	${CMP} ${CXXFLAGSHOST} ${FLAGS} -c particles/distribution.cpp ${INC_VLSV} ${INC_EIGEN} -I$(CURDIR) -Itools -o $@
 
 particles/scenario.o: ${DEPS_PARTICLES}  ${OBJS_VLSVREADERINTERFACE} particles/scenario.cpp
-	${CMP} ${CXXFLAGS} ${FLAGS} -c particles/scenario.cpp ${INC_VLSV} ${INC_EIGEN} -I$(CURDIR) -Itools -o $@
+	${CMP} ${CXXFLAGSHOST} ${FLAGS} -c particles/scenario.cpp ${INC_VLSV} ${INC_EIGEN} -I$(CURDIR) -Itools -o $@
 
 particles/physconst.o: ${DEPS_PARTICLES}  ${OBJS_VLSVREADERINTERFACE} particles/physconst.cpp
-	${CMP} ${CXXFLAGS} ${FLAGS} -c particles/physconst.cpp ${INC_VLSV} ${INC_EIGEN} -I$(CURDIR) -Itools -o $@
+	${CMP} ${CXXFLAGSHOST} ${FLAGS} -c particles/physconst.cpp ${INC_VLSV} ${INC_EIGEN} -I$(CURDIR) -Itools -o $@
 
 particles/histogram.o: ${DEPS_PARTICLES}  ${OBJS_VLSVREADERINTERFACE} particles/histogram.cpp
-	${CMP} ${CXXFLAGS} ${FLAGS} -c particles/histogram.cpp ${INC_VLSV} ${INC_EIGEN} -I$(CURDIR) -Itools -o $@
+	${CMP} ${CXXFLAGSHOST} ${FLAGS} -c particles/histogram.cpp ${INC_VLSV} ${INC_EIGEN} -I$(CURDIR) -Itools -o $@
 
 particle_post_pusher: ${OBJS_PARTICLES} ${DEPS_PARTICLES}  ${OBJS_VLSVREADERINTERFACE} particles/particle_post_pusher.cpp
-	${CMP} ${CXXFLAGS} ${FLAGS} -c particles/particle_post_pusher.cpp ${INC_VLSV} ${INC_EIGEN} ${INC_FSGRID} -I$(CURDIR) -Itools
+	${CMP} ${CXXFLAGSHOST} ${FLAGS} -c particles/particle_post_pusher.cpp ${INC_VLSV} ${INC_EIGEN} ${INC_FSGRID} -I$(CURDIR) -Itools
 	${LNK} -o $@ particle_post_pusher.o ${OBJS_PARTICLES}  ${OBJS_VLSVREADERINTERFACE} ${LIBS} ${LDFLAGS}
 
 fluxfunction.o:  tools/fluxfunction.cpp
-	${CMP} ${CXXFLAGS} ${FLAGS} -c tools/fluxfunction.cpp ${INC_VLSV} ${INC_EIGEN} ${INC_FSGRID} -I$(CURDIR)  -Itools -o $@
+	${CMP} ${CXXFLAGSHOST} ${FLAGS} -c tools/fluxfunction.cpp ${INC_VLSV} ${INC_EIGEN} ${INC_FSGRID} -I$(CURDIR)  -Itools -o $@
 
 fluxfunction: fluxfunction.o ${OBJS_VLSVREADERINTERFACE} particles/readfields.o particles/particleparameters.o readparameters.o version.o particles/physconst.o particles/distribution.o
 	${LNK} -o $@ fluxfunction.o particles/readfields.o particles/particleparameters.o readparameters.o version.o particles/physconst.o particles/distribution.o ${OBJS_VLSVREADERINTERFACE} ${LIB_VLSV} ${LIB_BOOST} ${LDFLAGS}
