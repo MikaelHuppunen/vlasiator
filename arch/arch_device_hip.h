@@ -307,6 +307,18 @@ namespace arch{
    template <typename Lambda, typename T>
    __device__ __forceinline__ static void lambda_eval(const uint (&idx)[4], T * __restrict__ thread_data, Lambda loop_body) { loop_body(idx[0], idx[1], idx[2], idx[3], thread_data); }
 
+   template <typename Lambda, typename T>
+   __device__ __forceinline__ static void lambda_eval(const uint (&idx)[1], T * __restrict__ thread_data, Lambda loop_body, const uint cellIndex, const uint popID) { loop_body(idx[0], cellIndex, popID, thread_data); }
+
+   template <typename Lambda, typename T>
+   __device__ __forceinline__ static void lambda_eval(const uint (&idx)[2], T * __restrict__ thread_data, Lambda loop_body, const uint cellIndex, const uint popID) { loop_body(idx[0], idx[1], cellIndex, popID, thread_data); }
+
+   template <typename Lambda, typename T>
+   __device__ __forceinline__ static void lambda_eval(const uint (&idx)[3], T * __restrict__ thread_data, Lambda loop_body, const uint cellIndex, const uint popID) { loop_body(idx[0], idx[1], idx[2], cellIndex, popID, thread_data); }
+
+   template <typename Lambda, typename T>
+   __device__ __forceinline__ static void lambda_eval(const uint (&idx)[4], T * __restrict__ thread_data, Lambda loop_body, const uint cellIndex, const uint popID) { loop_body(idx[0], idx[1], idx[2], idx[3], cellIndex, popID, thread_data); }
+
 /* Get the index for the underlying dimension, and call the respective lambda wrapper */
    template <uint NDim, typename Lambda, typename T>
    __device__ __forceinline__ static void loop_eval(const uint idx_glob, const uint * __restrict__ lims, T * __restrict__ thread_data, Lambda loop_body) {
@@ -328,6 +340,46 @@ namespace arch{
       }
       lambda_eval(idx, thread_data, loop_body);
    }
+
+
+/* Get the index for the underlying dimension, and call the respective lambda wrapper */
+   template <uint NDim, typename Lambda, typename T>
+   __device__ __forceinline__ static void loop_eval(const uint index, const uint cellIndex, const uint popID, const uint idx_glob, const uint *__restrict__ limitDimensions, const uint* * __restrict__ lims, T * __restrict__ thread_data, Lambda loop_body) {
+      uint idx[NDim];
+      uint indices[NDim];
+      switch (NDim)
+      {
+         // Note: intended fall-through
+         case 4:
+            indices[3] = limitDimensions[3] == 1 ? 0 : index;
+         case 3:
+            indices[2] = limitDimensions[2] == 1 ? 0 : index;
+         case 2:
+            indices[1] = limitDimensions[1] == 1 ? 0 : index;
+         case 1:
+            indices[0] = limitDimensions[0] == 1 ? 0 : index;
+            break;
+         default:
+            assert( 0 && "incorrect reduction dimensions, abort!\n");
+      }
+      switch (NDim)
+      {
+         // Note: intended fall-through
+         case 4:
+            idx[3] = (idx_glob / (lims[0][indices[0]] * lims[1][indices[1]] * lims[2][indices[2]])) % lims[3][indices[3]];
+         case 3:
+            idx[2] = (idx_glob / (lims[0][indices[0]] * lims[1][indices[1]])) % lims[2][indices[2]];
+         case 2:
+            idx[1] = (idx_glob / lims[0][indices[0]]) % lims[1][indices[1]];
+         case 1:
+            idx[0] = idx_glob % lims[0][indices[0]];
+            break;
+         default:
+            assert( 0 && "incorrect reduction dimensions, abort!\n");
+      }
+      lambda_eval(idx, thread_data, loop_body, cellIndex, popID);
+   }
+
 
 /* A general device kernel for reductions */
    template <uint Blocksize, reduce_op Op, uint NDim, uint NReduStatic, typename Lambda, typename T>
@@ -409,6 +461,101 @@ namespace arch{
             if(threadIdx.x == 0) {
                printf("ERROR at %s:%d: Invalid reduction identifier \"Op\".", __FILE__, __LINE__);
             }
+      }
+   }
+
+/* A general device kernel for reductions */
+   template <uint Blocksize, reduce_op Op, uint NDim, uint NReduStatic, typename Lambda, typename T>
+   __global__ static void __launch_bounds__(ARCH_BLOCKSIZE_R)
+      reduction_kernel(Lambda loop_body, const T * __restrict__ init_val, T * __restrict__ rslt, const uint *__restrict__ limitDimensions, const uint* * __restrict__ lims, const uint n_redu_dynamic, T *thread_data_dynamic)
+   {
+      /* Get the global 1D thread index*/
+      const uint idx_glob = blockIdx.x * blockDim.x + threadIdx.x;
+      const uint cellIndex = blockIdx.y;
+      const uint popID = blockIdx.z;
+      const uint index = cellIndex*gridDim.z + popID;
+
+      uint n_total = 1;
+      for(uint i = 0; i < NDim; i++) {
+         if(limitDimensions[i] == 1){
+            n_total *= lims[i][0];
+         }else{
+            n_total *= lims[i][index];
+         }
+      }
+
+      if (Op == reduce_op::null) {
+         T *thread_data = 0;
+         /* Check the loop limits and evaluate the loop body */
+         if (idx_glob < n_total) {
+            loop_eval<NDim>(index, cellIndex, popID, idx_glob, limitDimensions, lims, thread_data, loop_body);
+         }
+         return;
+      }
+
+      /* Specialize BlockReduce for a 1D block of Blocksize threads of type `T` */
+      typedef hipcub::BlockReduce<T, Blocksize, hipcub::BLOCK_REDUCE_RAKING_COMMUTATIVE_ONLY, 1, 1> BlockReduce;
+
+      /* Dynamic shared memory declaration */
+      extern __shared__ char temp_storage_dynamic[];
+
+      /* Static shared memory declaration */
+      constexpr uint size = NReduStatic ? NReduStatic : 1;
+      __shared__ typename BlockReduce::TempStorage temp_storage_static[size];
+
+      /* Assign a pointer to the shared memory (dynamic or static case) */
+      typename BlockReduce::TempStorage *temp_storage = NReduStatic ? temp_storage_static : (typename BlockReduce::TempStorage*) temp_storage_dynamic;
+
+      /* Static thread data declaration */
+      T thread_data_static[size];
+
+      /* Assign a pointer to the thread data (dynamic or static case)*/
+      T *thread_data = NReduStatic ? thread_data_static : &thread_data_dynamic[n_redu_dynamic * idx_glob];
+
+      /* Get the number of reductions (may be known at compile time or not) */
+      const uint n_reductions = NReduStatic ? NReduStatic : n_redu_dynamic;
+
+      /* Set initial values */
+      for(uint i = 0; i < n_reductions; i++){
+         if (Op == reduce_op::sum) {
+            thread_data[i] = 0;
+         } else {
+            thread_data[i] = init_val[i];
+         }
+      }
+
+      /* Check the loop limits and evaluate the loop body */
+      if (idx_glob < n_total) {
+         loop_eval<NDim>(index, cellIndex, popID, idx_glob, limitDimensions, lims, thread_data, loop_body);
+      }
+
+      /* Perform reductions */
+      for(uint i = 0; i < n_reductions; i++){
+         /* Compute the block-wide sum for thread 0 which stores it */
+         if(Op == reduce_op::sum){
+            T aggregate = BlockReduce(temp_storage[i]).Sum(thread_data[i]);
+            /* The first thread of each block stores the block-wide aggregate atomically */
+            if(threadIdx.x == 0) {
+               atomicAdd(&rslt[n_reductions*index+i], aggregate);
+            }
+         }
+         else if(Op == reduce_op::max){
+            T aggregate = BlockReduce(temp_storage[i]).Reduce(thread_data[i], hipcub::Max());
+            if(threadIdx.x == 0) {
+               atomicMax(&rslt[n_reductions*index+i], aggregate);
+            }
+         }
+         else if(Op == reduce_op::min){
+            T aggregate = BlockReduce(temp_storage[i]).Reduce(thread_data[i], hipcub::Min());
+            if(threadIdx.x == 0) {
+               atomicMin(&rslt[n_reductions*index+i], aggregate);
+            }
+         } else {
+            /* Other reduction operations are not supported - print an error message */
+            if(threadIdx.x == 0) {
+               printf("ERROR at %s:%d: Invalid reduction identifier \"Op\".", __FILE__, __LINE__);
+            }
+         }
       }
    }
 
@@ -541,6 +688,170 @@ namespace arch{
       CHK_ERR(hipFreeAsync(d_buf, gpuStreamList[thread_id]));
       CHK_ERR(hipFreeAsync(d_const_buf, gpuStreamList[thread_id]));
       CHK_ERR(hipFreeAsync(d_limits, gpuStreamList[thread_id]));
+   }
+
+
+/* Parallel reduce driver function for the HIP reductions */
+   template <reduce_op Op, uint NReduStatic, uint NDim, typename Lambda, typename T>
+   __forceinline__ static void parallel_reduce_driver(const uint (&blockDimensions)[2], const uint (&limitDimensions)[NDim], const uint* (&limits)[NDim], Lambda loop_body, T *sum, const uint n_redu_dynamic) {
+
+      /* Get the CPU thread id */
+#ifdef _OPENMP
+      const uint thread_id = omp_get_thread_num();
+#else
+      const uint thread_id = 0;
+#endif
+
+      /* Get the number of reductions (may be known at compile time or not) */
+      const uint n_reductions = NReduStatic ? NReduStatic : n_redu_dynamic;
+
+      uint *limitsData[NDim];
+      uint *host_limits[NDim];
+
+      /* Calculate the required size for the 1D kernel */
+      uint n_total = 1;
+      for(uint i = 0; i < NDim; i++) {
+         CHK_ERR(hipMallocAsync(&limitsData[i], limitDimensions[i]*sizeof(uint), gpuStreamList[thread_id]));
+         if(limitDimensions[i] == 1){
+            n_total *= limits[i][0];
+         }else{
+            uint maxNBlocks = 0;
+            for(uint celli = 0; celli < blockDimensions[0]; celli++){
+               for (uint popID = 0; popID < blockDimensions[1]; ++popID) {
+                  maxNBlocks = std::max(maxNBlocks, limits[i][celli*blockDimensions[1] + popID]);
+               }
+            }
+            n_total *= maxNBlocks;
+         }
+         CHK_ERR(hipMemcpyAsync(limitsData[i], limits[i], limitDimensions[i]*sizeof(uint), hipMemcpyHostToDevice,gpuStreamList[thread_id]));
+         host_limits[i] = limitsData[i];
+      }
+
+      /* Check the HIP default mempool settings and correct if wrong */
+      device_mempool_check(UINT64_MAX);
+
+      /* Create a device buffer to transfer the loop limits of each dimension to device */
+      const uint** d_limits;
+      uint *dev_limitDimensions;
+      CHK_ERR(hipMallocAsync(&d_limits, NDim*sizeof(uint*), gpuStreamList[thread_id]));
+      CHK_ERR(hipMallocAsync(&dev_limitDimensions, NDim*sizeof(uint), gpuStreamList[thread_id]));
+      CHK_ERR(hipMemcpyAsync(d_limits, host_limits, NDim*sizeof(uint*), hipMemcpyHostToDevice,gpuStreamList[thread_id]));
+      CHK_ERR(hipMemcpyAsync(dev_limitDimensions, limitDimensions, NDim*sizeof(uint), hipMemcpyHostToDevice,gpuStreamList[thread_id]));
+
+      /* Simple action for non-reducing call */
+      if (Op == reduce_op::null) {
+         T *d_const_buf = 0;
+         T *d_buf = 0;
+         T *d_thread_data_dynamic = 0;
+         /* Set the kernel dimensions */
+         const uint blocksize = ARCH_BLOCKSIZE_R;
+         const uint gridsize_x = (n_total - 1 + blocksize) / blocksize;
+         dim3 gridsize(gridsize_x, blockDimensions[0], blockDimensions[1]);
+         /* Call the kernel (the number of reductions known at compile time) */
+         if(gridsize_x > 0) {
+            reduction_kernel<ARCH_BLOCKSIZE_R, Op, NDim, NReduStatic><<<gridsize, blocksize, 0, gpuStreamList[thread_id]>>>(
+               loop_body, d_const_buf, d_buf, dev_limitDimensions, d_limits, n_reductions, d_thread_data_dynamic);
+         }
+         /* Check for kernel launch errors */
+         CHK_ERR(hipPeekAtLastError());
+         /* Synchronize after kernel call */
+         CHK_ERR(hipStreamSynchronize(gpuStreamList[thread_id]));
+         CHK_ERR(hipFreeAsync(d_limits, gpuStreamList[thread_id]));
+         for(uint i = 0; i < NDim; i++) {
+            CHK_ERR(hipFreeAsync(limitsData[i], gpuStreamList[thread_id]));
+         }
+         CHK_ERR(hipFreeAsync(dev_limitDimensions, gpuStreamList[thread_id]));
+         CHK_ERR( gpuPeekAtLastError() );
+         return;
+      }
+
+      /* Create a device buffer for the reduction results */
+      T *dev_sum;
+      CHK_ERR(hipMallocAsync(&dev_sum, blockDimensions[0]*blockDimensions[1]*sizeof(T), gpuStreamList[thread_id]));
+      CHK_ERR(hipMemcpyAsync(dev_sum, sum, blockDimensions[0]*blockDimensions[1]*sizeof(T), hipMemcpyHostToDevice,gpuStreamList[thread_id]));
+      T* d_buf = &dev_sum[0];
+
+      /* Create a device buffer to transfer the initial values to device */
+      T* d_const_buf;
+      CHK_ERR(hipMallocAsync(&d_const_buf, n_reductions*blockDimensions[0]*blockDimensions[1]*sizeof(T), gpuStreamList[thread_id]));
+      CHK_ERR(hipMemcpyAsync(d_const_buf, d_buf, n_reductions*blockDimensions[0]*blockDimensions[1]*sizeof(T), hipMemcpyDeviceToDevice, gpuStreamList[thread_id]));
+
+      /* Call the reduction kernel with different arguments depending
+      * on if the number of reductions is known at the compile time
+      */
+      T* d_thread_data_dynamic = 0; // declared zero to suppress unitialized use warning
+      if(NReduStatic == 0) {
+         /* Get the cub temp storage sizes for the dynamic shared memory kernel argument */
+         constexpr auto cub_temp_storage_type_size = sizeof(typename hipcub::BlockReduce<T, ARCH_BLOCKSIZE_R, hipcub::BLOCK_REDUCE_RAKING_COMMUTATIVE_ONLY, 1, 1>::TempStorage);
+         constexpr auto cub_temp_storage_type_size_small = sizeof(typename hipcub::BlockReduce<T, ARCH_BLOCKSIZE_R_SMALL, hipcub::BLOCK_REDUCE_RAKING_COMMUTATIVE_ONLY, 1, 1>::TempStorage);
+         /* Query device properties */
+         int device_id;
+         CHK_ERR(hipGetDevice(&device_id));
+         hipDeviceProp deviceProp;
+         CHK_ERR(hipGetDeviceProperties(&deviceProp, device_id));
+         /* Make sure there is enough shared memory for the used block size */
+         uint blocksize;
+         size_t shared_mem_bytes_per_block_request;
+         if(n_reductions * cub_temp_storage_type_size <= deviceProp.sharedMemPerBlock){
+         blocksize = ARCH_BLOCKSIZE_R;
+         shared_mem_bytes_per_block_request = n_reductions * cub_temp_storage_type_size;
+         }
+         else if(n_reductions * cub_temp_storage_type_size_small <= deviceProp.sharedMemPerBlock){
+         blocksize = ARCH_BLOCKSIZE_R_SMALL;
+         shared_mem_bytes_per_block_request = n_reductions * cub_temp_storage_type_size_small;
+         }
+         else{
+         printf("The device %d (%s) does not have enough shared memory even for the small blocksize (%d)! The error occurred in %s at line %d\n", device_id, deviceProp.gcnArchName, ARCH_BLOCKSIZE_R_SMALL, __FILE__, __LINE__);
+         exit(1);
+         }
+         /* Set the kernel grid dimensions */
+         const uint gridsize_x = (n_total - 1 + blocksize) / blocksize;
+         dim3 gridsize(gridsize_x, blockDimensions[0], blockDimensions[1]);
+         /* Allocate memory for the thread data values */
+         CHK_ERR(hipMallocAsync(&d_thread_data_dynamic, n_reductions * blocksize * gridsize_x * sizeof(T), gpuStreamList[thread_id]));
+         /* Call the kernel (the number of reductions not known at compile time) */
+         if(gridsize_x > 0){
+            if(blocksize == ARCH_BLOCKSIZE_R){
+               reduction_kernel<ARCH_BLOCKSIZE_R, Op, NDim, 0><<<gridsize, blocksize, shared_mem_bytes_per_block_request, gpuStreamList[thread_id]>>>(loop_body, d_const_buf, d_buf, dev_limitDimensions, d_limits, n_reductions, d_thread_data_dynamic);
+            }
+            else if(blocksize == ARCH_BLOCKSIZE_R_SMALL){
+               reduction_kernel<ARCH_BLOCKSIZE_R_SMALL, Op, NDim, 0><<<gridsize, blocksize, shared_mem_bytes_per_block_request, gpuStreamList[thread_id]>>>(loop_body, d_const_buf, d_buf, dev_limitDimensions, d_limits, n_reductions, d_thread_data_dynamic);
+            }
+            else{
+               printf("The blocksize (%u) does not match with any of the predetermined block sizes! The error occurred in %s at line %d\n", blocksize, __FILE__, __LINE__);
+               exit(1);
+            }
+         }      
+         /* Check for kernel launch errors */
+         CHK_ERR(hipPeekAtLastError());
+         /* Synchronize and free the thread data allocation */
+         CHK_ERR(hipStreamSynchronize(gpuStreamList[thread_id]));
+         CHK_ERR(hipFreeAsync(d_thread_data_dynamic, gpuStreamList[thread_id]));
+      }
+      else{
+         /* Set the kernel dimensions */
+         const uint blocksize = ARCH_BLOCKSIZE_R;
+         const uint gridsize_x = (n_total - 1 + blocksize) / blocksize;
+         dim3 gridsize(gridsize_x, blockDimensions[0], blockDimensions[1]);
+         /* Call the kernel (the number of reductions known at compile time) */
+         if(gridsize_x > 0) {
+            reduction_kernel<ARCH_BLOCKSIZE_R, Op, NDim, NReduStatic><<<gridsize, blocksize, 0, gpuStreamList[thread_id]>>>(loop_body, d_const_buf, d_buf, dev_limitDimensions, d_limits, n_reductions, d_thread_data_dynamic);
+         }
+         /* Check for kernel launch errors */
+         CHK_ERR(hipPeekAtLastError());
+         /* Synchronize after kernel call */
+         CHK_ERR(hipStreamSynchronize(gpuStreamList[thread_id]));
+      }
+      /* Copy the results back to host and free the allocated memory back to pool*/
+      CHK_ERR(hipMemcpyAsync(sum, dev_sum, blockDimensions[0]*blockDimensions[1]*sizeof(T), hipMemcpyDeviceToHost,gpuStreamList[thread_id]));
+      CHK_ERR(hipFreeAsync(dev_sum, gpuStreamList[thread_id]));
+      CHK_ERR(hipFreeAsync(d_const_buf, gpuStreamList[thread_id]));
+      CHK_ERR(hipFreeAsync(d_limits, gpuStreamList[thread_id]));
+      for(uint i = 0; i < NDim; i++) {
+         CHK_ERR(hipFreeAsync(limitsData[i], gpuStreamList[thread_id]));
+      }
+      CHK_ERR(hipFreeAsync(dev_limitDimensions, gpuStreamList[thread_id]));
+      CHK_ERR( gpuPeekAtLastError() );
    }
 }
 
