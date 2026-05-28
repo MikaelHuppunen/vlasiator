@@ -787,7 +787,7 @@ namespace arch{
          /* Query device properties */
          int device_id;
          CHK_ERR(hipGetDevice(&device_id));
-         hipDeviceProp deviceProp;
+         hipDeviceProp_t deviceProp;
          CHK_ERR(hipGetDeviceProperties(&deviceProp, device_id));
          /* Make sure there is enough shared memory for the used block size */
          uint blocksize;

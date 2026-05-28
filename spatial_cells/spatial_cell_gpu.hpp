@@ -572,11 +572,11 @@ __global__ static void resize_and_empty_kernel (
       Real* get_cell_parameters();
       const Real* get_cell_parameters() const;
 
-      vmesh::LocalID get_number_of_velocity_blocks(const uint popID) const;
+      __host__ __device__ vmesh::LocalID get_number_of_velocity_blocks(const uint popID) const;
       vmesh::LocalID get_number_of_all_velocity_blocks() const;
       int get_number_of_populations() const;
-      void debug_population_check(const uint popID) const;
-      void debug_population_check(const uint popID, const vmesh::LocalID blockLID) const;
+      __host__ __device__ void debug_population_check(const uint popID) const;
+      __host__ __device__ void debug_population_check(const uint popID, const vmesh::LocalID blockLID) const;
 
       Population & get_population(const uint popID);
       const Population & get_population(const uint popID) const;
@@ -646,8 +646,8 @@ __global__ static void resize_and_empty_kernel (
       const vmesh::VelocityBlockContainer* get_velocity_blocks(const size_t& popID) const;
       void dev_upload_population(const uint popID);
       vmesh::VelocityMesh* dev_get_velocity_mesh(const size_t& popID);
-      vmesh::VelocityBlockContainer* dev_get_velocity_blocks(const size_t& popID);
-      const vmesh::VelocityBlockContainer* dev_get_velocity_blocks(const size_t& popID) const;
+      __host__ __device__ vmesh::VelocityBlockContainer* dev_get_velocity_blocks(const size_t& popID);
+      __host__ __device__ const vmesh::VelocityBlockContainer* dev_get_velocity_blocks(const size_t& popID) const;
       // Prefetches for both blockContainers and vmeshes, all populations
       void prefetchDevice();
       void prefetchHost();
@@ -712,7 +712,7 @@ __global__ static void resize_and_empty_kernel (
       std::vector<spatial_cell::Population> populations;                        /**< Particle population variables.*/
    };
 
-   inline void SpatialCell::debug_population_check(const uint popID) const {
+   __host__ __device__ inline void SpatialCell::debug_population_check(const uint popID) const {
       #ifdef DEBUG_SPATIAL_CELL
       if (popID >= populations.size()) {
          std::cerr << "ERROR, popID " << popID << " exceeds populations.size() " << populations.size() << " in ";
@@ -721,7 +721,7 @@ __global__ static void resize_and_empty_kernel (
       }
       #endif
    }
-   inline void SpatialCell::debug_population_check(const uint popID, const vmesh::LocalID blockLID) const {
+   __host__ __device__ inline void SpatialCell::debug_population_check(const uint popID, const vmesh::LocalID blockLID) const {
       debug_population_check(popID);
       #ifdef DEBUG_SPATIAL_CELL
       if (blockLID >= populations[popID].blockContainer->size()) {
@@ -810,7 +810,7 @@ __global__ static void resize_and_empty_kernel (
       return parameters.data();
    }
 
-   inline vmesh::LocalID SpatialCell::get_number_of_velocity_blocks(const uint popID) const {
+   __host__ __device__ inline vmesh::LocalID SpatialCell::get_number_of_velocity_blocks(const uint popID) const {
       debug_population_check(popID);
       //return populations[popID].blockContainer->size();
       // Return size from vmesh instead of VBC to allow use of host-cached value
@@ -1066,11 +1066,11 @@ __global__ static void resize_and_empty_kernel (
       debug_population_check(popID);
       return populations[popID].blockContainer;
    }
-   inline vmesh::VelocityBlockContainer* SpatialCell::dev_get_velocity_blocks(const size_t& popID) {
+   __host__ __device__ inline vmesh::VelocityBlockContainer* SpatialCell::dev_get_velocity_blocks(const size_t& popID) {
       debug_population_check(popID);
       return gpuMemoryManager.getPointer<vmesh::VelocityBlockContainer>(populations[popID].dev_blockContainer);
    }
-   inline const vmesh::VelocityBlockContainer* SpatialCell::dev_get_velocity_blocks(const size_t& popID) const {
+   __host__ __device__ inline const vmesh::VelocityBlockContainer* SpatialCell::dev_get_velocity_blocks(const size_t& popID) const {
       debug_population_check(popID);
       return gpuMemoryManager.getPointer<vmesh::VelocityBlockContainer>(populations[popID].dev_blockContainer);
    }
