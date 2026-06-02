@@ -47,9 +47,8 @@
 #include "readparameters.h"
 #include "spatial_cells/spatial_cell_wrapper.hpp"
 #include "datareduction/datareducer.h"
-
 #include "sysboundary/sysboundary.h"
-#include "vlasovsolver/common_pitch_angle_diffusion.hpp"
+#include "vlasovsolver/cpu_pitch_angle_diffusion.h"
 
 #include "fieldtracing/fieldtracing.h"
 
@@ -1354,6 +1353,7 @@ int simulate(int argn,char* args[]) {
       addTimedBarrier("barrier-after-acceleration");
 
       if (P::artificialPADiff){
+         // TODO: GPU version
          phiprof::Timer diffusionTimer {"Pitch-angle diffusion"};
          for (uint popID=0; popID<getObjectWrapper().particleSpecies.size(); ++popID) {
 	      pitchAngleDiffusion(mpiGrid,popID);
