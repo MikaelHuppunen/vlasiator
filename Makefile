@@ -134,16 +134,6 @@ ifeq ($(USE_GPU),1)
 $(shell ./updateGpuMemoryPointerList.sh 1>&2)
 endif
 
-#GPU specs
-ifeq ($(USE_GPU),1)
-	ifdef THREADS_PER_MP
-		COMPFLAGS += -DTHREADS_PER_MP=$(THREADS_PER_MP)
-	endif
-	ifdef REGISTERS_PER_MP
-		COMPFLAGS += -DREGISTERS_PER_MP=$(REGISTERS_PER_MP)
-	endif
-endif
-
 #Vectorclass settings
 ifdef WID
 	COMPFLAGS += -DWID=$(WID)

@@ -382,15 +382,12 @@ void adjust_velocity_blocks_in_cells(
          );
       CHK_ERR( gpuPeekAtLastError() );
       #else
-      const uint warpsPerBlockBatchHalo = (threadsPerMP/GPUTHREADS + blocksPerMP - 1)/blocksPerMP;
-      dim3 grid_vel_halo((largestContentList + warpsPerBlockBatchHalo - 1)/warpsPerBlockBatchHalo,nCells,1);
-      dim3 block_vel_halo(GPUTHREADS, warpsPerBlockBatchHalo, 1);
+      dim3 grid_vel_halo(largestContentList,nCells,1);
       // We do 26 (launch with GPUTHREADS) neighbors in a single block at a time.
-      batch_update_velocity_halo_kernel<<<grid_vel_halo, block_vel_halo, 0, priorityStream>>> (
+      batch_update_velocity_halo_kernel<<<grid_vel_halo, GPUTHREADS, 0, priorityStream>>> (
          GET_POINTER(gpuMemoryManager, vmesh::VelocityMesh*, dev_vmeshes),
          GET_POINTER(gpuMemoryManager, split::SplitVector<vmesh::GlobalID>*, dev_vbwcl_vec),
-         GET_POINTER(gpuMemoryManager, SINGLE_ARG(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>*), dev_allMaps), // Needs both content and no content maps
-         warpsPerBlockBatchHalo
+         GET_POINTER(gpuMemoryManager, SINGLE_ARG(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>*), dev_allMaps) // Needs both content and no content maps
          );
       CHK_ERR( gpuPeekAtLastError() );
       #endif

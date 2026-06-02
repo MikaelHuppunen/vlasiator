@@ -45,11 +45,6 @@
 #define REGISTERS_PER_MP 65536
 #endif
 
-// Device properties
-extern int gpuMultiProcessorCount;
-extern int blocksPerMP;
-extern int threadsPerMP;
-
 // Magic multipliers used to make educated guesses for initial allocations
 // and for managing dynamic increases in allocation sizes. Some of these are
 // scaled based on WID value for better guesses,

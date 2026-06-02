@@ -38,11 +38,6 @@
 
 // #define MAXCPUTHREADS 64 now in gpu_base.hpp
 
-// Device properties
-int gpuMultiProcessorCount = 0;
-int blocksPerMP = 0;
-int threadsPerMP = 0;
-
 extern Logger logFile;
 int myDevice;
 int myRank;
@@ -158,19 +153,6 @@ __host__ void gpu_init_device() {
    // Decide on number of allocations to prepare
    const uint nBaseCells = P::xcells_ini * P::ycells_ini * P::zcells_ini;
    allocationCount = (nBaseCells == 1) ? 1 : P::GPUallocations;
-
-   // Get device properties
-   gpuDeviceProp prop;
-   CHK_ERR( gpuGetDeviceProperties(&prop, myDevice) );
-   gpuMultiProcessorCount = prop.multiProcessorCount;
-   threadsPerMP = prop.maxThreadsPerMultiProcessor;
-   #if defined(USE_GPU) && defined(__CUDACC__)
-   CHK_ERR( gpuDeviceGetAttribute(&blocksPerMP, gpuDevAttrMaxBlocksPerMultiprocessor, myDevice) );
-   #endif
-   #if defined(USE_GPU) && defined(__HIP_PLATFORM_HCC___)
-   blocksPerMP = threadsPerMP/GPUTHREADS; // This should be the maximum number of wavefronts per CU
-   #endif
-
 
    // Query device capabilities (only for CUDA, not needed for HIP)
    #if defined(USE_GPU) && defined(__CUDACC__)
