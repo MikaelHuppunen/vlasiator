@@ -1099,9 +1099,10 @@ namespace spatial_cell {
          const vmesh::LocalID amount
             = 2 + populations[popID].blockContainer->size()
             * populations[popID].blockContainer->getBlockAllocationFactor();
+         const vmesh::LocalID shrinkCutoff = amount*gpuShrinkLimit;
          largestAmount = std::max(largestAmount,(size_t)populations[popID].blockContainer->size());
          // Allow capacity to be a bit larger than needed by number of blocks, shrink otherwise
-         if (populations[popID].blockContainer->capacity() > amount ) {
+         if (populations[popID].blockContainer->capacity() > shrinkCutoff ) {
             if (populations[popID].blockContainer->setNewCapacityShrink(amount) == false) {
                success = false;
             }

@@ -50,6 +50,8 @@ extern int gpuMultiProcessorCount;
 extern int blocksPerMP;
 extern int threadsPerMP;
 
+extern double gpuShrinkLimit;
+
 // Magic multipliers used to make educated guesses for initial allocations
 // and for managing dynamic increases in allocation sizes. Some of these are
 // scaled based on WID value for better guesses,
