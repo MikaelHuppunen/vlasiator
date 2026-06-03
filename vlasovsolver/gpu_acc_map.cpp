@@ -1109,14 +1109,12 @@ __global__ void __launch_bounds__(WID3, Hashinator::defaults::MAX_BLOCKSIZE/(WID
                const int tcell = target_cell_index_common
                                + gk_mod_WID * gpu_cell_indices_to_id[2];
                // Write values into block data
-               if (isfinite(tval) && (tval>(Realf)(0.0)) && (targetLID != invalidLID) ) {
-                  // gpu_blockData[targetLID * WID3 + tcell] += tval;
-
-                  // We use atomicAdd to avoid the need for sync
-                  // It shouldn't be any slower if there is no competition
-                  atomicAdd(&gpu_blockData[targetLID*WID3+tcell],tval);
+               if (isfinite(tval) && (tval>0) && (targetLID != invalidLID) ) {
+                  gpu_blockData[targetLID * WID3 + tcell] += tval;
+                  // atomicAdd(&gpu_blockData[targetLID*WID3+tcell],tval);
                }
             } // end check if gk valid for this thread
+            __syncthreads();
          } // for loop over target k-indices
       } // for-loop over source blocks
    } // End this column
