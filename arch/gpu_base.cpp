@@ -43,7 +43,7 @@ int gpuMultiProcessorCount = 0;
 int blocksPerMP = 0;
 int threadsPerMP = 0;
 
-double gpuShrinkLimit = 2.0;
+double gpuShrinkFactor = 1.2;
 
 extern Logger logFile;
 int myDevice;

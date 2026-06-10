@@ -877,17 +877,48 @@ bool adjustVelocityBlocks(dccrg::Dccrg<SpatialCell, dccrg::Cartesian_Geometry>& 
 void shrink_to_fit_grid_data(dccrg::Dccrg<SpatialCell, dccrg::Cartesian_Geometry>& mpiGrid) {
    const std::vector<CellID>& cells = getLocalCells();
    const std::vector<CellID>& remote_cells = mpiGrid.get_remote_cells_on_process_boundary();
+
+   #ifdef USE_GPU
+   size_t totalAmount = 0;
+   size_t potentialAmount = 0;
+   size_t blocks = 0;
+   for (size_t i = 0; i < cells.size() + remote_cells.size(); ++i) {
+      if (i < cells.size()) {
+         SpatialCell* target = mpiGrid[cells[i]];
+         if (target != nullptr) {
+            blocks += target->gatherShrink(totalAmount, potentialAmount);
+         }
+      } else {
+         SpatialCell* target= mpiGrid[remote_cells[i - cells.size()]];
+         if (target != nullptr) {
+               blocks += target->gatherShrink(totalAmount, potentialAmount);
+         }
+      }
+   }
+   if(blocks == 0){
+      return;
+   }
+   size_t shrinkLimit = static_cast<size_t>(gpuShrinkFactor*max(static_cast<double>(totalAmount)-static_cast<double>(potentialAmount), 0.0)/static_cast<double>(blocks));
+   #endif
    #pragma omp parallel for
    for (size_t i = 0; i < cells.size() + remote_cells.size(); ++i) {
       if (i < cells.size()) {
          SpatialCell* target = mpiGrid[cells[i]];
          if (target != nullptr) {
+            #ifdef USE_GPU
+            target->shrink_to_fit(shrinkLimit);
+            #else
             target->shrink_to_fit();
+            #endif
          }
       } else {
          SpatialCell* target= mpiGrid[remote_cells[i - cells.size()]];
          if (target != nullptr) {
+            #ifdef USE_GPU
+            target->shrink_to_fit(shrinkLimit);
+            #else
             target->shrink_to_fit();
+            #endif
          }
       }
    }
