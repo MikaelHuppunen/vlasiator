@@ -1115,13 +1115,13 @@ namespace spatial_cell {
       populations[popID].max_dt[species::MAXVDT] = value;
    }
 
-   size_t SpatialCell::gatherShrink(size_t &totalAmount, size_t &potentialAmount) {
+   size_t SpatialCell::gatherShrink(size_t &totalCapacity, size_t &totalSize) {
       for (size_t popID=0; popID<populations.size(); ++popID) {
          const vmesh::LocalID amount
             = 2 + populations[popID].blockContainer->size()
             * populations[popID].blockContainer->getBlockAllocationFactor();
-         totalAmount += populations[popID].blockContainer->capacity();
-         potentialAmount += amount;
+         totalCapacity += populations[popID].blockContainer->capacity();
+         totalSize += amount;
       }
       return populations.size();
    }
