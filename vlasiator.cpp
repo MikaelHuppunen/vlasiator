@@ -1097,6 +1097,7 @@ int simulate(int argn,char* args[]) {
             shrink_to_fit_grid_data(mpiGrid);
             shrinkTimer.stop();
          }
+         gpuMemoryManager.clearSession();
 
          if (refineNow || (!dtIsChanged && P::adaptRefinement && P::tstep % (P::rebalanceInterval * P::refineCadence) == 0 && P::t > P::refineAfter)) { 
             logFile << "(AMR): Adapting refinement!"  << endl << writeVerbose;
