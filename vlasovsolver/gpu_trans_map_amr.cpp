@@ -93,14 +93,14 @@ __global__ void __launch_bounds__(WID3) translation_kernel(
    uint *dev_binStart,
    uint *dev_binSize,
    const uint numberOfBins,
-   const uint blockDataOrderedStride
+   const size_t* __restrict__ blockDataOffset
    ) {
    // This is launched with grid size (nGpuBlocks,nAllocations,1)
    // where nGpuBlocks is the count of blocks which fit in the smallest temp buffer at once
    // and nAllocations is the number of temp GPU buffers to use.
    const uint startingBlockIndex = blockIdx.y*gridDim.x;
    const uint blockIndexIncrement = gridDim.y*gridDim.x;
-   Realf* pencilOrderedSource = dev_blockDataOrdered + blockIdx.y*blockDataOrderedStride;
+   Realf* pencilOrderedSource = dev_blockDataOrdered + blockDataOffset[blockIdx.y];
 
    // This is launched with block size (WID,WID,WID)
    const vmesh::LocalID ti = (threadIdx.z)*blockDim.x*blockDim.y + threadIdx.y*blockDim.x + threadIdx.x;
@@ -394,9 +394,10 @@ bool trans_map_1d_amr(const dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geometry>&
    phiprof::Timer allocateTimer {"trans-amr-allocs"};
    // Ensure GPU data has sufficient allocations/sizes
    const uint sumOfLengths = DimensionPencils[dimension].sumOfLengths;
-   gpu_vlasov_allocate(sumOfLengths);
-   // Ensure allocation for allPencilsMeshes, allPencilsContainers
    gpuMemoryManager.startSession(0,0);
+   gpu_vlasov_set_allocation_sizes(sumOfLengths);
+   gpu_vlasov_allocate();
+   // Ensure allocation for allPencilsMeshes, allPencilsContainers
 
    SESSION_HOST_ALLOCATE(gpuMemoryManager, vmesh::VelocityMesh*, host_allPencilsMeshes, sumOfLengths*sizeof(vmesh::VelocityMesh*));
    SESSION_HOST_ALLOCATE(gpuMemoryManager, vmesh::VelocityBlockContainer*, host_allPencilsContainers, sumOfLengths*sizeof(vmesh::VelocityBlockContainer*));
@@ -587,7 +588,7 @@ bool trans_map_1d_amr(const dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geometry>&
       dev_allPencilsMeshes, // Pointers to velocity meshes
       dev_allPencilsContainers, // pointers to BlockContainers
       dev_pencilBlockData, // pointers into cell block data, both written and read
-      GET_POINTER(gpuMemoryManager, Realf, dev_blockDataOrdered), // buffer of pointers to ordered buffer data
+      GET_SESSION_POINTER(gpuMemoryManager, Realf, dev_blockDataOrdered), // buffer of pointers to ordered buffer data
       pencilDZ,
       pencilRatios, // buffer tor holding target ratios
       dev_pencilBlocksCount, // store how many non-empty blocks each pencil has for this GID
@@ -595,7 +596,7 @@ bool trans_map_1d_amr(const dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geometry>&
       gpuMemoryManager.getPointer<uint>(DimensionPencils[dimension].dev_binStart),
       gpuMemoryManager.getPointer<uint>(DimensionPencils[dimension].dev_binSize),
       numberOfBins,
-      gpu_vlasov_getSmallestAllocation()*WID3 * sizeof(Realf)
+      GET_SESSION_POINTER(gpuMemoryManager, size_t, dev_blockDataOffsets)
       );
    CHK_ERR( gpuPeekAtLastError() );
    CHK_ERR( gpuStreamSynchronize(bgStream) );

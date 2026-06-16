@@ -670,7 +670,7 @@ __global__ void __launch_bounds__(WID3) reorder_blocks_by_dimension_kernel(
    ColumnOffsets* dev_columnOffsetData,
    vmesh::LocalID* dev_nColumns,
    const uint cumulativeOffset,
-   const uint blockDataOrderedStride
+   const size_t* __restrict__ blockDataOffset
    ) {
    // This is launched with block size (WID,WID,WID)
    const uint ti = threadIdx.z*blockDim.x*blockDim.y + threadIdx.y*blockDim.x + threadIdx.x;
@@ -688,7 +688,7 @@ __global__ void __launch_bounds__(WID3) reorder_blocks_by_dimension_kernel(
    }
    const vmesh::VelocityBlockContainer* __restrict__ blockContainer = blockContainers[cellOffset];
    ColumnOffsets* columnData = dev_columnOffsetData + parallelOffsetIndex;
-   Realf *gpu_blockDataOrdered = dev_blockDataOrdered + parallelOffsetIndex*blockDataOrderedStride;
+   Realf *gpu_blockDataOrdered = dev_blockDataOrdered + blockDataOffset[parallelOffsetIndex];
 
    // Caller function verified this cast is safe
    vmesh::LocalID* LIDlist = reinterpret_cast<vmesh::LocalID*>(dev_vbwcl_vec[cellOffset]->data());
@@ -965,7 +965,7 @@ __global__ void __launch_bounds__(WID3, ACCELERATION_KERNEl_MIN_BLOCKS) accelera
    const Real *dev_minValues, // indexing: cellOffset
    const size_t invalidLID,
    const uint cumulativeOffset,
-   const uint blockDataOrderedStride
+   const size_t* __restrict__ blockDataOffset
 ) {
    const uint parallelOffsetIndex = blockIdx.y; // which vlasov buffer allocation to access
    const uint cellOffset = parallelOffsetIndex + cumulativeOffset;
@@ -978,7 +978,7 @@ __global__ void __launch_bounds__(WID3, ACCELERATION_KERNEl_MIN_BLOCKS) accelera
    const int ij = threadIdx.x + threadIdx.y * blockDim.x; // transverse index
    const int ti = ij + k*blockDim.x*blockDim.y;
 
-   const Realf* __restrict__ gpu_blockDataOrdered = dev_blockDataOrdered + parallelOffsetIndex*blockDataOrderedStride;
+   const Realf* __restrict__ gpu_blockDataOrdered = dev_blockDataOrdered + blockDataOffset[parallelOffsetIndex];
    const ColumnOffsets* __restrict__ columnData = dev_columnOffsetData + parallelOffsetIndex;
 
    const Realf intersection = dev_intersections[cellOffset*4+0];
@@ -1448,8 +1448,9 @@ __host__ bool gpu_acc_map_1d(
       const vmesh::VelocityMesh *thisVmesh = SC->get_velocity_mesh(popID);
       const vmesh::LocalID nBlocks = thisVmesh->size();
       maxAllocation = max(maxAllocation, 2*host_totalColumns+nBlocks);
+      gpu_vlasov_set_allocation_size(cellIndex, 2*host_totalColumns+nBlocks);
    } // end parallel region
-   gpu_vlasov_allocate(maxAllocation);
+   gpu_vlasov_allocate();
    
    allocTimer2.stop();
 
@@ -1460,19 +1461,17 @@ __host__ bool gpu_acc_map_1d(
    const dim3 block_reorder(WID,WID,WID);
    reorder_blocks_by_dimension_kernel<<<grid_reorder, block_reorder, 0, baseStream>>> (
       GET_POINTER(gpuMemoryManager, vmesh::VelocityBlockContainer*, dev_VBCs),
-      GET_POINTER(gpuMemoryManager, Realf, dev_blockDataOrdered),
+      GET_SESSION_POINTER(gpuMemoryManager, Realf, dev_blockDataOrdered),
       GET_POINTER(gpuMemoryManager, uint, gpu_cell_indices_to_id),
       GET_POINTER(gpuMemoryManager, split::SplitVector<vmesh::GlobalID>*, dev_vbwcl_vec), //dev_velocity_block_with_content_list, // use as LIDlist
       GET_POINTER(gpuMemoryManager, ColumnOffsets, dev_columnOffsetData),
       GET_SESSION_POINTER(gpuMemoryManager, vmesh::LocalID, dev_nColumns),
       cumulativeOffset,
-      gpu_vlasov_getSmallestAllocation()*WID3 * sizeof(Realf)
+      GET_SESSION_POINTER(gpuMemoryManager, size_t, dev_blockDataOffsets)
       );
    CHK_ERR( gpuPeekAtLastError() );
    CHK_ERR( gpuStreamSynchronize(baseStream) );
    reorderTimer.stop();
-
-   gpuMemoryManager.endSession();
 
    phiprof::Timer extentsTimer {"column extents"};
    // Reset counters used for verifying sufficient vector capacities and not overflowing v-space
@@ -1675,7 +1674,7 @@ __host__ bool gpu_acc_map_1d(
    acceleration_kernel<<<grid_acc, block_acc, 0, baseStream>>> (
       GET_POINTER(gpuMemoryManager, vmesh::VelocityMesh*, dev_vmeshes), // indexing: cellOffset
       GET_POINTER(gpuMemoryManager, vmesh::VelocityBlockContainer*, dev_VBCs), // indexing: cellOffset
-      GET_POINTER(gpuMemoryManager, Realf, dev_blockDataOrdered), //indexing: blockIdx.y
+      GET_SESSION_POINTER(gpuMemoryManager, Realf, dev_blockDataOrdered), //indexing: blockIdx.y
       GET_POINTER(gpuMemoryManager, uint, gpu_cell_indices_to_id),
       GET_POINTER(gpuMemoryManager, uint, gpu_block_indices_to_id),
       GET_POINTER(gpuMemoryManager, ColumnOffsets, dev_columnOffsetData), //indexing: blockIdx.y
@@ -1686,10 +1685,13 @@ __host__ bool gpu_acc_map_1d(
       GET_POINTER(gpuMemoryManager, Real, dev_minValues), // indexing: cellOffset, used by slope limiters
       invalidLocalID,
       cumulativeOffset,
-      gpu_vlasov_getSmallestAllocation()*WID3 * sizeof(Realf)
+      GET_SESSION_POINTER(gpuMemoryManager, size_t, dev_blockDataOffsets)
       );
    CHK_ERR( gpuPeekAtLastError() );
    CHK_ERR( gpuStreamSynchronize(baseStream) );
+
+   gpuMemoryManager.endSession();
+
    accTimer.stop();
 
    return true;

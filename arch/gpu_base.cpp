@@ -332,49 +332,23 @@ int gpu_reportMemory(const size_t local_cells_capacity, const size_t ghost_cells
    Top-level GPU memory allocation function.
    This is called from within non-threaded regions so does not perform async.
  */
-__host__ void gpu_vlasov_allocate(
-   const uint maxBlockCount // Largest found vmesh size
-   ) {
-   // Always prepare for at least VLASOV_BUFFER_MINBLOCKS blocks
-   const uint maxBlocksPerCell = max(VLASOV_BUFFER_MINBLOCKS, maxBlockCount);
-   
-   CREATE_UNIQUE_POINTER(gpuMemoryManager, dev_blockDataOrdered);
+__host__ void gpu_vlasov_allocate() {
 
-   uint blockAllocationCount = maxBlocksPerCell;
+   SESSION_HOST_ALLOCATE(gpuMemoryManager, size_t, host_blockDataOffsets, allocationCount*sizeof(size_t));
+   SESSION_ALLOCATE(gpuMemoryManager, size_t, dev_blockDataOffsets, allocationCount*sizeof(size_t));
 
-   // Dual use of blockDataOrdered: use also for acceleration probe cube and its flattened version.
-   // Calculate required size
-   size_t blockDataAllocation = blockAllocationCount * WID3 * sizeof(Realf);
+   size_t *host_blockDataOffsets = GET_SESSION_HOST_POINTER(gpuMemoryManager, size_t, host_blockDataOffsets);
+   size_t *dev_blockDataOffsets = GET_SESSION_POINTER(gpuMemoryManager, size_t, dev_blockDataOffsets);
 
-   /*
-   CUDA C Programming Guide
-   6.3.2. Device Memory Accesses (June 2025)
-   "Any address of a variable residing in global memory or returned by one of the memory allocation routines from the driver or
-   runtime API is always aligned to at least 256 bytes."
-
-   ROCm documentation
-   HIP 6.4.43483 Documentation for hipMallocPitch
-   "Currently the alignment is set to 128 bytes"
-
-   Thus, our mallocs should be in increments of 256 bytes. WID3 is at least 64, and len(Realf) is at least 4, so this is true in all
-   cases. Still, let us ensure (just to be sure) that probe cube addressing does not break alignment.
-   And in fact let's use the block memory size as the stride.
-   */
-   blockDataAllocation = (1 + ((blockDataAllocation - 1) / (WID3 * sizeof(Realf)))) * (WID3 * sizeof(Realf));
-
-   while(gpu_vlasov_allocatedSize.size() < allocationCount){ //Make sure the gpu_vlasov_allocatedSize has enough elements
-      gpu_vlasov_allocatedSize.push_back(0);
+   size_t totalOffset = 0;
+   for (uint i=0; i<allocationCount; ++i) {
+      host_blockDataOffsets[i] = totalOffset;
+      totalOffset += gpu_vlasov_allocatedSize[i] * WID3 * sizeof(Realf);
    }
 
-   bool reallocated = ALLOCATE_GPU(gpuMemoryManager, dev_blockDataOrdered, allocationCount*blockDataAllocation*sizeof(Realf));
+   SESSION_ALLOCATE(gpuMemoryManager, Realf, dev_blockDataOrdered, totalOffset*sizeof(Realf));
 
-   if(reallocated){
-      // per-buffer allocations
-      for (uint i=0; i<allocationCount; ++i) {
-         // Store size of new allocation (in units blocks)
-         gpu_vlasov_allocatedSize[i] = blockDataAllocation / (WID3 * sizeof(Realf));
-      }
-   }
+   CHK_ERR( gpuMemcpy(dev_blockDataOffsets, host_blockDataOffsets, allocationCount*sizeof(size_t), gpuMemcpyHostToDevice) );
 }
 
 /*
@@ -420,6 +394,45 @@ __host__ void gpu_calculateProbeAllocation(
    */
    probeAllocation = (1 + ((probeAllocation - 1) / (WID3 * sizeof(Realf)))) * (WID3 * sizeof(Realf));
    gpu_probeStride = max(gpu_probeStride,probeAllocation);
+}
+
+__host__ void gpu_vlasov_set_allocation_sizes(size_t blockCount) {
+   for(int i = 0; i < allocationCount; i++){
+      gpu_vlasov_set_allocation_size(i, blockCount);
+   }
+}
+
+/* Deallocation at end of simulation */
+__host__ void gpu_vlasov_set_allocation_size(size_t index, size_t blockCount) {
+   // Always prepare for at least VLASOV_BUFFER_MINBLOCKS blocks
+   const size_t maxBlocksPerCell = max((size_t)VLASOV_BUFFER_MINBLOCKS, blockCount);
+
+   const size_t blockAllocationCount = maxBlocksPerCell;
+
+   // Dual use of blockDataOrdered: use also for acceleration probe cube and its flattened version.
+   // Calculate required size
+   size_t blockDataAllocation = blockAllocationCount * WID3 * sizeof(Realf);
+
+   /*
+   CUDA C Programming Guide
+   6.3.2. Device Memory Accesses (June 2025)
+   "Any address of a variable residing in global memory or returned by one of the memory allocation routines from the driver or
+   runtime API is always aligned to at least 256 bytes."
+
+   ROCm documentation
+   HIP 6.4.43483 Documentation for hipMallocPitch
+   "Currently the alignment is set to 128 bytes"
+
+   Thus, our mallocs should be in increments of 256 bytes. WID3 is at least 64, and len(Realf) is at least 4, so this is true in all
+   cases. Still, let us ensure (just to be sure) that probe cube addressing does not break alignment.
+   And in fact let's use the block memory size as the stride.
+   */
+   blockDataAllocation = (1 + ((blockDataAllocation - 1) / (WID3 * sizeof(Realf)))) * (WID3 * sizeof(Realf));
+
+   while(gpu_vlasov_allocatedSize.size() < allocationCount){ //Make sure the gpu_vlasov_allocatedSize has enough elements
+      gpu_vlasov_allocatedSize.push_back(0);
+   }
+   gpu_vlasov_allocatedSize[index] = blockDataAllocation / (WID3 * sizeof(Realf));;
 }
 
 /* Deallocation at end of simulation */
