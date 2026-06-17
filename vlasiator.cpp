@@ -1087,13 +1087,7 @@ int simulate(int argn,char* args[]) {
          // * shrink to fit before LB * //
          shrink_to_fit_grid_data(mpiGrid);
          shrinkTimer.stop();
-         /*
 
-         std::cout << gpu_getAllocationCount() << '\n';
-         gpu_acc_deallocate();
-         gpu_setAllocationCount(gpu_getAllocationCount()-8);
-         gpuMemoryManager.clearSession();
-         */
          if (refineNow || (!dtIsChanged && P::adaptRefinement && P::tstep % (P::rebalanceInterval * P::refineCadence) == 0 && P::t > P::refineAfter)) { 
             logFile << "(AMR): Adapting refinement!"  << endl << writeVerbose;
             refineNow = false;
@@ -1136,6 +1130,20 @@ int simulate(int argn,char* args[]) {
          P::prepareForRebalance = false;
 
          overrideRebalanceNow = false;
+
+         std::cout << gpu_getAllocationCount() << '\n';
+         size_t free_byte ;
+         size_t total_byte ;
+         CHK_ERR( gpuMemGetInfo( &free_byte, &total_byte) );
+         std::cout << static_cast<double>(free_byte)/static_cast<double>(total_byte) << '\n';
+         if (static_cast<double>(free_byte)/static_cast<double>(total_byte) > 0.6){
+            gpu_acc_deallocate();
+            gpu_setAllocationCount(2*gpu_getAllocationCount());
+         }else if (static_cast<double>(free_byte)/static_cast<double>(total_byte) < 0.2){
+            gpu_acc_deallocate();
+            gpu_setAllocationCount(gpu_getAllocationCount()/2);
+            gpuMemoryManager.clearSession();
+         }
 
          // Make sure the ionosphere communicator is up-to-date, in case inner boundary cells
          // moved.
