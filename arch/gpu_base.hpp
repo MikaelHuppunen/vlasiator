@@ -80,6 +80,7 @@ uint gpu_getThread();
 uint gpu_getMaxThreads();
 int gpu_getDevice();
 uint gpu_getAllocationCount();
+void gpu_setAllocationCount(uint value);
 int gpu_reportMemory(const size_t local_cap=0, const size_t ghost_cap=0, const size_t local_size=0, const size_t ghost_size=0);
 
 unsigned int nextPowerOfTwo(unsigned int n);
@@ -401,6 +402,32 @@ struct GPUMemoryManager {
       return true;
    }
 
+   // Clear the allocated session pointers
+   bool clearSession(){
+      if(sessionOn){
+         std::cerr << "Please end the session before clearing it" << std::endl;
+         return false;
+      }
+
+      // Free the session pointers
+      freePointer(dev_sessionPointer);
+      freeHostPointer(host_sessionPointer);
+
+      dev_sessionAllocationSize = 0;
+      dev_previousSessionSize = 0;
+      dev_sessionSize = 0;
+      host_previousSessionSize = 0;
+      host_sessionSize = 0;
+      host_sessionAllocationSize = 0;
+
+      // Free the pointers that did not fit into the session pointer
+      freeSessionPointers();
+
+      maxSessionPointerIndex = 0;
+
+      return true;
+   }
+
    #define ALLOCATE_GPU(object, member, bytes) object.allocate(object.member, bytes)
    // Allocate memory to a pointer by index
    bool allocate(const size_t& pointerIndex, size_t bytes) {
@@ -680,7 +707,8 @@ struct GPUMemoryManager {
 
       return allocateAsync(pointerIndex, bytes, stream);
    }
-   
+
+   #define GPU_FREE_POINTER(object, member) object.freePointer(object.member)
    // Free a pointer
    bool freePointer(size_t& pointerIndex) {
       if (pointerIndex == 0) {
@@ -709,6 +737,28 @@ struct GPUMemoryManager {
          return allocationSizes[pointerIndex];
       }
       return 0;
+   }
+   
+   // Free a pointer
+   bool freeHostPointer(size_t& pointerIndex) {
+      if (pointerIndex == 0) {
+         std::cerr << "Error: Pointer not found in 'gpuMemoryManager.freePointer'.\n";
+         return false;
+      }
+
+      if (pointerIndex > maxPointerIndex) {
+         //Assumes it was freed already, could also be invalid pointer
+         return false;
+      }
+
+      std::lock_guard<std::mutex> lock(memoryMutex);
+
+      CHK_ERR( gpuFreeHost(gpuMemoryPointers[pointerIndex]) );
+      allocationSizes[pointerIndex] = (size_t)(0);
+      pointerDevice[pointerIndex] = NO_POINTER_DEVICE;
+      gpuMemoryPointers[pointerIndex] = nullptr;
+      
+      return true;
    }
 
    // Get the total amount of GPU memory allocated with the memory manager

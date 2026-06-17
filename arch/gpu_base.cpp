@@ -260,6 +260,10 @@ __host__ uint gpu_getAllocationCount() {
    return allocationCount;
 }
 
+__host__ void gpu_setAllocationCount(uint value) {
+   allocationCount = value;
+}
+
 /*
    Memory reporting function
 */
@@ -554,6 +558,9 @@ __host__ void gpu_acc_allocate(
 __host__ void gpu_acc_deallocate() {
    if (host_columnOffsetData != NULL) {
       // delete[] host_columnOffsetData;
+   }
+   if (GET_POINTER(gpuMemoryManager, ColumnOffsets, dev_columnOffsetData) != NULL) {
+      GPU_FREE_POINTER(gpuMemoryManager, dev_columnOffsetData);
    }
    host_columnOffsetData = NULL;
 }
