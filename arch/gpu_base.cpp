@@ -74,6 +74,8 @@ uint gpu_allocated_largestVmeshSizePower = 0;
 uint gpu_allocated_unionSetSize = 0;
 uint gpu_largest_columnCount = 0;
 
+int previousAllocationCount = 0;
+
 __host__ uint gpu_getThread() {
 #ifdef _OPENMP
     return omp_get_thread_num();
@@ -158,6 +160,7 @@ __host__ void gpu_init_device() {
    // Decide on number of allocations to prepare
    const uint nBaseCells = P::xcells_ini * P::ycells_ini * P::zcells_ini;
    allocationCount = (nBaseCells == 1) ? 1 : P::GPUallocations;
+   previousAllocationCount = allocationCount;
 
    // Get device properties
    gpuDeviceProp prop;
@@ -539,8 +542,13 @@ __host__ void gpu_batch_allocate(uint nCells, uint maxNeighbours) {
 __host__ void gpu_acc_allocate(
    uint maxBlockCount
    ) {
+   if (previousAllocationCount != allocationCount) {
+      gpu_acc_reallocate(maxBlockCount);
+      return;
+   }
    if (host_columnOffsetData == NULL) {
       // This would be preferable as would use pinned memory but fails on exit
+      previousAllocationCount = allocationCount;
       void *buf;
       CHK_ERR( gpuMallocHost((void**)&buf,allocationCount*sizeof(ColumnOffsets)) );
       host_columnOffsetData = new (buf) ColumnOffsets[allocationCount];
@@ -552,6 +560,48 @@ __host__ void gpu_acc_allocate(
    }
    // Above function stores buffer pointers in host_blockDataOrdered, copy pointers to dev_blockDataOrdered
    CHK_ERR( gpuMemcpy(GET_POINTER(gpuMemoryManager, ColumnOffsets, dev_columnOffsetData), host_columnOffsetData, allocationCount*sizeof(ColumnOffsets), gpuMemcpyHostToDevice) );
+}
+
+__host__ void gpu_acc_reallocate(uint maxBlockCount) {
+   if (previousAllocationCount == allocationCount) {
+      return;
+   }
+
+   ColumnOffsets *oldHostData = host_columnOffsetData;
+
+   void *buf;
+   CHK_ERR( gpuMallocHost((void**)&buf, allocationCount*sizeof(ColumnOffsets)) );
+   ColumnOffsets* newHostData = new (buf) ColumnOffsets[allocationCount];
+
+   const uint keepCount = (previousAllocationCount < allocationCount) ? previousAllocationCount : allocationCount;
+
+   if (oldHostData != NULL) {
+      for (uint i = 0; i < keepCount; ++i) {
+         newHostData[i] = std::move(oldHostData[i]);
+      }
+      for (uint i = 0; i < previousAllocationCount; ++i) {
+         oldHostData[i].~ColumnOffsets();
+      }
+      CHK_ERR( gpuFreeHost(oldHostData) );
+   }
+   host_columnOffsetData = newHostData;
+
+   CREATE_UNIQUE_POINTER(gpuMemoryManager, dev_columnOffsetData);
+   bool reallocated = ALLOCATE_GPU(gpuMemoryManager, dev_columnOffsetData, allocationCount*sizeof(ColumnOffsets));
+
+   if (reallocated) {
+      for (uint i = 0; i < keepCount; ++i) {
+         gpuStream_t stream = gpu_getStream();
+         CHK_ERR( gpuMemcpyAsync(GET_POINTER(gpuMemoryManager, ColumnOffsets, dev_columnOffsetData)+i, host_columnOffsetData+i, sizeof(ColumnOffsets), gpuMemcpyHostToDevice, stream));
+      }
+   }
+   for (uint i = previousAllocationCount; i < allocationCount; ++i) {
+      gpu_acc_allocate_perthread(i, maxBlockCount);
+   }
+
+   CHK_ERR( gpuMemcpy(GET_POINTER(gpuMemoryManager, ColumnOffsets, dev_columnOffsetData), host_columnOffsetData, allocationCount*sizeof(ColumnOffsets), gpuMemcpyHostToDevice) );
+
+   previousAllocationCount = allocationCount;
 }
 
 /* Deallocation at end of simulation */

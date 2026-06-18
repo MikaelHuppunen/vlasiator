@@ -95,6 +95,7 @@ uint gpu_vlasov_getSmallestAllocation();
 void gpu_batch_allocate(uint nCells=0, uint maxNeighbours=0);
 
 void gpu_acc_allocate(uint maxBlockCount);
+void gpu_acc_reallocate(uint maxBlockCount);
 void gpu_acc_allocate_perthread(uint cpuThreadID, uint firstAllocationCount, uint columnSetAllocationCount=0);
 void gpu_acc_deallocate();
 
