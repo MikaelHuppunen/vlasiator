@@ -1130,8 +1130,10 @@ int simulate(int argn,char* args[]) {
          size_t free_byte ;
          size_t total_byte ;
          CHK_ERR( gpuMemGetInfo( &free_byte, &total_byte) );
-         if (static_cast<double>(free_byte)/static_cast<double>(total_byte) > 0.6){
-            gpu_setAllocationCount(min(2*gpu_getAllocationCount(), gpuMultiProcessorCount*blocksPerMP));
+         double usedRatio = 1.0-static_cast<double>(free_byte)/static_cast<double>(total_byte);
+         int allocationMultiplier = static_cast<int>(0.8/usedRatio);
+         if (allocationMultiplier > 1){
+            gpu_setAllocationCount(min(allocationMultiplier*gpu_getAllocationCount(), gpuMultiProcessorCount*blocksPerMP));
          }else if (static_cast<double>(free_byte)/static_cast<double>(total_byte) < 0.2){
             gpu_setAllocationCount(gpu_getAllocationCount()/2);
             gpuMemoryManager.clearSession();
