@@ -1133,7 +1133,7 @@ int simulate(int argn,char* args[]) {
          double usedRatio = 1.0-static_cast<double>(free_byte)/static_cast<double>(total_byte);
          int allocationMultiplier = static_cast<int>(0.8/usedRatio);
          if (allocationMultiplier > 1){
-            gpu_setAllocationCount(min(allocationMultiplier*gpu_getAllocationCount(), gpuMultiProcessorCount*blocksPerMP));
+            gpu_setAllocationCount(min(allocationMultiplier*gpu_getAllocationCount(), P::GPUallocations));
          }else if (static_cast<double>(free_byte)/static_cast<double>(total_byte) < 0.2){
             gpu_setAllocationCount(gpu_getAllocationCount()/2);
             gpuMemoryManager.clearSession();
