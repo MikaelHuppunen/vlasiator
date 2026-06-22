@@ -85,7 +85,7 @@ void initializeGrids(int argn, char** argc, dccrg::Dccrg<SpatialCell, dccrg::Car
                      fsgrid::FsData<std::array<Real, fsgrids::egradpe::N_EGRADPE>>& egradpe,
                      fsgrid::FsData<std::array<Real, fsgrids::volfields::N_VOL>>& vol,
                      fsgrid::FsData<fsgrids::technical>& technical, FieldSolverGrid& fsgrid,
-                     SysBoundary& sysBoundaries, Project& project);
+                     SysBoundary& sysBoundaries, Project& project, bool shrinkToFitEnabled);
 
 /*!
   \brief Balance load

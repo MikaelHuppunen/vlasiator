@@ -43,6 +43,8 @@ int gpuMultiProcessorCount = 0;
 int blocksPerMP = 0;
 int threadsPerMP = 0;
 
+double gpuShrinkFactor = 65536.0;
+
 extern Logger logFile;
 int myDevice;
 int myRank;

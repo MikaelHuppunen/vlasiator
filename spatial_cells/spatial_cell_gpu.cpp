@@ -1115,13 +1115,23 @@ namespace spatial_cell {
       populations[popID].max_dt[species::MAXVDT] = value;
    }
 
+   size_t SpatialCell::gatherShrink(size_t &totalCapacity, size_t &totalSize) {
+      for (size_t popID=0; popID<populations.size(); ++popID) {
+         const vmesh::LocalID amount
+            = 2 + populations[popID].blockContainer->size()
+            * populations[popID].blockContainer->getBlockAllocationFactor();
+         totalCapacity += populations[popID].blockContainer->capacity();
+         totalSize += amount;
+      }
+      return populations.size();
+   }
+
    /**  Purges extra capacity from block vectors. It sets size to
     * num_blocks * block_allocation_factor (if capacity greater than this),
     * and also forces capacity to this new smaller value.
     * @return True on success.*/
-   bool SpatialCell::shrink_to_fit() {
+   bool SpatialCell::shrink_to_fit(size_t shrinkLimit) {
       bool success = true;
-      return true; // on AMD, shrink_to_fit appears broken.
       size_t largestAmount = 0;
       for (size_t popID=0; popID<populations.size(); ++popID) {
          const vmesh::LocalID amount
@@ -1129,7 +1139,7 @@ namespace spatial_cell {
             * populations[popID].blockContainer->getBlockAllocationFactor();
          largestAmount = std::max(largestAmount,(size_t)populations[popID].blockContainer->size());
          // Allow capacity to be a bit larger than needed by number of blocks, shrink otherwise
-         if (populations[popID].blockContainer->capacity() > amount ) {
+         if (populations[popID].blockContainer->capacity()-amount > shrinkLimit ) {
             if (populations[popID].blockContainer->setNewCapacityShrink(amount) == false) {
                success = false;
             }

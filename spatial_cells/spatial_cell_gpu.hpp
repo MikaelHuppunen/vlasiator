@@ -643,7 +643,8 @@ __global__ static void resize_and_empty_kernel (
       uint64_t get_cell_memory_capacity();
       uint64_t get_cell_memory_size();
       void prepare_to_receive_blocks(const uint popID);
-      bool shrink_to_fit();
+      bool shrink_to_fit(size_t shrinkLimit);
+      size_t gatherShrink(size_t &totalCapacity, size_t &totalSize);
       size_t size(const uint popID) const;
       void dev_resize_vmesh(const uint popID, const uint nBlocks);
       vmesh::VelocityMesh* get_velocity_mesh(const size_t& popID);

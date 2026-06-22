@@ -50,6 +50,8 @@ extern int gpuMultiProcessorCount;
 extern int blocksPerMP;
 extern int threadsPerMP;
 
+extern double gpuShrinkFactor;
+
 // Magic multipliers used to make educated guesses for initial allocations
 // and for managing dynamic increases in allocation sizes. Some of these are
 // scaled based on WID value for better guesses,
@@ -400,6 +402,32 @@ struct GPUMemoryManager {
       return true;
    }
 
+   // Clear the allocated session pointers
+   bool clearSession(){
+      if(sessionOn){
+         std::cerr << "Please end the session before clearing it" << std::endl;
+         return false;
+      }
+
+      // Free the session pointers
+      freePointer(dev_sessionPointer);
+      freeHostPointer(host_sessionPointer);
+
+      dev_sessionAllocationSize = 0;
+      dev_previousSessionSize = 0;
+      dev_sessionSize = 0;
+      host_previousSessionSize = 0;
+      host_sessionSize = 0;
+      host_sessionAllocationSize = 0;
+
+      // Free the pointers that did not fit into the session pointer
+      freeSessionPointers();
+
+      maxSessionPointerIndex = 0;
+
+      return true;
+   }
+
    #define ALLOCATE_GPU(object, member, bytes) object.allocate(object.member, bytes)
    // Allocate memory to a pointer by index
    bool allocate(const size_t& pointerIndex, size_t bytes) {
@@ -695,6 +723,28 @@ struct GPUMemoryManager {
       std::lock_guard<std::mutex> lock(memoryMutex);
 
       CHK_ERR( gpuFree(gpuMemoryPointers[pointerIndex]) );
+      allocationSizes[pointerIndex] = (size_t)(0);
+      pointerDevice[pointerIndex] = NO_POINTER_DEVICE;
+      gpuMemoryPointers[pointerIndex] = nullptr;
+      
+      return true;
+   }
+   
+   // Free a pointer
+   bool freeHostPointer(size_t& pointerIndex) {
+      if (pointerIndex == 0) {
+         std::cerr << "Error: Pointer not found in 'gpuMemoryManager.freePointer'.\n";
+         return false;
+      }
+
+      if (pointerIndex > maxPointerIndex) {
+         //Assumes it was freed already, could also be invalid pointer
+         return false;
+      }
+
+      std::lock_guard<std::mutex> lock(memoryMutex);
+
+      CHK_ERR( gpuFreeHost(gpuMemoryPointers[pointerIndex]) );
       allocationSizes[pointerIndex] = (size_t)(0);
       pointerDevice[pointerIndex] = NO_POINTER_DEVICE;
       gpuMemoryPointers[pointerIndex] = nullptr;

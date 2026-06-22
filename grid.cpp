@@ -103,7 +103,8 @@ void initializeGrids(
    fsgrid::FsData<std::array<Real, fsgrids::volfields::N_VOL>>& vol,
    fsgrid::FsData<fsgrids::technical>& technical, FieldSolverGrid& fsgrid,
    SysBoundary& sysBoundaries,
-   Project& project
+   Project& project,
+   bool shrinkToFitEnabled
 ) {
    int myRank;
    MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
@@ -302,7 +303,9 @@ void initializeGrids(
          }
       }
 
-      shrink_to_fit_grid_data(mpiGrid); // get rid of excess data already here
+      if(shrinkToFitEnabled){
+         shrink_to_fit_grid_data(mpiGrid); //get rid of excess data already here
+      }
 
       /*
       // Apply boundary conditions so that we get correct initial moments
@@ -874,17 +877,52 @@ bool adjustVelocityBlocks(dccrg::Dccrg<SpatialCell, dccrg::Cartesian_Geometry>& 
 void shrink_to_fit_grid_data(dccrg::Dccrg<SpatialCell, dccrg::Cartesian_Geometry>& mpiGrid) {
    const std::vector<CellID>& cells = getLocalCells();
    const std::vector<CellID>& remote_cells = mpiGrid.get_remote_cells_on_process_boundary();
+
+   #ifdef USE_GPU
+   size_t totalCapacity = 0;
+   size_t totalSize = 0;
+   size_t blocks = 0;
+   for (size_t i = 0; i < cells.size() + remote_cells.size(); ++i) {
+      if (i < cells.size()) {
+         SpatialCell* target = mpiGrid[cells[i]];
+         if (target != nullptr) {
+            blocks += target->gatherShrink(totalCapacity, totalSize);
+         }
+      } else {
+         SpatialCell* target= mpiGrid[remote_cells[i - cells.size()]];
+         if (target != nullptr) {
+               blocks += target->gatherShrink(totalCapacity, totalSize);
+         }
+      }
+   }
+   if(blocks == 0){
+      return;
+   }
+   size_t free_byte ;
+   size_t total_byte ;
+   CHK_ERR( gpuMemGetInfo( &free_byte, &total_byte) );
+   //calculate limit based on need of shrinking
+   size_t shrinkLimit = static_cast<size_t>(gpuShrinkFactor*static_cast<double>(free_byte)/(static_cast<double>(blocks)*max(static_cast<double>(totalCapacity)-static_cast<double>(totalSize), 1.0)*WID3));
+   #endif
    #pragma omp parallel for
    for (size_t i = 0; i < cells.size() + remote_cells.size(); ++i) {
       if (i < cells.size()) {
          SpatialCell* target = mpiGrid[cells[i]];
          if (target != nullptr) {
+            #ifdef USE_GPU
+            target->shrink_to_fit(shrinkLimit);
+            #else
             target->shrink_to_fit();
+            #endif
          }
       } else {
          SpatialCell* target= mpiGrid[remote_cells[i - cells.size()]];
          if (target != nullptr) {
+            #ifdef USE_GPU
+            target->shrink_to_fit(shrinkLimit);
+            #else
             target->shrink_to_fit();
+            #endif
          }
       }
    }
