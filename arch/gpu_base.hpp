@@ -82,19 +82,22 @@ uint gpu_getThread();
 uint gpu_getMaxThreads();
 int gpu_getDevice();
 uint gpu_getAllocationCount();
+void gpu_setAllocationCount(uint value);
 int gpu_reportMemory(const size_t local_cap=0, const size_t ghost_cap=0, const size_t local_size=0, const size_t ghost_size=0);
 
 unsigned int nextPowerOfTwo(unsigned int n);
 
-void gpu_vlasov_allocate(uint maxBlockCount);
+void gpu_vlasov_allocate();
 void gpu_calculateProbeAllocation(uint maxBlockCount);
 void gpu_vlasov_deallocate();
-void gpu_vlasov_allocate_perthread(uint cpuThreadID, uint maxBlockCount);
+void gpu_vlasov_set_allocation_sizes(size_t blockCount);
+void gpu_vlasov_set_allocation_size(size_t index, size_t size);
 uint gpu_vlasov_getSmallestAllocation();
 
 void gpu_batch_allocate(uint nCells=0, uint maxNeighbours=0);
 
 void gpu_acc_allocate(uint maxBlockCount);
+void gpu_acc_reallocate(uint maxBlockCount);
 void gpu_acc_allocate_perthread(uint cpuThreadID, uint firstAllocationCount, uint columnSetAllocationCount=0);
 void gpu_acc_deallocate();
 
@@ -288,7 +291,7 @@ struct GPUMemoryManager {
    , or SESSION_HOST_ALLOCATE are listed here.
    */
    #define DEFINITIONS_HERE
-   size_t dev_allMaps, dev_allPencilsContainers, dev_allPencilsMeshes, dev_blockDataOrdered, dev_bulkVX, dev_bulkVY, dev_bulkVZ, dev_bValues, dev_cellIdxArray, dev_cellIdxKeys, dev_cellIdxStartCutoff, dev_columnOffsetData, dev_Ddt, dev_densityPostAdjust, dev_densityPreAdjust, dev_dfdt_mu, dev_dxdydz, dev_fcount, dev_fmu, dev_intersections, dev_lists_delete, dev_lists_to_replace, dev_lists_with_replace_new, dev_lists_with_replace_old, dev_mass, dev_massLoss, dev_max_dt, dev_minValues, dev_moments1, dev_moments2, dev_nAfter, dev_nBefore, dev_nBlocksToChange, dev_nColumns, dev_nColumnSets, dev_nu0Values, dev_nWithContent, dev_overflownElements, dev_pencilBlockData, dev_pencilBlocksCount, dev_potentialDdtValues, dev_probeCubeData, dev_remappedCellIdxArray, dev_resizeSuccess, dev_smallCellIdxArray, dev_sparsity, dev_VBC, dev_VBCs, dev_vbwcl_neigh, dev_vbwcl_vec, dev_velocityIdxArray, dev_vmeshes, gpu_block_indices_to_id, gpu_block_indices_to_probe, gpu_cell_indices_to_id, gpuInitBlocks, gpuInitBuffer, host_allMaps, host_allPencilsContainers, host_allPencilsMeshes, host_blockDataOrdered, host_bulkVX, host_bulkVY, host_bulkVZ, host_bValues, host_cellIdxStartCutoff, host_Ddt, host_dxdydz, host_intersections, host_lists_delete, host_lists_to_replace, host_lists_with_replace_new, host_lists_with_replace_old, host_mass, host_massLoss, host_max_dt, host_minValues, host_moments1, host_moments2, host_nAfter, host_nBefore, host_nBlocksToChange, host_nColumns, host_nColumnSets, host_nu0Values, host_nWithContent, host_overflownElements, host_remappedCellIdxArray, host_resizeSuccess, host_returnLID, host_returnReal, host_returnRealf, host_smallCellIdxArray, host_sparsity, host_VBC, host_VBCs, host_vbwcl_neigh, host_vbwcl_vec, host_vmeshes, member, my_test_pointer, returnLID, returnReal, returnRealf;
+   size_t dev_allMaps, dev_allPencilsContainers, dev_allPencilsMeshes, dev_blockDataOffsets, dev_blockDataOrdered, dev_bulkVX, dev_bulkVY, dev_bulkVZ, dev_bValues, dev_cellIdxArray, dev_cellIdxKeys, dev_cellIdxStartCutoff, dev_columnOffsetData, dev_Ddt, dev_densityPostAdjust, dev_densityPreAdjust, dev_dfdt_mu, dev_dxdydz, dev_fcount, dev_fmu, dev_intersections, dev_lists_delete, dev_lists_to_replace, dev_lists_with_replace_new, dev_lists_with_replace_old, dev_mass, dev_massLoss, dev_max_dt, dev_minValues, dev_moments1, dev_moments2, dev_nAfter, dev_nBefore, dev_nBlocksToChange, dev_nColumns, dev_nColumnSets, dev_nu0Values, dev_nWithContent, dev_overflownElements, dev_pencilBlockData, dev_pencilBlocksCount, dev_potentialDdtValues, dev_probeCubeData, dev_remappedCellIdxArray, dev_resizeSuccess, dev_smallCellIdxArray, dev_sparsity, dev_VBC, dev_VBCs, dev_vbwcl_neigh, dev_vbwcl_vec, dev_velocityIdxArray, dev_vmeshes, gpu_block_indices_to_id, gpu_block_indices_to_probe, gpu_cell_indices_to_id, gpuInitBlocks, gpuInitBuffer, host_allMaps, host_allPencilsContainers, host_allPencilsMeshes, host_blockDataOffsets, host_bulkVX, host_bulkVY, host_bulkVZ, host_bValues, host_cellIdxStartCutoff, host_Ddt, host_dxdydz, host_intersections, host_lists_delete, host_lists_to_replace, host_lists_with_replace_new, host_lists_with_replace_old, host_mass, host_massLoss, host_max_dt, host_minValues, host_moments1, host_moments2, host_nAfter, host_nBefore, host_nBlocksToChange, host_nColumns, host_nColumnSets, host_nu0Values, host_nWithContent, host_overflownElements, host_remappedCellIdxArray, host_resizeSuccess, host_returnLID, host_returnReal, host_returnRealf, host_smallCellIdxArray, host_sparsity, host_VBC, host_VBCs, host_vbwcl_neigh, host_vbwcl_vec, host_vmeshes, member, my_test_pointer, returnLID, returnReal, returnRealf;
    #define DEFINITIONS_END
    #undef DEFINITIONS_HERE
    #undef DEFINITIONS_END
@@ -707,7 +710,8 @@ struct GPUMemoryManager {
 
       return allocateAsync(pointerIndex, bytes, stream);
    }
-   
+
+   #define GPU_FREE_POINTER(object, member) object.freePointer(object.member)
    // Free a pointer
    bool freePointer(size_t& pointerIndex) {
       if (pointerIndex == 0) {
@@ -884,6 +888,11 @@ struct GPUMemoryManager {
    // Get pointer in a session
    template <typename T>
    T* getSessionPointer(const size_t& pointerIndex) const {
+      if(!sessionOn){
+         std::cerr << "No session is currently on. Cannot get session pointer.\n";
+         return nullptr;
+      }
+
       if (pointerIndex == 0 || pointerIndex > maxSessionPointerIndex){
          throw std::runtime_error("Unknown pointer name at gpuMemoryManager.getSessionPointer!\n");
       }
@@ -904,6 +913,11 @@ struct GPUMemoryManager {
    // Get host pointer in a session
    template <typename T>
    T* getSessionHostPointer(const size_t& pointerIndex) const {
+      if(!sessionOn){
+         std::cerr << "No session is currently on. Cannot get session host pointer.\n";
+         return nullptr;
+      }
+
       if (pointerIndex == 0 || pointerIndex > maxSessionPointerIndex){
          throw std::runtime_error("Unknown pointer name at gpuMemoryManager.getSessionHostPointer!\n");
       }

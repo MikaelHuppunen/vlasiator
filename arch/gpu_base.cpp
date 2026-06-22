@@ -76,6 +76,8 @@ uint gpu_allocated_largestVmeshSizePower = 0;
 uint gpu_allocated_unionSetSize = 0;
 uint gpu_largest_columnCount = 0;
 
+int previousAllocationCount = 0;
+
 __host__ uint gpu_getThread() {
 #ifdef _OPENMP
     return omp_get_thread_num();
@@ -160,6 +162,7 @@ __host__ void gpu_init_device() {
    // Decide on number of allocations to prepare
    const uint nBaseCells = P::xcells_ini * P::ycells_ini * P::zcells_ini;
    allocationCount = (nBaseCells == 1) ? 1 : P::GPUallocations;
+   previousAllocationCount = allocationCount;
 
    // Get device properties
    gpuDeviceProp prop;
@@ -262,6 +265,10 @@ __host__ uint gpu_getAllocationCount() {
    return allocationCount;
 }
 
+__host__ void gpu_setAllocationCount(uint value) {
+   allocationCount = value;
+}
+
 /*
    Memory reporting function
 */
@@ -334,24 +341,23 @@ int gpu_reportMemory(const size_t local_cells_capacity, const size_t ghost_cells
    Top-level GPU memory allocation function.
    This is called from within non-threaded regions so does not perform async.
  */
-__host__ void gpu_vlasov_allocate(
-   const uint maxBlockCount // Largest found vmesh size
-   ) {
-   // Always prepare for at least VLASOV_BUFFER_MINBLOCKS blocks
-   const uint maxBlocksPerCell = max(VLASOV_BUFFER_MINBLOCKS, maxBlockCount);
-   
-   CREATE_UNIQUE_POINTER(gpuMemoryManager, host_blockDataOrdered);
-   CREATE_UNIQUE_POINTER(gpuMemoryManager, dev_blockDataOrdered);
-   ALLOCATE_GPU(gpuMemoryManager, dev_blockDataOrdered, allocationCount*sizeof(Realf*));
-   HOST_ALLOCATE_GPU(gpuMemoryManager, host_blockDataOrdered, allocationCount*sizeof(Realf*));
+__host__ void gpu_vlasov_allocate() {
 
-   // per-buffer allocations
+   SESSION_HOST_ALLOCATE(gpuMemoryManager, size_t, host_blockDataOffsets, allocationCount*sizeof(size_t));
+   SESSION_ALLOCATE(gpuMemoryManager, size_t, dev_blockDataOffsets, allocationCount*sizeof(size_t));
+
+   size_t *host_blockDataOffsets = GET_SESSION_HOST_POINTER(gpuMemoryManager, size_t, host_blockDataOffsets);
+   size_t *dev_blockDataOffsets = GET_SESSION_POINTER(gpuMemoryManager, size_t, dev_blockDataOffsets);
+
+   size_t totalOffset = 0;
    for (uint i=0; i<allocationCount; ++i) {
-      gpu_vlasov_allocate_perthread(i, maxBlocksPerCell);
+      host_blockDataOffsets[i] = totalOffset;
+      totalOffset += gpu_vlasov_allocatedSize[i] * WID3 * sizeof(Realf);
    }
 
-   // Above function stores buffer pointers in host_blockDataOrdered, copy pointers to dev_blockDataOrdered
-   CHK_ERR( gpuMemcpy(GET_POINTER(gpuMemoryManager, Realf*, dev_blockDataOrdered), GET_POINTER(gpuMemoryManager, Realf*, host_blockDataOrdered), allocationCount*sizeof(Realf*), gpuMemcpyHostToDevice) );
+   SESSION_ALLOCATE(gpuMemoryManager, Realf, dev_blockDataOrdered, totalOffset*sizeof(Realf));
+
+   CHK_ERR( gpuMemcpy(dev_blockDataOffsets, host_blockDataOffsets, allocationCount*sizeof(size_t), gpuMemcpyHostToDevice) );
 }
 
 /*
@@ -399,6 +405,45 @@ __host__ void gpu_calculateProbeAllocation(
    gpu_probeStride = max(gpu_probeStride,probeAllocation);
 }
 
+__host__ void gpu_vlasov_set_allocation_sizes(size_t blockCount) {
+   for(int i = 0; i < allocationCount; i++){
+      gpu_vlasov_set_allocation_size(i, blockCount);
+   }
+}
+
+/* Deallocation at end of simulation */
+__host__ void gpu_vlasov_set_allocation_size(size_t index, size_t blockCount) {
+   // Always prepare for at least VLASOV_BUFFER_MINBLOCKS blocks
+   const size_t maxBlocksPerCell = max((size_t)VLASOV_BUFFER_MINBLOCKS, blockCount);
+
+   const size_t blockAllocationCount = maxBlocksPerCell;
+
+   // Dual use of blockDataOrdered: use also for acceleration probe cube and its flattened version.
+   // Calculate required size
+   size_t blockDataAllocation = blockAllocationCount * WID3 * sizeof(Realf);
+
+   /*
+   CUDA C Programming Guide
+   6.3.2. Device Memory Accesses (June 2025)
+   "Any address of a variable residing in global memory or returned by one of the memory allocation routines from the driver or
+   runtime API is always aligned to at least 256 bytes."
+
+   ROCm documentation
+   HIP 6.4.43483 Documentation for hipMallocPitch
+   "Currently the alignment is set to 128 bytes"
+
+   Thus, our mallocs should be in increments of 256 bytes. WID3 is at least 64, and len(Realf) is at least 4, so this is true in all
+   cases. Still, let us ensure (just to be sure) that probe cube addressing does not break alignment.
+   And in fact let's use the block memory size as the stride.
+   */
+   blockDataAllocation = (1 + ((blockDataAllocation - 1) / (WID3 * sizeof(Realf)))) * (WID3 * sizeof(Realf));
+
+   while(gpu_vlasov_allocatedSize.size() < allocationCount){ //Make sure the gpu_vlasov_allocatedSize has enough elements
+      gpu_vlasov_allocatedSize.push_back(0);
+   }
+   gpu_vlasov_allocatedSize[index] = blockDataAllocation / (WID3 * sizeof(Realf));;
+}
+
 /* Deallocation at end of simulation */
 __host__ void gpu_vlasov_deallocate() {
    while(gpu_vlasov_allocatedSize.size() < allocationCount){ //Make sure the gpu_vlasov_allocatedSize has enough elements
@@ -418,46 +463,6 @@ __host__ uint gpu_vlasov_getSmallestAllocation() {
       smallestAllocation = std::min(smallestAllocation,gpu_vlasov_allocatedSize[i]);
    }
    return smallestAllocation;
-}
-
-__host__ void gpu_vlasov_allocate_perthread(
-   uint allocID,
-   uint blockAllocationCount
-   ) {
-   while(gpu_vlasov_allocatedSize.size() < allocationCount){ //Make sure the gpu_vlasov_allocatedSize has enough elements
-      gpu_vlasov_allocatedSize.push_back(0);
-   }
-   while(gpu_vlasov_subPointers.size() < allocationCount){ //Make sure the gpu_vlasov_subPointers has enough elements
-      gpu_vlasov_subPointers.push_back(0);
-   }
-
-   // Dual use of blockDataOrdered: use also for acceleration probe cube and its flattened version.
-   // Calculate required size
-   size_t blockDataAllocation = blockAllocationCount * WID3 * sizeof(Realf);
-   /*
-     CUDA C Programming Guide
-     6.3.2. Device Memory Accesses (June 2025)
-     "Any address of a variable residing in global memory or returned by one of the memory allocation routines from the driver or
-     runtime API is always aligned to at least 256 bytes."
-
-     ROCm documentation
-     HIP 6.4.43483 Documentation for hipMallocPitch
-     "Currently the alignment is set to 128 bytes"
-
-     Thus, our mallocs should be in increments of 256 bytes. WID3 is at least 64, and len(Realf) is at least 4, so this is true in all
-     cases. Still, let us ensure (just to be sure) that probe cube addressing does not break alignment.
-     And in fact let's use the block memory size as the stride.
-   */
-   blockDataAllocation = (1 + ((blockDataAllocation - 1) / (WID3 * sizeof(Realf)))) * (WID3 * sizeof(Realf));
-
-   gpuMemoryManager.createPointer(gpu_vlasov_subPointers[allocID]);
-   bool reAllocated = gpuMemoryManager.allocate(gpu_vlasov_subPointers[allocID], blockDataAllocation);
-   SET_SUBPOINTER(gpuMemoryManager, Realf, host_blockDataOrdered, allocID,  gpu_vlasov_subPointers[allocID]);
-
-   // Store size of new allocation (in units blocks)
-   if (reAllocated) {
-      gpu_vlasov_allocatedSize[allocID] = blockDataAllocation / (WID3 * sizeof(Realf));
-   }
 }
 
 /** Allocation and deallocation for pointers used by batch operations in block adjustment */
@@ -539,8 +544,13 @@ __host__ void gpu_batch_allocate(uint nCells, uint maxNeighbours) {
 __host__ void gpu_acc_allocate(
    uint maxBlockCount
    ) {
+   if (previousAllocationCount != allocationCount) {
+      gpu_acc_reallocate(maxBlockCount);
+      return;
+   }
    if (host_columnOffsetData == NULL) {
       // This would be preferable as would use pinned memory but fails on exit
+      previousAllocationCount = allocationCount;
       void *buf;
       CHK_ERR( gpuMallocHost((void**)&buf,allocationCount*sizeof(ColumnOffsets)) );
       host_columnOffsetData = new (buf) ColumnOffsets[allocationCount];
@@ -554,10 +564,55 @@ __host__ void gpu_acc_allocate(
    CHK_ERR( gpuMemcpy(GET_POINTER(gpuMemoryManager, ColumnOffsets, dev_columnOffsetData), host_columnOffsetData, allocationCount*sizeof(ColumnOffsets), gpuMemcpyHostToDevice) );
 }
 
+__host__ void gpu_acc_reallocate(uint maxBlockCount) {
+   if (previousAllocationCount == allocationCount) {
+      return;
+   }
+
+   ColumnOffsets *oldHostData = host_columnOffsetData;
+
+   void *buf;
+   CHK_ERR( gpuMallocHost((void**)&buf, allocationCount*sizeof(ColumnOffsets)) );
+   ColumnOffsets* newHostData = new (buf) ColumnOffsets[allocationCount];
+
+   const uint keepCount = (previousAllocationCount < allocationCount) ? previousAllocationCount : allocationCount;
+
+   if (oldHostData != NULL) {
+      for (uint i = 0; i < keepCount; ++i) {
+         newHostData[i] = std::move(oldHostData[i]);
+      }
+      for (uint i = 0; i < previousAllocationCount; ++i) {
+         oldHostData[i].~ColumnOffsets();
+      }
+      CHK_ERR( gpuFreeHost(oldHostData) );
+   }
+   host_columnOffsetData = newHostData;
+
+   CREATE_UNIQUE_POINTER(gpuMemoryManager, dev_columnOffsetData);
+   bool reallocated = ALLOCATE_GPU(gpuMemoryManager, dev_columnOffsetData, allocationCount*sizeof(ColumnOffsets));
+
+   if (reallocated) {
+      for (uint i = 0; i < keepCount; ++i) {
+         gpuStream_t stream = gpu_getStream();
+         CHK_ERR( gpuMemcpyAsync(GET_POINTER(gpuMemoryManager, ColumnOffsets, dev_columnOffsetData)+i, host_columnOffsetData+i, sizeof(ColumnOffsets), gpuMemcpyHostToDevice, stream));
+      }
+   }
+   for (uint i = previousAllocationCount; i < allocationCount; ++i) {
+      gpu_acc_allocate_perthread(i, maxBlockCount);
+   }
+
+   CHK_ERR( gpuMemcpy(GET_POINTER(gpuMemoryManager, ColumnOffsets, dev_columnOffsetData), host_columnOffsetData, allocationCount*sizeof(ColumnOffsets), gpuMemcpyHostToDevice) );
+
+   previousAllocationCount = allocationCount;
+}
+
 /* Deallocation at end of simulation */
 __host__ void gpu_acc_deallocate() {
    if (host_columnOffsetData != NULL) {
       // delete[] host_columnOffsetData;
+   }
+   if (GET_POINTER(gpuMemoryManager, ColumnOffsets, dev_columnOffsetData) != NULL) {
+      GPU_FREE_POINTER(gpuMemoryManager, dev_columnOffsetData);
    }
    host_columnOffsetData = NULL;
 }

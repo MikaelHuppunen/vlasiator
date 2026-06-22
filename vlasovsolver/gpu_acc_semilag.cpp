@@ -150,7 +150,6 @@ void gpu_accelerate_cells(dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geometry>& m
       }
       // Ensure accelerator has enough temporary memory allocated
       verificationTimer.start();
-      gpu_vlasov_allocate(gpuMaxBlockCount);
       gpu_acc_allocate(gpuMaxBlockCount);
       verificationTimer.stop();
 
