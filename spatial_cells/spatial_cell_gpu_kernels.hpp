@@ -273,7 +273,7 @@ __global__ void update_vmesh_and_blockparameters_kernel (
    // }
 
    Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID> *map = dev_vmesh->gpu_expose_map();
-   split::SplitVector<vmesh::GlobalID> *list = dev_vmesh->getGrid();
+   split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>> *list = dev_vmesh->getGrid();
 
    #ifdef USE_WARPACCESSORS
    const uint w_tid = ti % GPUTHREADS;
@@ -305,10 +305,10 @@ __global__ void update_vmesh_and_blockparameters_kernel (
 __global__ void resize_vbc_kernel_pre(
    vmesh::VelocityMesh *vmesh,
    vmesh::VelocityBlockContainer *blockContainer,
-   const split::SplitVector<vmesh::GlobalID>* __restrict__ list_with_replace_new,
-   const split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>* __restrict__ list_delete,
-   const split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>* __restrict__ list_to_replace,
-   const split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>* __restrict__ list_with_replace_old,
+   const split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>* __restrict__ list_with_replace_new,
+   const split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>* __restrict__ list_delete,
+   const split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>* __restrict__ list_to_replace,
+   const split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>* __restrict__ list_with_replace_old,
    vmesh::LocalID* returnLID, // return values: nbefore, nafter, nblockstochange, resize success
    Realf* gpu_rhoLossAdjust // mass loss, set to zero
    ) {
@@ -351,10 +351,10 @@ __global__ void resize_vbc_kernel_post(
 __global__ void __launch_bounds__(WID3,4) update_velocity_blocks_kernel(
    vmesh::VelocityMesh *vmesh,
    vmesh::VelocityBlockContainer *blockContainer,
-   const split::SplitVector<vmesh::GlobalID>* __restrict__ list_with_replace_new,
-   const split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>* __restrict__ list_delete,
-   const split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>* __restrict__ list_to_replace,
-   const split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>* __restrict__ list_with_replace_old,
+   const split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>* __restrict__ list_with_replace_new,
+   const split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>* __restrict__ list_delete,
+   const split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>* __restrict__ list_to_replace,
+   const split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>* __restrict__ list_with_replace_old,
    const vmesh::LocalID nBlocksBeforeAdjust,
    const vmesh::LocalID nBlocksToChange,
    const vmesh::LocalID nBlocksAfterAdjust,

@@ -29,7 +29,7 @@
 
 // Buffers, vectors and set for use in translation. Cannot be declared in arch/gpu_base.hpp, because of
 // compilation errors.
-extern split::SplitVector<vmesh::GlobalID> *unionOfBlocks, *dev_unionOfBlocks;
+extern split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>> *unionOfBlocks, *dev_unionOfBlocks;
 extern Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID> *unionOfBlocksSet, *dev_unionOfBlocksSet;
 
 bool trans_map_1d_amr(const dccrg::Dccrg<spatial_cell::SpatialCell,dccrg::Cartesian_Geometry>& mpiGrid,

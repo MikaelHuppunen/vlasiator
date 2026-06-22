@@ -59,7 +59,7 @@ ColumnOffsets *host_columnOffsetData = NULL;
 size_t gpu_probeFullSize = 0, gpu_probeFlattenedSize = 0, gpu_probeStride = 0;
 
 // Buffers, Vector and set for use in translation
-split::SplitVector<vmesh::GlobalID> *unionOfBlocks=NULL, *dev_unionOfBlocks=NULL;
+split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>> *unionOfBlocks=NULL, *dev_unionOfBlocks=NULL;
 Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID> *unionOfBlocksSet=NULL, *dev_unionOfBlocksSet=NULL;
 
 // Memory manager
@@ -284,34 +284,16 @@ int gpu_reportMemory(const size_t local_cells_capacity, const size_t ghost_cells
       + sizeof(vmesh::MeshWrapper); // MWdev
    // DT reduction buffers are deallocated every step (GPUTODO, make persistent)
 
-   size_t vlasovBuffers = 0;
-   size_t batchBuffers = 0;
-
-   size_t accBuffers = 0;
-   for (uint i=0; i<allocationCount; ++i) {
-      if (host_columnOffsetData) {
-         accBuffers += host_columnOffsetData[i].capacityInBytes(); // struct contents
-      }
-   }
-
-   size_t transBuffers = 0;
-   if (unionOfBlocksSet) {
-      transBuffers += sizeof(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>);
-      transBuffers += unionOfBlocksSet->bucket_count() * sizeof(Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>);
-   }
-   if (unionOfBlocks) {
-      transBuffers += sizeof(split::SplitVector<vmesh::GlobalID>);
-      transBuffers += unionOfBlocks->capacity() * sizeof(vmesh::GlobalID);
-   }
    // Remote neighbor contribution buffers are in unified memory but deallocated after each use
 
    size_t memoryManagerCapacity = gpuMemoryManager.totalGpuAllocation();
+   size_t memoryManagerManagedCapacity = gpuMemoryManager.totalManagedAllocation();
 
    size_t free_byte ;
    size_t total_byte ;
    CHK_ERR( gpuMemGetInfo( &free_byte, &total_byte) );
    size_t used_mb = (total_byte-free_byte)/(1024*1024);
-   size_t sum_mb = (miniBuffers+batchBuffers+vlasovBuffers+accBuffers+transBuffers+local_cells_capacity+ghost_cells_capacity+memoryManagerCapacity)/(1024*1024);
+   size_t sum_mb = (miniBuffers+memoryManagerCapacity+memoryManagerManagedCapacity)/(1024*1024);
    size_t local_req_mb = local_cells_size/(1024*1024);
    size_t ghost_req_mb = ghost_cells_size/(1024*1024);
 
@@ -319,13 +301,8 @@ int gpu_reportMemory(const size_t local_cells_capacity, const size_t ghost_cells
       logFile<<" =================================="<<std::endl;
       logFile<<" GPU Memory report"<<std::endl;
       logFile<<"     mini-buffers:          "<<miniBuffers/(1024*1024)<<" Mbytes"<<std::endl;
-      logFile<<"     Batch buffers:         "<<batchBuffers/(1024*1024)<<" Mbytes"<<std::endl;
-      logFile<<"     Vlasov buffers:        "<<vlasovBuffers/(1024*1024)<<" Mbytes"<<std::endl;
-      logFile<<"     Acceleration buffers:  "<<accBuffers/(1024*1024)<<" Mbytes"<<std::endl;
-      logFile<<"     Translation buffers:   "<<transBuffers/(1024*1024)<<" Mbytes"<<std::endl;
-      logFile<<"     Local cells:           "<<local_cells_capacity/(1024*1024)<<" Mbytes"<<std::endl;
-      logFile<<"     Ghost cells:           "<<ghost_cells_capacity/(1024*1024)<<" Mbytes"<<std::endl;
       logFile<<"     Memory manager:        "<<memoryManagerCapacity/(1024*1024)<<" Mbytes"<<std::endl;
+      logFile<<"     Split vectors:         "<<memoryManagerManagedCapacity/(1024*1024)<<" Mbytes"<<std::endl;
       if (local_req_mb || ghost_req_mb) {
          logFile<<"     Local cells required:  "<<local_req_mb<<" Mbytes"<<std::endl;
          logFile<<"     Ghost cells required:  "<<ghost_req_mb<<" Mbytes"<<std::endl;
@@ -343,8 +320,8 @@ int gpu_reportMemory(const size_t local_cells_capacity, const size_t ghost_cells
  */
 __host__ void gpu_vlasov_allocate() {
 
-   SESSION_HOST_ALLOCATE(gpuMemoryManager, size_t, host_blockDataOffsets, allocationCount*sizeof(size_t));
-   SESSION_ALLOCATE(gpuMemoryManager, size_t, dev_blockDataOffsets, allocationCount*sizeof(size_t));
+   SESSION_HOST_ALLOCATE(gpuMemoryManager, host_blockDataOffsets, size_t, allocationCount*sizeof(size_t));
+   SESSION_ALLOCATE(gpuMemoryManager, dev_blockDataOffsets, size_t, allocationCount*sizeof(size_t));
 
    size_t *host_blockDataOffsets = GET_SESSION_HOST_POINTER(gpuMemoryManager, size_t, host_blockDataOffsets);
    size_t *dev_blockDataOffsets = GET_SESSION_POINTER(gpuMemoryManager, size_t, dev_blockDataOffsets);
@@ -355,7 +332,7 @@ __host__ void gpu_vlasov_allocate() {
       totalOffset += gpu_vlasov_allocatedSize[i] * WID3 * sizeof(Realf);
    }
 
-   SESSION_ALLOCATE(gpuMemoryManager, Realf, dev_blockDataOrdered, totalOffset*sizeof(Realf));
+   SESSION_ALLOCATE(gpuMemoryManager, dev_blockDataOrdered, Realf, totalOffset*sizeof(Realf));
 
    CHK_ERR( gpuMemcpy(dev_blockDataOffsets, host_blockDataOffsets, allocationCount*sizeof(size_t), gpuMemcpyHostToDevice) );
 }
@@ -488,11 +465,11 @@ __host__ void gpu_batch_allocate(uint nCells, uint maxNeighbours) {
    HOST_ALLOCATE_WITH_BUFFER(gpuMemoryManager, host_vmeshes, nCells*sizeof(vmesh::VelocityMesh*), BLOCK_ALLOCATION_FACTOR);
    HOST_ALLOCATE_WITH_BUFFER(gpuMemoryManager, host_VBCs, nCells*sizeof(vmesh::VelocityBlockContainer*), BLOCK_ALLOCATION_FACTOR);
    HOST_ALLOCATE_WITH_BUFFER(gpuMemoryManager, host_allMaps, 2*nCells*sizeof(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>*), BLOCK_ALLOCATION_FACTOR); // note double size
-   HOST_ALLOCATE_WITH_BUFFER(gpuMemoryManager, host_vbwcl_vec, nCells*sizeof(split::SplitVector<vmesh::GlobalID>*), BLOCK_ALLOCATION_FACTOR);
-   HOST_ALLOCATE_WITH_BUFFER(gpuMemoryManager, host_lists_with_replace_new, nCells*sizeof(split::SplitVector<vmesh::GlobalID>*), BLOCK_ALLOCATION_FACTOR);
-   HOST_ALLOCATE_WITH_BUFFER(gpuMemoryManager, host_lists_delete, nCells*sizeof(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>*), BLOCK_ALLOCATION_FACTOR);
-   HOST_ALLOCATE_WITH_BUFFER(gpuMemoryManager, host_lists_to_replace, nCells*sizeof(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>*), BLOCK_ALLOCATION_FACTOR);
-   HOST_ALLOCATE_WITH_BUFFER(gpuMemoryManager, host_lists_with_replace_old, nCells*sizeof(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>*), BLOCK_ALLOCATION_FACTOR);
+   HOST_ALLOCATE_WITH_BUFFER(gpuMemoryManager, host_vbwcl_vec, nCells*sizeof(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>*), BLOCK_ALLOCATION_FACTOR);
+   HOST_ALLOCATE_WITH_BUFFER(gpuMemoryManager, host_lists_with_replace_new, nCells*sizeof(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>*), BLOCK_ALLOCATION_FACTOR);
+   HOST_ALLOCATE_WITH_BUFFER(gpuMemoryManager, host_lists_delete, nCells*sizeof(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>*), BLOCK_ALLOCATION_FACTOR);
+   HOST_ALLOCATE_WITH_BUFFER(gpuMemoryManager, host_lists_to_replace, nCells*sizeof(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>*), BLOCK_ALLOCATION_FACTOR);
+   HOST_ALLOCATE_WITH_BUFFER(gpuMemoryManager, host_lists_with_replace_old, nCells*sizeof(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>*), BLOCK_ALLOCATION_FACTOR);
    HOST_ALLOCATE_WITH_BUFFER(gpuMemoryManager, host_nBefore, nCells*sizeof(vmesh::LocalID), BLOCK_ALLOCATION_FACTOR);
    HOST_ALLOCATE_WITH_BUFFER(gpuMemoryManager, host_nAfter, nCells*sizeof(vmesh::LocalID), BLOCK_ALLOCATION_FACTOR);
    HOST_ALLOCATE_WITH_BUFFER(gpuMemoryManager, host_nBlocksToChange, nCells*sizeof(vmesh::LocalID), BLOCK_ALLOCATION_FACTOR);
@@ -522,11 +499,11 @@ __host__ void gpu_batch_allocate(uint nCells, uint maxNeighbours) {
    ALLOCATE_WITH_BUFFER(gpuMemoryManager, dev_vmeshes, nCells*sizeof(vmesh::VelocityMesh*), BLOCK_ALLOCATION_FACTOR);
    ALLOCATE_WITH_BUFFER(gpuMemoryManager, dev_VBCs, nCells*sizeof(vmesh::VelocityBlockContainer*), BLOCK_ALLOCATION_FACTOR);
    ALLOCATE_WITH_BUFFER(gpuMemoryManager, dev_allMaps, 2*nCells*sizeof(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>*), BLOCK_ALLOCATION_FACTOR);
-   ALLOCATE_WITH_BUFFER(gpuMemoryManager, dev_vbwcl_vec, nCells*sizeof(split::SplitVector<vmesh::GlobalID>*), BLOCK_ALLOCATION_FACTOR);
-   ALLOCATE_WITH_BUFFER(gpuMemoryManager, dev_lists_with_replace_new, nCells*sizeof(split::SplitVector<vmesh::GlobalID>*), BLOCK_ALLOCATION_FACTOR);
-   ALLOCATE_WITH_BUFFER(gpuMemoryManager, dev_lists_delete, nCells*sizeof(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>*), BLOCK_ALLOCATION_FACTOR);
-   ALLOCATE_WITH_BUFFER(gpuMemoryManager, dev_lists_to_replace, nCells*sizeof(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>*), BLOCK_ALLOCATION_FACTOR);
-   ALLOCATE_WITH_BUFFER(gpuMemoryManager, dev_lists_with_replace_old, nCells*sizeof(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>*), BLOCK_ALLOCATION_FACTOR);
+   ALLOCATE_WITH_BUFFER(gpuMemoryManager, dev_vbwcl_vec, nCells*sizeof(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>*), BLOCK_ALLOCATION_FACTOR);
+   ALLOCATE_WITH_BUFFER(gpuMemoryManager, dev_lists_with_replace_new, nCells*sizeof(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>*), BLOCK_ALLOCATION_FACTOR);
+   ALLOCATE_WITH_BUFFER(gpuMemoryManager, dev_lists_delete, nCells*sizeof(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>*), BLOCK_ALLOCATION_FACTOR);
+   ALLOCATE_WITH_BUFFER(gpuMemoryManager, dev_lists_to_replace, nCells*sizeof(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>*), BLOCK_ALLOCATION_FACTOR);
+   ALLOCATE_WITH_BUFFER(gpuMemoryManager, dev_lists_with_replace_old, nCells*sizeof(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>*), BLOCK_ALLOCATION_FACTOR);
    ALLOCATE_WITH_BUFFER(gpuMemoryManager, dev_nBefore, nCells*sizeof(vmesh::LocalID), BLOCK_ALLOCATION_FACTOR);
    ALLOCATE_WITH_BUFFER(gpuMemoryManager, dev_nAfter, nCells*sizeof(vmesh::LocalID), BLOCK_ALLOCATION_FACTOR);
    ALLOCATE_WITH_BUFFER(gpuMemoryManager, dev_nBlocksToChange, nCells*sizeof(vmesh::LocalID), BLOCK_ALLOCATION_FACTOR);
@@ -699,8 +676,8 @@ __host__ void gpu_trans_allocate(
    if (unionSetSize > 0) {
       if (gpu_allocated_unionSetSize == 0) {
          // New allocation
-         void *buf0 = malloc(sizeof(split::SplitVector<vmesh::GlobalID>));
-         unionOfBlocks = ::new (buf0) split::SplitVector<vmesh::GlobalID>(unionSetSize);
+         void *buf0 = malloc(sizeof(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>));
+         unionOfBlocks = ::new (buf0) split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>(unionSetSize);
          unionOfBlocks->clear();
          //unionOfBlocks->optimizeGPU(stream);
          dev_unionOfBlocks = unionOfBlocks->upload<true>(stream); // <true> == optimize to GPU
