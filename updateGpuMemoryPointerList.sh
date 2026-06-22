@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Collects all pointers passed to gpuMemoryManager
-# and writes them into ./arch/gpu_base.hpp between
+# and writes them into ./arch/gpu_memory_manager.hpp between
 # //DEFINITIONS_HERE and //DEFINITIONS_END markers.
 
 shopt -s globstar nullglob
@@ -37,8 +37,8 @@ done
 # --- Prepare the definitions content ---
 definitions=$(for key in "${!seen[@]}"; do echo "$key"; done | sort)
 
-# --- Update gpu_base.hpp ---
-target="./arch/gpu_base.hpp"
+# --- Update gpu_memory_manager.hpp ---
+target="./arch/gpu_memory_manager.hpp"
 
 if [[ ! -f "$target" ]]; then
    echo "[ERROR] $target not found."

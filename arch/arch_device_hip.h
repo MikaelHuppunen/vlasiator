@@ -124,6 +124,8 @@ inline static void hip_error(hipError_t err, const char *file, int line) {
    }
 }
 
+#include "gpu_memory_manager.hpp"
+
 /* Namespace for architecture-specific functions */
 namespace arch{
 
@@ -193,7 +195,7 @@ namespace arch{
 
       buf(T * const _ptr, uint _bytes) : ptr(_ptr), bytes(_bytes) {
          thread_id = omp_get_thread_num();
-         CHK_ERR(hipMallocAsync(&d_ptr, bytes, gpuStreamList[thread_id]));
+         CHK_ERR(gpuMallocAsync(&d_ptr, bytes, gpuStreamList[thread_id]));
          syncDeviceData();
       }
 
@@ -236,14 +238,14 @@ namespace arch{
       void* ptr;
       const uint thread_id = omp_get_thread_num();
       device_mempool_check(UINT64_MAX);
-      CHK_ERR(hipMallocAsync(&ptr, bytes, gpuStreamList[thread_id]));
+      CHK_ERR(gpuMallocAsync(&ptr, bytes, gpuStreamList[thread_id]));
       return ptr;
    }
 
    __host__ __forceinline__ static void* allocate(size_t bytes, hipStream_t stream) {
       void* ptr;
       device_mempool_check(UINT64_MAX);
-      CHK_ERR(hipMallocAsync(&ptr, bytes, stream));
+      CHK_ERR(gpuMallocAsync(&ptr, bytes, stream));
       return ptr;
    }
 
@@ -439,7 +441,7 @@ namespace arch{
 
       /* Create a device buffer to transfer the loop limits of each dimension to device */
       uint* d_limits;
-      CHK_ERR(hipMallocAsync(&d_limits, NDim*sizeof(uint), gpuStreamList[thread_id]));
+      CHK_ERR(gpuMallocAsync(&d_limits, NDim*sizeof(uint), gpuStreamList[thread_id]));
       CHK_ERR(hipMemcpyAsync(d_limits, limits, NDim*sizeof(uint), hipMemcpyHostToDevice,gpuStreamList[thread_id]));
 
       /* Simple action for non-reducing call */
@@ -464,12 +466,12 @@ namespace arch{
 
       /* Create a device buffer for the reduction results */
       T* d_buf;
-      CHK_ERR(hipMallocAsync(&d_buf, n_reductions*sizeof(T), gpuStreamList[thread_id]));
+      CHK_ERR(gpuMallocAsync(&d_buf, n_reductions*sizeof(T), gpuStreamList[thread_id]));
       CHK_ERR(hipMemcpyAsync(d_buf, sum, n_reductions*sizeof(T), hipMemcpyHostToDevice, gpuStreamList[thread_id]));
 
       /* Create a device buffer to transfer the initial values to device */
       T* d_const_buf;
-      CHK_ERR(hipMallocAsync(&d_const_buf, n_reductions*sizeof(T), gpuStreamList[thread_id]));
+      CHK_ERR(gpuMallocAsync(&d_const_buf, n_reductions*sizeof(T), gpuStreamList[thread_id]));
       CHK_ERR(hipMemcpyAsync(d_const_buf, d_buf, n_reductions*sizeof(T), hipMemcpyDeviceToDevice, gpuStreamList[thread_id]));
 
       /* Call the reduction kernel with different arguments depending
@@ -503,7 +505,7 @@ namespace arch{
          /* Set the kernel grid dimensions */
          const uint gridsize = (n_total - 1 + blocksize) / blocksize;
          /* Allocate memory for the thread data values */
-         CHK_ERR(hipMallocAsync(&d_thread_data_dynamic, n_reductions * blocksize * gridsize * sizeof(T), gpuStreamList[thread_id]));
+         CHK_ERR(gpuMallocAsync(&d_thread_data_dynamic, n_reductions * blocksize * gridsize * sizeof(T), gpuStreamList[thread_id]));
          /* Call the kernel (the number of reductions not known at compile time) */
          if(gridsize > 0){
             if(blocksize == ARCH_BLOCKSIZE_R){

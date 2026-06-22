@@ -128,6 +128,8 @@ inline static void cuda_error(cudaError_t err, const char *file, int line) {
    }
 }
 
+#include "gpu_memory_manager.hpp"
+
 /* Create auxiliary max atomic function for double types */
 __device__ __forceinline__ static void atomicMax(double *address, double val2) {
    unsigned long long ret = __double_as_longlong(*address);
@@ -201,7 +203,7 @@ namespace arch{
 #else
          const uint thread_id = 0;
 #endif
-         CHK_ERR(cudaMallocAsync(&d_ptr, bytes, gpuStreamList[thread_id]));
+         CHK_ERR(gpuMallocAsync(&d_ptr, bytes, gpuStreamList[thread_id]));
          syncDeviceData();
       }
 
@@ -248,14 +250,14 @@ namespace arch{
       const uint thread_id = 0;
 #endif
       device_mempool_check(UINT64_MAX);
-      CHK_ERR(cudaMallocAsync(&ptr, bytes, gpuStreamList[thread_id]));
+      CHK_ERR(gpuMallocAsync(&ptr, bytes, gpuStreamList[thread_id]));
       return ptr;
    }
 
    __host__ __forceinline__ static void* allocate(size_t bytes, cudaStream_t stream) {
       void* ptr;
       device_mempool_check(UINT64_MAX);
-      CHK_ERR(cudaMallocAsync(&ptr, bytes, stream));
+      CHK_ERR(gpuMallocAsync(&ptr, bytes, stream));
       return ptr;
    }
 
@@ -462,7 +464,7 @@ namespace arch{
 
       /* Create a device buffer to transfer the loop limits of each dimension to device */
       uint* d_limits;
-      CHK_ERR(cudaMallocAsync(&d_limits, NDim*sizeof(uint), gpuStreamList[thread_id]));
+      CHK_ERR(gpuMallocAsync(&d_limits, NDim*sizeof(uint), gpuStreamList[thread_id]));
       CHK_ERR(cudaMemcpyAsync(d_limits, limits, NDim*sizeof(uint), cudaMemcpyHostToDevice,gpuStreamList[thread_id]));
 
       /* Simple action for non-reducing call */
@@ -488,12 +490,12 @@ namespace arch{
 
       /* Create a device buffer for the reduction results */
       T* d_buf;
-      CHK_ERR(cudaMallocAsync(&d_buf, n_reductions*sizeof(T), gpuStreamList[thread_id]));
+      CHK_ERR(gpuMallocAsync(&d_buf, n_reductions*sizeof(T), gpuStreamList[thread_id]));
       CHK_ERR(cudaMemcpyAsync(d_buf, sum, n_reductions*sizeof(T), cudaMemcpyHostToDevice, gpuStreamList[thread_id]));
 
       /* Create a device buffer to transfer the initial values to device */
       T* d_const_buf;
-      CHK_ERR(cudaMallocAsync(&d_const_buf, n_reductions*sizeof(T), gpuStreamList[thread_id]));
+      CHK_ERR(gpuMallocAsync(&d_const_buf, n_reductions*sizeof(T), gpuStreamList[thread_id]));
       CHK_ERR(cudaMemcpyAsync(d_const_buf, d_buf, n_reductions*sizeof(T), cudaMemcpyDeviceToDevice, gpuStreamList[thread_id]));
 
       /* Call the reduction kernel with different arguments depending
@@ -527,7 +529,7 @@ namespace arch{
          /* Set the kernel grid dimensions */
          const uint gridsize = (n_total - 1 + blocksize) / blocksize;
          /* Allocate memory for the thread data values */
-         CHK_ERR(cudaMallocAsync(&d_thread_data_dynamic, n_reductions * blocksize * gridsize * sizeof(T), gpuStreamList[thread_id]));
+         CHK_ERR(gpuMallocAsync(&d_thread_data_dynamic, n_reductions * blocksize * gridsize * sizeof(T), gpuStreamList[thread_id]));
          /* Call the kernel (the number of reductions not known at compile time) */
          if(gridsize > 0){
             if(blocksize == ARCH_BLOCKSIZE_R){
