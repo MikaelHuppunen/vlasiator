@@ -463,8 +463,8 @@ namespace arch{
       device_mempool_check(UINT64_MAX);
 
       /* Create a device buffer to transfer the loop limits of each dimension to device */
-      uint* d_limits;
-      CHK_ERR(gpuMallocAsync(&d_limits, NDim*sizeof(uint), gpuStreamList[thread_id]));
+      SUBPOINTER_ALLOCATE_ASYNC(gpuMemoryManager, d_limits, thread_id, NDim*sizeof(uint), gpuStreamList[thread_id]);
+      uint *d_limits = GET_SUBPOINTER(gpuMemoryManager, uint, d_limits, thread_id);
       CHK_ERR(cudaMemcpyAsync(d_limits, limits, NDim*sizeof(uint), cudaMemcpyHostToDevice,gpuStreamList[thread_id]));
 
       /* Simple action for non-reducing call */
@@ -484,18 +484,18 @@ namespace arch{
          CHK_ERR(cudaPeekAtLastError());
          /* Synchronize after kernel call */
          CHK_ERR(cudaStreamSynchronize(gpuStreamList[thread_id]));
-         CHK_ERR(cudaFreeAsync(d_limits, gpuStreamList[thread_id]));
+         GPU_FREE_SUBPOINTER_ASYNC(gpuMemoryManager, d_limits, thread_id, gpuStreamList[thread_id]);
          return;
       }
 
       /* Create a device buffer for the reduction results */
-      T* d_buf;
-      CHK_ERR(gpuMallocAsync(&d_buf, n_reductions*sizeof(T), gpuStreamList[thread_id]));
+      SUBPOINTER_ALLOCATE_ASYNC(gpuMemoryManager, d_buf, thread_id, n_reductions*sizeof(T), gpuStreamList[thread_id]);
+      T *d_buf = GET_SUBPOINTER(gpuMemoryManager, T, d_buf, thread_id);
       CHK_ERR(cudaMemcpyAsync(d_buf, sum, n_reductions*sizeof(T), cudaMemcpyHostToDevice, gpuStreamList[thread_id]));
 
       /* Create a device buffer to transfer the initial values to device */
-      T* d_const_buf;
-      CHK_ERR(gpuMallocAsync(&d_const_buf, n_reductions*sizeof(T), gpuStreamList[thread_id]));
+      SUBPOINTER_ALLOCATE_ASYNC(gpuMemoryManager, d_const_buf, thread_id, n_reductions*sizeof(T), gpuStreamList[thread_id]);
+      T *d_const_buf = GET_SUBPOINTER(gpuMemoryManager, T, d_const_buf, thread_id);
       CHK_ERR(cudaMemcpyAsync(d_const_buf, d_buf, n_reductions*sizeof(T), cudaMemcpyDeviceToDevice, gpuStreamList[thread_id]));
 
       /* Call the reduction kernel with different arguments depending
@@ -529,7 +529,8 @@ namespace arch{
          /* Set the kernel grid dimensions */
          const uint gridsize = (n_total - 1 + blocksize) / blocksize;
          /* Allocate memory for the thread data values */
-         CHK_ERR(gpuMallocAsync(&d_thread_data_dynamic, n_reductions * blocksize * gridsize * sizeof(T), gpuStreamList[thread_id]));
+         SUBPOINTER_ALLOCATE_ASYNC(gpuMemoryManager, d_thread_data_dynamic, thread_id, n_reductions * blocksize * gridsize * sizeof(T), gpuStreamList[thread_id]);
+         d_thread_data_dynamic = GET_SUBPOINTER(gpuMemoryManager, T, d_thread_data_dynamic, thread_id);
          /* Call the kernel (the number of reductions not known at compile time) */
          if(gridsize > 0){
             if(blocksize == ARCH_BLOCKSIZE_R){
@@ -547,7 +548,7 @@ namespace arch{
          CHK_ERR(cudaPeekAtLastError());
          /* Synchronize and free the thread data allocation */
          CHK_ERR(cudaStreamSynchronize(gpuStreamList[thread_id]));
-         CHK_ERR(cudaFreeAsync(d_thread_data_dynamic, gpuStreamList[thread_id]));
+         GPU_FREE_SUBPOINTER_ASYNC(gpuMemoryManager, d_thread_data_dynamic, thread_id, gpuStreamList[thread_id]);
       }
       else{
          /* Set the kernel dimensions */
@@ -564,9 +565,9 @@ namespace arch{
       }
       /* Copy the results back to host and free the allocated memory back to pool*/
       CHK_ERR(cudaMemcpyAsync(sum, d_buf, n_reductions*sizeof(T), cudaMemcpyDeviceToHost, gpuStreamList[thread_id]));
-      CHK_ERR(cudaFreeAsync(d_buf, gpuStreamList[thread_id]));
-      CHK_ERR(cudaFreeAsync(d_const_buf, gpuStreamList[thread_id]));
-      CHK_ERR(cudaFreeAsync(d_limits, gpuStreamList[thread_id]));
+      GPU_FREE_SUBPOINTER_ASYNC(gpuMemoryManager, d_buf, thread_id, gpuStreamList[thread_id]);
+      GPU_FREE_SUBPOINTER_ASYNC(gpuMemoryManager, d_const_buf, thread_id, gpuStreamList[thread_id]);
+      GPU_FREE_SUBPOINTER_ASYNC(gpuMemoryManager, d_limits, thread_id, gpuStreamList[thread_id]);
    }
 }
 

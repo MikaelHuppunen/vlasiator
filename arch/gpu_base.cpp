@@ -197,6 +197,10 @@ __host__ void gpu_init_device() {
    CREATE_SUBPOINTERS(gpuMemoryManager, host_returnLID, maxNThreads);
    CREATE_SUBPOINTERS(gpuMemoryManager, gpuInitBuffer, maxNThreads);
    CREATE_SUBPOINTERS(gpuMemoryManager, gpuInitBlocks, maxNThreads);
+   CREATE_SUBPOINTERS(gpuMemoryManager, d_limits, maxNThreads);
+   CREATE_SUBPOINTERS(gpuMemoryManager, d_buf, maxNThreads);
+   CREATE_SUBPOINTERS(gpuMemoryManager, d_const_buf, maxNThreads);
+   CREATE_SUBPOINTERS(gpuMemoryManager, d_thread_data_dynamic, maxNThreads);
 
 
    int *leastPriority = new int; // likely 0
