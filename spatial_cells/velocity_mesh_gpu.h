@@ -127,13 +127,13 @@ namespace vmesh {
       void print_addresses();
       void print_sizes();
 
-      ARCH_HOSTDEV Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>* gpu_expose_map();
+      ARCH_HOSTDEV Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>* gpu_expose_map();
 
    private:
       size_t meshID;
       size_t ltg_size=0, ltg_capacity=0, gtl_sizepower=0; // host-cached values
 
-      Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID> globalToLocalMap;
+      Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>> globalToLocalMap;
       split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>> localToGlobalMap;
    };
 
@@ -143,7 +143,7 @@ namespace vmesh {
    inline VelocityMesh::VelocityMesh() {
       meshID = std::numeric_limits<size_t>::max();
       // Set sizepower to 10 (1024 blocks) straight away so there's enough room to grow?
-      globalToLocalMap = Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>(INIT_MAP_SIZE);
+      globalToLocalMap = Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>(INIT_MAP_SIZE);
       localToGlobalMap = split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>(INIT_VMESH_SIZE);
       localToGlobalMap.clear();
       ltg_size = 0;
@@ -157,7 +157,7 @@ namespace vmesh {
       gpuStream_t stream = gpu_getStream();
       meshID = other.meshID;
       if (other.localToGlobalMap.size() > 0) {
-         globalToLocalMap = Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>(other.globalToLocalMap);
+         globalToLocalMap = Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>(other.globalToLocalMap);
          localToGlobalMap = split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>(other.localToGlobalMap.capacity());
          // Overwrite is like a copy assign but takes a stream
          localToGlobalMap.overwrite(other.localToGlobalMap,stream);
@@ -165,7 +165,7 @@ namespace vmesh {
          ltg_capacity = localToGlobalMap.capacity();
          gtl_sizepower = globalToLocalMap.getSizePower();
       } else {
-         globalToLocalMap = Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>(INIT_MAP_SIZE);
+         globalToLocalMap = Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>(INIT_MAP_SIZE);
          localToGlobalMap = split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>(INIT_VMESH_SIZE);
          localToGlobalMap.clear();
          ltg_size = 0;
@@ -324,7 +324,7 @@ namespace vmesh {
       if (shrink) {
          ltg_capacity = 1;
          gtl_sizepower = 4;
-         globalToLocalMap = Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>(ltg_capacity);
+         globalToLocalMap = Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>(ltg_capacity);
          localToGlobalMap = split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>(gtl_sizepower);
          localToGlobalMap.clear();
       } else {
@@ -1480,7 +1480,7 @@ namespace vmesh {
       return;
    }
 
-   ARCH_HOSTDEV inline Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>* VelocityMesh::gpu_expose_map() {
+   ARCH_HOSTDEV inline Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>* VelocityMesh::gpu_expose_map() {
       return &globalToLocalMap;
    }
 

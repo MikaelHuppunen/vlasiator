@@ -228,7 +228,7 @@ __global__ static void resize_and_empty_kernel (
    }
    __syncthreads();
    // check map sizepower
-   Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID> *globalToLocalMap = vmesh->gpu_expose_map();
+   Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>> *globalToLocalMap = vmesh->gpu_expose_map();
    Hashinator::Info *info = globalToLocalMap->expose_mapinfo<false>();
    // Set map fill to zero. Target goal is to have empty map. Even if we need
    // to recapacitate the map, this will lead to a clean new allocation without
@@ -692,8 +692,8 @@ __global__ static void resize_and_empty_kernel (
       split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>> *dev_velocity_block_with_content_list=0;  /**< Device pointer to list of existing cells with content.*/
       vmesh::LocalID velocity_block_with_content_list_size=0;                       /**< Size of vector. Needed for MPI communication of size before actual list transfer.*/
       vmesh::LocalID velocity_block_with_content_list_capacity=0;                   /**< Capacity of vector. Cached value.*/
-      Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID> *velocity_block_with_content_map=0, *velocity_block_with_no_content_map=0;
-      Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID> *dev_velocity_block_with_content_map=0, *dev_velocity_block_with_no_content_map=0;
+      Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>> *velocity_block_with_content_map=0, *velocity_block_with_no_content_map=0;
+      Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>> *dev_velocity_block_with_content_map=0, *dev_velocity_block_with_no_content_map=0;
       vmesh::LocalID vbwcl_sizePower, vbwncl_sizePower;
 
       split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>> *list_with_replace_new=0, *dev_list_with_replace_new=0;
@@ -1139,7 +1139,7 @@ __global__ static void resize_and_empty_kernel (
       size += CellParams::N_SPATIAL_CELL_PARAMS * sizeof(Real);
       size += bvolderivatives::N_BVOL_DERIVATIVES * sizeof(Real);
 
-      size += 2 * sizeof(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>);
+      size += 2 * sizeof(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>);
       size += sizeof(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>);
       size += 3 * sizeof(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>);
 
@@ -1178,7 +1178,7 @@ __global__ static void resize_and_empty_kernel (
       // capacity += CellParams::N_SPATIAL_CELL_PARAMS * sizeof(Real);
       // capacity += bvolderivatives::N_BVOL_DERIVATIVES * sizeof(Real);
 
-      capacity += 2 * sizeof(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>);
+      capacity += 2 * sizeof(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>);
       capacity += sizeof(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>);
       capacity += 3 * sizeof(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>);
       //size_t pops1 = 0, pops2=0;

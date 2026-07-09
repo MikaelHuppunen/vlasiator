@@ -38,8 +38,8 @@
 __global__ void __launch_bounds__(WID3,4) update_velocity_block_content_lists_kernel (
    const vmesh::VelocityMesh* __restrict__ vmesh,
    const vmesh::VelocityBlockContainer* __restrict__ blockContainer,
-   Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>* vbwcl_map,
-   Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>* vbwncl_map,
+   Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>* vbwcl_map,
+   Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>* vbwncl_map,
    const Real velocity_block_min_value
    ) {
    // const int gpuBlocks = gridDim.x;
@@ -124,8 +124,8 @@ __global__ void update_velocity_halo_kernel (
    const vmesh::VelocityMesh* __restrict__ vmesh,
    const vmesh::LocalID velocity_block_with_content_list_size, // actually not used
    const vmesh::GlobalID* __restrict__ velocity_block_with_content_list_data,
-   Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>* dev_velocity_block_with_content_map,
-   Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>* dev_velocity_block_with_no_content_map
+   Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>* dev_velocity_block_with_content_map,
+   Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>* dev_velocity_block_with_no_content_map
    ) {
    //const int gpuBlocks = gridDim.x; // Equal to VB with content list size (or at least 1)
    const int blocki = blockIdx.x;
@@ -200,8 +200,8 @@ __global__ void update_neighbour_halo_kernel (
    const uint neighbour_count,
    const vmesh::GlobalID* __restrict__ const *dev_neigh_vbwcls,
    const vmesh::LocalID* __restrict__ dev_neigh_Nvbwcls,
-   Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>* dev_velocity_block_with_content_map,
-   Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>* dev_velocity_block_with_no_content_map
+   Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>* dev_velocity_block_with_content_map,
+   Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>* dev_velocity_block_with_no_content_map
    ) {
    //const int blockSize = blockDim.x; // should be 32*32 or 16*64
    //const int gpuBlocks = gridDim.x; // Equal to count of neighbour content blocks divided by (warps/block)
@@ -272,7 +272,7 @@ __global__ void update_vmesh_and_blockparameters_kernel (
    //    dev_blockContainer->setNewSize(nLIDs);
    // }
 
-   Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID> *map = dev_vmesh->gpu_expose_map();
+   Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>> *map = dev_vmesh->gpu_expose_map();
    split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>> *list = dev_vmesh->getGrid();
 
    #ifdef USE_WARPACCESSORS

@@ -69,33 +69,33 @@ namespace spatial_cell {
 
    // Non-templated caller functions due to dual use from both block adjustment and acceleration
    void extract_to_replace_caller(
-      Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>** input_maps,
+      Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>** input_maps,
       split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>> **output_vecs,
       vmesh::LocalID* output_sizes,
       vmesh::VelocityMesh** rule_meshes,
-      Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>** rule_maps,
+      Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>** rule_maps,
       split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>** rule_vectors,
       const uint nCells,
       gpuStream_t stream
       );
 
    void extract_to_delete_or_move_caller(
-      Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>** input_maps,
+      Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>** input_maps,
       split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>> **output_vecs,
       vmesh::LocalID* output_sizes,
       vmesh::VelocityMesh** rule_meshes,
-      Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>** rule_maps,
+      Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>** rule_maps,
       split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>** rule_vectors,
       const uint nCells,
       gpuStream_t stream
       );
 
    void extract_to_add_caller(
-      Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>** input_maps,
+      Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>** input_maps,
       split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>> **output_vecs,
       vmesh::LocalID* output_sizes,
       vmesh::VelocityMesh** rule_meshes,
-      Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>** rule_maps,
+      Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>** rule_maps,
       split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>** rule_vectors,
       const uint nCells,
       gpuStream_t stream

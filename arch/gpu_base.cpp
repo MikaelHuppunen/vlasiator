@@ -59,7 +59,7 @@ size_t gpu_probeFullSize = 0, gpu_probeFlattenedSize = 0, gpu_probeStride = 0;
 
 // Buffers, Vector and set for use in translation
 split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>> *unionOfBlocks=NULL, *dev_unionOfBlocks=NULL;
-Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID> *unionOfBlocksSet=NULL, *dev_unionOfBlocksSet=NULL;
+Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>> *unionOfBlocksSet=NULL, *dev_unionOfBlocksSet=NULL;
 
 // Memory manager
 GPUMemoryManager gpuMemoryManager;
@@ -486,7 +486,7 @@ __host__ void gpu_batch_allocate(uint nCells, uint maxNeighbours) {
 
    HOST_ALLOCATE_WITH_BUFFER(gpuMemoryManager, host_vmeshes, nCells*sizeof(vmesh::VelocityMesh*), BLOCK_ALLOCATION_FACTOR);
    HOST_ALLOCATE_WITH_BUFFER(gpuMemoryManager, host_VBCs, nCells*sizeof(vmesh::VelocityBlockContainer*), BLOCK_ALLOCATION_FACTOR);
-   HOST_ALLOCATE_WITH_BUFFER(gpuMemoryManager, host_allMaps, 2*nCells*sizeof(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>*), BLOCK_ALLOCATION_FACTOR); // note double size
+   HOST_ALLOCATE_WITH_BUFFER(gpuMemoryManager, host_allMaps, 2*nCells*sizeof(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>*), BLOCK_ALLOCATION_FACTOR); // note double size
    HOST_ALLOCATE_WITH_BUFFER(gpuMemoryManager, host_vbwcl_vec, nCells*sizeof(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>*), BLOCK_ALLOCATION_FACTOR);
    HOST_ALLOCATE_WITH_BUFFER(gpuMemoryManager, host_lists_with_replace_new, nCells*sizeof(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>*), BLOCK_ALLOCATION_FACTOR);
    HOST_ALLOCATE_WITH_BUFFER(gpuMemoryManager, host_lists_delete, nCells*sizeof(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>*), BLOCK_ALLOCATION_FACTOR);
@@ -520,7 +520,7 @@ __host__ void gpu_batch_allocate(uint nCells, uint maxNeighbours) {
 
    ALLOCATE_WITH_BUFFER(gpuMemoryManager, dev_vmeshes, nCells*sizeof(vmesh::VelocityMesh*), BLOCK_ALLOCATION_FACTOR);
    ALLOCATE_WITH_BUFFER(gpuMemoryManager, dev_VBCs, nCells*sizeof(vmesh::VelocityBlockContainer*), BLOCK_ALLOCATION_FACTOR);
-   ALLOCATE_WITH_BUFFER(gpuMemoryManager, dev_allMaps, 2*nCells*sizeof(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>*), BLOCK_ALLOCATION_FACTOR);
+   ALLOCATE_WITH_BUFFER(gpuMemoryManager, dev_allMaps, 2*nCells*sizeof(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>*), BLOCK_ALLOCATION_FACTOR);
    ALLOCATE_WITH_BUFFER(gpuMemoryManager, dev_vbwcl_vec, nCells*sizeof(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>*), BLOCK_ALLOCATION_FACTOR);
    ALLOCATE_WITH_BUFFER(gpuMemoryManager, dev_lists_with_replace_new, nCells*sizeof(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>*), BLOCK_ALLOCATION_FACTOR);
    ALLOCATE_WITH_BUFFER(gpuMemoryManager, dev_lists_delete, nCells*sizeof(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>*), BLOCK_ALLOCATION_FACTOR);
@@ -626,16 +626,16 @@ __host__ void gpu_trans_allocate(
       const vmesh::LocalID HashmapReqSize = ceil(log2((int)largestVmesh)) +2;
       if (gpu_allocated_largestVmeshSizePower == 0) {
          // New allocation
-         void *buf0 = malloc(sizeof(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>));
-         unionOfBlocksSet = ::new (buf0) Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>(HashmapReqSize);
+         void *buf0 = malloc(sizeof(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>));
+         unionOfBlocksSet = ::new (buf0) Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>(HashmapReqSize);
          dev_unionOfBlocksSet = unionOfBlocksSet->upload<true>(stream); // <true> == optimize to GPU
          gpu_allocated_largestVmeshSizePower = HashmapReqSize;
       } else {
          // Ensure allocation
          if (HashmapReqSize > gpu_allocated_largestVmeshSizePower) {
             ::delete unionOfBlocksSet;
-            void *buf0 = malloc(sizeof(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>));
-            unionOfBlocksSet = ::new (buf0) Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>(HashmapReqSize);
+            void *buf0 = malloc(sizeof(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>));
+            unionOfBlocksSet = ::new (buf0) Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>(HashmapReqSize);
             dev_unionOfBlocksSet = unionOfBlocksSet->upload<true>(stream); // <true> == optimize to GPU
             gpu_allocated_largestVmeshSizePower = HashmapReqSize;
          } else {

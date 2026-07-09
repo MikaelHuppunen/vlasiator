@@ -318,7 +318,7 @@ __global__ void __launch_bounds__(WID3) translation_kernel(
  */
 #ifdef USE_WARPACCESSORS
 __global__ void __launch_bounds__(GPUTHREADS*WARPSPERBLOCK) gather_union_of_blocks_kernel_WA(
-   Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID> *unionOfBlocksSet,
+   Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>> *unionOfBlocksSet,
    const vmesh::VelocityMesh* __restrict__ const *dev_vmeshes,
    const uint nAllCells)
 {
@@ -338,7 +338,7 @@ __global__ void __launch_bounds__(GPUTHREADS*WARPSPERBLOCK) gather_union_of_bloc
 }
 #else
 __global__ void __launch_bounds__(GPUTHREADS*WARPSPERBLOCK) gather_union_of_blocks_kernel(
-   Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID> *unionOfBlocksSet,
+   Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>> *unionOfBlocksSet,
    const vmesh::VelocityMesh* __restrict__ const *dev_vmeshes,
    const uint nAllCells)
 {

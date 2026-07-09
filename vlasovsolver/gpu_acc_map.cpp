@@ -748,7 +748,7 @@ __global__ void __launch_bounds__(WID3) reorder_blocks_by_dimension_kernel(
    vmesh::VelocityMesh** __restrict__ vmeshes,
    ColumnOffsets* dev_columnOffsetData,
    split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>* *lists_with_replace_new,
-   Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>* *allMaps,
+   Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>* *allMaps,
    const uint* __restrict__ gpu_block_indices_to_id,
    const Realf* dev_intersections,
    const int bailout_velocity_space_wall_margin,
@@ -772,8 +772,8 @@ __global__ void __launch_bounds__(WID3) reorder_blocks_by_dimension_kernel(
    const Realf intersection_dk = dev_intersections[cellOffset*4+3];
    ColumnOffsets* columnData = dev_columnOffsetData + parallelOffsetIndex;
 
-   Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID> *dev_map_require = allMaps[2*cellOffset];
-   Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID> *dev_map_remove = allMaps[2*cellOffset+1];
+   Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>> *dev_map_require = allMaps[2*cellOffset];
+   Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>> *dev_map_remove = allMaps[2*cellOffset+1];
    split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>> *list_with_replace_new = lists_with_replace_new[cellOffset];
    const vmesh::VelocityMesh* __restrict__ vmesh = vmeshes[cellOffset];
    // Shared within all threads in one block (one columnSet)
@@ -1483,7 +1483,7 @@ __host__ bool gpu_acc_map_1d(
       GET_POINTER(gpuMemoryManager, vmesh::VelocityMesh*, dev_vmeshes),
       GET_POINTER(gpuMemoryManager, ColumnOffsets, dev_columnOffsetData),
       GET_POINTER(gpuMemoryManager, SINGLE_ARG(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>*), dev_lists_with_replace_new),
-      GET_POINTER(gpuMemoryManager, SINGLE_ARG(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>*), dev_allMaps),
+      GET_POINTER(gpuMemoryManager, SINGLE_ARG(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>*), dev_allMaps),
       GET_POINTER(gpuMemoryManager, uint, gpu_block_indices_to_id),
       GET_POINTER(gpuMemoryManager, Realf, dev_intersections),
       Parameters::bailout_velocity_space_wall_margin,
@@ -1531,7 +1531,7 @@ __host__ bool gpu_acc_map_1d(
          GET_POINTER(gpuMemoryManager, vmesh::VelocityMesh*, dev_vmeshes),
          GET_POINTER(gpuMemoryManager, ColumnOffsets, dev_columnOffsetData),
          GET_POINTER(gpuMemoryManager, SINGLE_ARG(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>*), dev_lists_with_replace_new),
-         GET_POINTER(gpuMemoryManager, SINGLE_ARG(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>*), dev_allMaps),
+         GET_POINTER(gpuMemoryManager, SINGLE_ARG(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>*), dev_allMaps),
          GET_POINTER(gpuMemoryManager, uint, gpu_block_indices_to_id),
          GET_POINTER(gpuMemoryManager, Realf, dev_intersections),
          Parameters::bailout_velocity_space_wall_margin,
@@ -1585,33 +1585,33 @@ __host__ bool gpu_acc_map_1d(
    // TODO: Launch these three extracts in parallel from different streams?
    // Finds Blocks (GID,LID) to be rescued from end of v-space
    extract_to_delete_or_move_caller(
-      GET_POINTER(gpuMemoryManager, SINGLE_ARG(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>*), dev_allMaps)+2*cumulativeOffset, //dev_has_content_maps, // input maps
+      GET_POINTER(gpuMemoryManager, SINGLE_ARG(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>*), dev_allMaps)+2*cumulativeOffset, //dev_has_content_maps, // input maps
       GET_POINTER(gpuMemoryManager, SINGLE_ARG(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>*), dev_lists_with_replace_old)+cumulativeOffset, // output vecs
       NULL, // pass null to not store vector lengths
       GET_POINTER(gpuMemoryManager, vmesh::VelocityMesh*, dev_vmeshes)+cumulativeOffset, // rule_meshes
-      GET_POINTER(gpuMemoryManager, SINGLE_ARG(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>*), dev_allMaps)+2*cumulativeOffset+1, //dev_has_no_content_maps// rule_maps
+      GET_POINTER(gpuMemoryManager, SINGLE_ARG(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>*), dev_allMaps)+2*cumulativeOffset+1, //dev_has_no_content_maps// rule_maps
       GET_POINTER(gpuMemoryManager, SINGLE_ARG(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>*), dev_lists_with_replace_new)+cumulativeOffset, // rule_vectors
       nLaunchCells,
       baseStream
       );
    // Find Blocks (GID,LID) to be outright deleted
    extract_to_delete_or_move_caller(
-      GET_POINTER(gpuMemoryManager, SINGLE_ARG(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>*), dev_allMaps)+2*cumulativeOffset+1,//dev_has_no_content_maps, // input maps
+      GET_POINTER(gpuMemoryManager, SINGLE_ARG(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>*), dev_allMaps)+2*cumulativeOffset+1,//dev_has_no_content_maps, // input maps
       GET_POINTER(gpuMemoryManager, SINGLE_ARG(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>*), dev_lists_delete)+cumulativeOffset, // output vecs
       NULL, // pass null to not store vector lengths
       GET_POINTER(gpuMemoryManager, vmesh::VelocityMesh*, dev_vmeshes)+cumulativeOffset, // rule_meshes
-      GET_POINTER(gpuMemoryManager, SINGLE_ARG(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>*), dev_allMaps)+2*cumulativeOffset+1, //dev_has_no_content_maps, // rule_maps
+      GET_POINTER(gpuMemoryManager, SINGLE_ARG(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>*), dev_allMaps)+2*cumulativeOffset+1, //dev_has_no_content_maps, // rule_maps
       GET_POINTER(gpuMemoryManager, SINGLE_ARG(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>*), dev_lists_with_replace_new)+cumulativeOffset, // rule_vectors
       nLaunchCells,
       baseStream
       );
    // Find Blocks (GID,LID) to be replaced with new ones
    extract_to_replace_caller(
-      GET_POINTER(gpuMemoryManager, SINGLE_ARG(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>*), dev_allMaps)+2*cumulativeOffset+1,//dev_has_no_content_maps, // input maps
+      GET_POINTER(gpuMemoryManager, SINGLE_ARG(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>*), dev_allMaps)+2*cumulativeOffset+1,//dev_has_no_content_maps, // input maps
       GET_POINTER(gpuMemoryManager, SINGLE_ARG(split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>,splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>*), dev_lists_to_replace)+cumulativeOffset, // output vecs
       NULL, // pass null to not store vector lengths
       GET_POINTER(gpuMemoryManager, vmesh::VelocityMesh*, dev_vmeshes)+cumulativeOffset, // rule_meshes
-      GET_POINTER(gpuMemoryManager, SINGLE_ARG(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID>*), dev_allMaps)+2*cumulativeOffset+1,//dev_has_no_content_maps, // rule_maps
+      GET_POINTER(gpuMemoryManager, SINGLE_ARG(Hashinator::Hashmap<vmesh::GlobalID,vmesh::LocalID, splitGpuMemoryManagerallocator<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>>*), dev_allMaps)+2*cumulativeOffset+1,//dev_has_no_content_maps, // rule_maps
       GET_POINTER(gpuMemoryManager, SINGLE_ARG(split::SplitVector<vmesh::GlobalID, splitGpuMemoryManagerallocator<vmesh::GlobalID>>*), dev_lists_with_replace_new)+cumulativeOffset, // rule_vectors
       nLaunchCells,
       baseStream
