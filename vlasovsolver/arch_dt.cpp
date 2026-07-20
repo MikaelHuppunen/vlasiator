@@ -106,37 +106,21 @@ void reduce_vlasov_dt_multi_cell(dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geome
    const uint nPOP = getObjectWrapper().particleSpecies.size();
 
    #ifdef USE_GPU
-   // Resize dev_vmeshes, one for each cell and each pop
-   gpu_trans_allocate(nAllCells*nPOP,0,0);
-
    gpuMemoryManager.startSession(0,0);
 
-   SESSION_HOST_ALLOCATE(gpuMemoryManager, Real, host_max_dt, nAllCells*nPOP*sizeof(Real));
-   SESSION_HOST_ALLOCATE(gpuMemoryManager, Real, host_dxdydz, nAllCells*nPOP*3*sizeof(Real));
-   SESSION_HOST_ALLOCATE(gpuMemoryManager, uint, host_nBlocks, nAllCells*nPOP*sizeof(uint));
-   SESSION_HOST_ALLOCATE(gpuMemoryManager, vmesh::VelocityBlockContainer*, host_blockContainers, nAllCells*nPOP*sizeof(vmesh::VelocityBlockContainer*));
-   SESSION_ALLOCATE(gpuMemoryManager, Real, max_dt, nAllCells*nPOP*sizeof(Real));
    SESSION_ALLOCATE(gpuMemoryManager, Real, dxdydz, nAllCells*nPOP*3*sizeof(Real));
    SESSION_ALLOCATE(gpuMemoryManager, uint, nBlocks, nAllCells*nPOP*sizeof(uint));
    SESSION_ALLOCATE(gpuMemoryManager, vmesh::VelocityBlockContainer*, blockContainers, nAllCells*nPOP*sizeof(vmesh::VelocityBlockContainer*));
-   
-   Real* host_max_dt = GET_SESSION_HOST_POINTER(gpuMemoryManager, Real, host_max_dt);
-   Real* host_dxdydz = GET_SESSION_HOST_POINTER(gpuMemoryManager, Real, host_dxdydz);
-   uint* host_nBlocks = GET_SESSION_HOST_POINTER(gpuMemoryManager, uint, host_nBlocks);
-   vmesh::VelocityBlockContainer** host_blockContainers = GET_SESSION_HOST_POINTER(gpuMemoryManager, vmesh::VelocityBlockContainer*, host_blockContainers);
-   Real* max_dt = GET_SESSION_POINTER(gpuMemoryManager, Real, max_dt);
    Real* dxdydz = GET_SESSION_POINTER(gpuMemoryManager, Real, dxdydz);
    uint* nBlocks = GET_SESSION_POINTER(gpuMemoryManager, uint, nBlocks);
    vmesh::VelocityBlockContainer** blockContainers = GET_SESSION_POINTER(gpuMemoryManager, vmesh::VelocityBlockContainer*, blockContainers);
 
-   #else 
+   #endif
 
-   Real host_max_dt[nAllCells*nPOP];
    Real host_dxdydz[nAllCells*nPOP*3];
    uint host_nBlocks[nAllCells*nPOP];
    vmesh::VelocityBlockContainer *host_blockContainers[nAllCells*nPOP];
-
-   #endif
+   std::vector<Real> max_dt(nAllCells*nPOP);
 
    // Gather vmeshes
    uint maxNBlocks = 0;
@@ -156,8 +140,8 @@ void reduce_vlasov_dt_multi_cell(dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geome
          #endif
 
          host_nBlocks[celli*nPOP + popID] = cell->get_number_of_velocity_blocks(popID);
-         maxNBlocks = std::min(maxNBlocks, host_nBlocks[celli*nPOP + popID]);
-         host_max_dt[celli*nPOP + popID] = numeric_limits<Real>::max();
+         maxNBlocks = std::max(maxNBlocks, host_nBlocks[celli*nPOP + popID]);
+         max_dt[celli*nPOP + popID] = numeric_limits<Real>::max();
       }
    }
 
@@ -165,9 +149,8 @@ void reduce_vlasov_dt_multi_cell(dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geome
    CHK_ERR( gpuMemcpy(dxdydz, host_dxdydz, nAllCells*nPOP*3*sizeof(Real), gpuMemcpyHostToDevice) );
    CHK_ERR( gpuMemcpy(GET_POINTER(gpuMemoryManager, vmesh::VelocityMesh*, dev_vmeshes), GET_POINTER(gpuMemoryManager, vmesh::VelocityMesh*, host_vmeshes), nAllCells*nPOP*sizeof(vmesh::VelocityMesh*), gpuMemcpyHostToDevice) );
    CHK_ERR( gpuMemcpy(nBlocks, host_nBlocks, nAllCells*nPOP*sizeof(uint), gpuMemcpyHostToDevice) );
-   CHK_ERR( gpuMemcpy(max_dt, host_max_dt, nAllCells*nPOP*sizeof(Real), gpuMemcpyHostToDevice) );
+   CHK_ERR( gpuMemcpy(blockContainers, host_blockContainers, nAllCells*nPOP*sizeof(vmesh::VelocityBlockContainer*), gpuMemcpyHostToDevice) );
    #else
-   Real *max_dt = host_max_dt;
    Real *dxdydz = host_dxdydz;
    uint *nBlocks = host_nBlocks;
    vmesh::VelocityBlockContainer **blockContainers = host_blockContainers;
@@ -177,9 +160,8 @@ void reduce_vlasov_dt_multi_cell(dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geome
    const Real HALF = 0.5;
    uint dim1 = 2;
    const uint* limits[2]={&dim1, host_nBlocks};
-   const uint maxLimits[2]={dim1, maxNBlocks};
    
-   arch::parallel_reduce<arch::min>({nAllCells, nPOP}, {1, nAllCells*nPOP}, limits, maxLimits,
+   arch::parallel_reduce<arch::min>({nAllCells, nPOP}, {1, nAllCells*nPOP}, limits,
       ARCH_LOOP_LAMBDA (uint i, const uint blockLID, const uint cellIndex, const uint popID, Real *lthreadMin) -> void{
          const Real dx = dxdydz[3*cellIndex*nPOP + 3*popID + 0];
          const Real dy = dxdydz[3*cellIndex*nPOP + 3*popID + 1];
@@ -202,23 +184,18 @@ void reduce_vlasov_dt_multi_cell(dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geome
 
    #ifdef USE_GPU
    CHK_ERR( gpuPeekAtLastError() );
-   CHK_ERR( gpuMemcpy(host_max_dt, max_dt, nAllCells*nPOP*sizeof(Real), gpuMemcpyDeviceToHost) );
-   // CHK_ERR( gpuStreamSynchronize(bgStream) );
+   gpuMemoryManager.endSession();
    #endif
 
    #pragma omp parallel for schedule(static)
    for(uint celli = 0; celli < nAllCells; celli++){
       SpatialCell* cell = mpiGrid[cells[celli]];
       for (uint popID = 0; popID < nPOP; ++popID) {
-         cell->set_max_r_dt(popID, host_max_dt[celli*nPOP + popID]);
+         cell->set_max_r_dt(popID, max_dt[celli*nPOP + popID]);
          cell->parameters[CellParams::MAXRDT] = min(cell->get_max_r_dt(popID), cell->parameters[CellParams::MAXRDT]);
       }
    }
    computeGpuTimestepTimer.stop();
-
-   #ifdef USE_GPU
-   gpuMemoryManager.endSession();
-   #endif
 
    // GPUTODO thread this?
    phiprof::Timer computeRestTimestepTimer {"compute-vlasov-rest-timestep"};

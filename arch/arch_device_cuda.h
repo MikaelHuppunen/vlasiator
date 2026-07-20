@@ -716,7 +716,7 @@ namespace arch{
 
 /* Parallel reduce driver function for the CUDA reductions */
    template <reduce_op Op, uint NReduStatic, uint NDim, typename Lambda, typename T>
-   __forceinline__ static void parallel_reduce_driver(const uint (&blockDimensions)[2], const uint (&limitDimensions)[NDim], const uint* (&limits)[NDim], const uint (&maxLimits)[NDim], Lambda loop_body, T *sum, const uint n_redu_dynamic) {
+   __forceinline__ static void parallel_reduce_driver(const uint (&blockDimensions)[2], const uint (&limitDimensions)[NDim], const uint* (&limits)[NDim], Lambda loop_body, T *sum, const uint n_redu_dynamic, bool dataOnDevice = false) {
 
       /* Get the CPU thread id */
 #ifdef _OPENMP
@@ -728,10 +728,26 @@ namespace arch{
       /* Get the number of reductions (may be known at compile time or not) */
       const uint n_reductions = NReduStatic ? NReduStatic : n_redu_dynamic;
 
+      uint *limitsData[NDim];
+      uint *host_limits[NDim];
+
       /* Calculate the required size for the 1D kernel */
       uint n_total = 1;
       for(uint i = 0; i < NDim; i++) {
-         n_total *= maxLimits[i];
+         CHK_ERR(cudaMallocAsync(&limitsData[i], limitDimensions[i]*sizeof(uint), gpuStreamList[thread_id]));
+         if(limitDimensions[i] == 1){
+            n_total *= limits[i][0];
+         }else{
+            uint maxNBlocks = 0;
+            for(uint celli = 0; celli < blockDimensions[0]; celli++){
+               for (uint popID = 0; popID < blockDimensions[1]; ++popID) {
+                  maxNBlocks = std::max(maxNBlocks, limits[i][celli*blockDimensions[1] + popID]);
+               }
+            }
+            n_total *= maxNBlocks;
+         }
+         CHK_ERR(cudaMemcpyAsync(limitsData[i], limits[i], limitDimensions[i]*sizeof(uint), cudaMemcpyHostToDevice,gpuStreamList[thread_id]));
+         host_limits[i] = limitsData[i];
       }
 
       /* Check the CUDA default mempool settings and correct if wrong */
@@ -740,9 +756,10 @@ namespace arch{
       /* Create a device buffer to transfer the loop limits of each dimension to device */
       const uint** d_limits;
       uint *dev_limitDimensions;
+      T *dev_sum;
       CHK_ERR(cudaMallocAsync(&d_limits, NDim*sizeof(uint*), gpuStreamList[thread_id]));
       CHK_ERR(cudaMallocAsync(&dev_limitDimensions, NDim*sizeof(uint), gpuStreamList[thread_id]));
-      CHK_ERR(cudaMemcpyAsync(d_limits, limits, NDim*sizeof(uint*), cudaMemcpyHostToDevice,gpuStreamList[thread_id]));
+      CHK_ERR(cudaMemcpyAsync(d_limits, host_limits, NDim*sizeof(uint*), cudaMemcpyHostToDevice,gpuStreamList[thread_id]));
       CHK_ERR(cudaMemcpyAsync(dev_limitDimensions, limitDimensions, NDim*sizeof(uint), cudaMemcpyHostToDevice,gpuStreamList[thread_id]));
 
       /* Simple action for non-reducing call */
@@ -764,11 +781,23 @@ namespace arch{
          /* Synchronize after kernel call */
          CHK_ERR(cudaStreamSynchronize(gpuStreamList[thread_id]));
          CHK_ERR(cudaFreeAsync(d_limits, gpuStreamList[thread_id]));
+         for(uint i = 0; i < NDim; i++) {
+            CHK_ERR(cudaFreeAsync(limitsData[i], gpuStreamList[thread_id]));
+         }
+         CHK_ERR(cudaFreeAsync(dev_limitDimensions, gpuStreamList[thread_id]));
+         CHK_ERR( gpuPeekAtLastError() );
          return;
       }
 
+      if (dataOnDevice) {
+         dev_sum = sum;
+      } else {
+         CHK_ERR(cudaMallocAsync(&dev_sum, blockDimensions[0]*blockDimensions[1]*sizeof(T), gpuStreamList[thread_id]));
+         CHK_ERR(cudaMemcpyAsync(dev_sum, sum, blockDimensions[0]*blockDimensions[1]*sizeof(T), cudaMemcpyHostToDevice,gpuStreamList[thread_id]));
+      }
+
       /* Create a device buffer for the reduction results */
-      T* d_buf = &sum[0];
+      T* d_buf = &dev_sum[0];
 
       /* Create a device buffer to transfer the initial values to device */
       T* d_const_buf;
@@ -842,8 +871,17 @@ namespace arch{
          CHK_ERR(cudaStreamSynchronize(gpuStreamList[thread_id]));
       }
       /* Copy the results back to host and free the allocated memory back to pool*/
+      CHK_ERR(cudaMemcpyAsync(sum, dev_sum, blockDimensions[0]*blockDimensions[1]*sizeof(T), cudaMemcpyDeviceToHost,gpuStreamList[thread_id]));
+      if (!dataOnDevice) {
+         CHK_ERR(cudaFreeAsync(dev_sum, gpuStreamList[thread_id]));
+      }
       CHK_ERR(cudaFreeAsync(d_const_buf, gpuStreamList[thread_id]));
       CHK_ERR(cudaFreeAsync(d_limits, gpuStreamList[thread_id]));
+      for(uint i = 0; i < NDim; i++) {
+         CHK_ERR(cudaFreeAsync(limitsData[i], gpuStreamList[thread_id]));
+      }
+      CHK_ERR(cudaFreeAsync(dev_limitDimensions, gpuStreamList[thread_id]));
+      CHK_ERR( gpuPeekAtLastError() );
    }
 }
 

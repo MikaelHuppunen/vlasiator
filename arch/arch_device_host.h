@@ -129,7 +129,7 @@ namespace arch{
 
 /* Parallel reduce driver function - specialization for 2D case */
    template <reduce_op Op, uint NReductions, uint NDim, typename Lambda, typename T, typename = typename std::enable_if<std::is_void<typename std::invoke_result<Lambda, uint, uint, uint, uint, T*>::type>::value>::type>
-   inline static void parallel_reduce_driver(const uint (&blockDimensions)[2], const uint (&limitDimensions)[NDim], const uint* (&limits)[2], const uint (&maxLimits)[NDim], Lambda loop_body, T *sum, const uint n_redu_dynamic) {
+   inline static void parallel_reduce_driver(const uint (&blockDimensions)[2], const uint (&limitDimensions)[NDim], const uint* (&limits)[2], Lambda loop_body, T *sum, const uint n_redu_dynamic, bool dataOnDevice = false) {
       uint indices[NDim];
 
       for(uint cellIndex = 0; cellIndex < blockDimensions[0]; cellIndex++){
