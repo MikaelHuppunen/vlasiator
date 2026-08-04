@@ -865,8 +865,8 @@ namespace spatial_cell {
                   this->dev_velocity_block_with_content_list = this->velocity_block_with_content_list->upload<true>();
                   //this->velocity_block_with_content_list->optimizeGPU(stream); // included in upload<true>()
                } else {
-                  this->velocity_block_with_content_list->resize(this->velocity_block_with_content_list_size,true);
-                  this->dev_velocity_block_with_content_list = this->velocity_block_with_content_list->upload<false>();
+                  //this->velocity_block_with_content_list->resize(this->velocity_block_with_content_list_size,true);
+                  //this->dev_velocity_block_with_content_list = this->velocity_block_with_content_list->upload<false>();
                }
              }
             //velocity_block_with_content_list_size should first be updated, before this can be done (STAGE1)
