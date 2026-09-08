@@ -79,20 +79,13 @@ INC_CUDA = -isystem /usr/local/cuda/include
 ROOT_FOLDER = $(dir $(abspath $(firstword $(MAKEFILE_LIST))))
 
 # The external libraries are located here
-LIBRARY_PREFIX = $(ROOT_FOLDER)libraries-libraries
+LIBRARY_PREFIX = $(ROOT_FOLDER)libraries-Cooler_cuda
 
-INC_BOOST = -I/usr/include/boost/
-LIB_BOOST = -L/usr/lib/x86_64-linux-gnu/ -lboost_program_options
+INC_ZOLTAN = -I$(LIBRARY_PREFIX)/include
+LIB_ZOLTAN = -L$(LIBRARY_PREFIX)/lib -lzoltan
 
-INC_ZOLTAN = -I$(LIBRARY_PREFIX)/Zoltan/include
-LIB_ZOLTAN = -L$(LIBRARY_PREFIX)/Zoltan/lib -lzoltan
+INC_VLSV = -I$(LIBRARY_PREFIX)/include
+LIB_VLSV = -L$(LIBRARY_PREFIX)/lib -lvlsv -Xlinker=-rpath=$(LIBRARY_PREFIX)/lib
 
-# INC_PAPI = -I$(LIBRARY_PREFIX)/papi/include
-# LIB_PAPI = -I$(LIBRARY_PREFIX)/papi/lib -Wl,-rpath=$(LIBRARY_PREFIX)/papi/lib
-
-INC_VLSV = -I$(LIBRARY_PREFIX)/vlsv
-LIB_VLSV = -L$(LIBRARY_PREFIX)/vlsv -lvlsv -Xlinker=-rpath=$(LIBRARY_PREFIX)/vlsv/lib
-
-LIB_PROFILE = -L$(LIBRARY_PREFIX)/phiprof/lib -lphiprof -Xlinker=-rpath=$(LIBRARY_PREFIX)/phiprof/lib
-INC_PROFILE = -I$(LIBRARY_PREFIX)/phiprof/include
-
+LIB_PROFILE = -L$(LIBRARY_PREFIX)/lib -lphiprof -Xlinker=-rpath=$(LIBRARY_PREFIX)/phiprof/lib
+INC_PROFILE = -I$(LIBRARY_PREFIX)/include
