@@ -432,8 +432,10 @@ namespace fsgrids {
    };
 
    typedef std::span<std::array<Real, fsgrids::bfield::N_BFIELD>> perbspan;
+   typedef std::array<Real, fsgrids::bfield::N_BFIELD> perbElement;
    typedef std::span<const std::array<Real, fsgrids::bfield::N_BFIELD>> constperbspan;
    typedef std::span<std::array<Real, fsgrids::efield::N_EFIELD>> efieldspan;
+   typedef std::array<Real, fsgrids::efield::N_EFIELD> efieldspanElement;
    typedef std::span<const std::array<Real, fsgrids::efield::N_EFIELD>> constefieldspan;
    typedef std::span<std::array<Real, fsgrids::ehall::N_EHALL>> ehallspan;
    typedef std::span<const std::array<Real, fsgrids::ehall::N_EHALL>> constehallspan;
