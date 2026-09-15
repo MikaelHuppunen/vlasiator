@@ -26,7 +26,13 @@
 
 #include "ldz_magnetic_field.hpp"
 
-void propagateMagneticField(fsgrids::perbspan perb,
+#ifdef USE_GPU
+#define functionDevice __device__
+#else
+#define functionDevice __host__
+#endif
+
+functionDevice void propagateMagneticField(fsgrids::perbspan perb,
                             fsgrids::perbspan perbdt2,
                             fsgrids::constefieldspan e,
                             fsgrids::constefieldspan edt2,
@@ -70,8 +76,13 @@ void propagateMagneticField(fsgrids::perbspan perb,
       }
 
       default:
+         #ifdef USE_GPU
+         printf("%s:%d: Invalid RK case.\n", __FILE__, __LINE__);
+         assert(false);
+         #else
          std::cerr << __FILE__ << ":" << __LINE__ << ":" << "Invalid RK case." << std::endl;
          abort();
+         #endif
       }
    }
 
@@ -104,8 +115,13 @@ void propagateMagneticField(fsgrids::perbspan perb,
          break;
       }
       default:
+         #ifdef USE_GPU
+         printf("%s:%d: Invalid RK case.\n", __FILE__, __LINE__);
+         assert(false);
+         #else
          std::cerr << __FILE__ << ":" << __LINE__ << ":" << "Invalid RK case." << std::endl;
          abort();
+         #endif
       }
    }
 
@@ -138,126 +154,13 @@ void propagateMagneticField(fsgrids::perbspan perb,
          break;
       }
       default:
+         #ifdef USE_GPU
+         printf("%s:%d: Invalid RK case.\n", __FILE__, __LINE__);
+         assert(false);
+         #else
          std::cerr << __FILE__ << ":" << __LINE__ << ":" << "Invalid RK case." << std::endl;
          abort();
-      }
-   }
-}
-
-__device__ void propagateMagneticFieldDevice(fsgrids::perbspan perb,
-                            fsgrids::perbspan perbdt2,
-                            fsgrids::constefieldspan e,
-                            fsgrids::constefieldspan edt2,
-                            const fsgrid::FsStencil& stencil, Real dt, int32_t RKCase, bool doX, bool doY, bool doZ,
-                            const std::array<Real, 3>& gridSpacing) {
-   creal dtdx = dt / gridSpacing[0];
-   creal dtdy = dt / gridSpacing[1];
-   creal dtdz = dt / gridSpacing[2];
-
-   std::array<Real, fsgrids::bfield::N_BFIELD>& perBGrid0 = perb[stencil.ooo()];
-
-   if (doX == true) {
-      switch (RKCase) {
-      case RK_ORDER1: {
-         const auto& EGrid0 = e[stencil.ooo()];
-         const auto& EGrid1 = e[stencil.opo()];
-         const auto& EGrid2 = e[stencil.oop()];
-         perBGrid0[fsgrids::bfield::PERBX] += dtdz * (EGrid2[fsgrids::efield::EY] - EGrid0[fsgrids::efield::EY]) +
-                                              dtdy * (EGrid0[fsgrids::efield::EZ] - EGrid1[fsgrids::efield::EZ]);
-         break;
-      }
-
-      case RK_ORDER2_STEP1: {
-         auto& perBDt2Grid0 = perbdt2[stencil.ooo()];
-         const auto& EGrid0 = e[stencil.ooo()];
-         const auto& EGrid1 = e[stencil.opo()];
-         const auto& EGrid2 = e[stencil.oop()];
-         perBDt2Grid0[fsgrids::bfield::PERBX] = perBGrid0[fsgrids::bfield::PERBX] +
-             0.5 * (dtdz * (EGrid2[fsgrids::efield::EY] - EGrid0[fsgrids::efield::EY]) +
-                    dtdy * (EGrid0[fsgrids::efield::EZ] - EGrid1[fsgrids::efield::EZ]));
-         break;
-      }
-
-      case RK_ORDER2_STEP2: {
-         const auto& EGrid0 = edt2[stencil.ooo()];
-         const auto& EGrid1 = edt2[stencil.opo()];
-         const auto& EGrid2 = edt2[stencil.oop()];
-         perBGrid0[fsgrids::bfield::PERBX] += dtdz * (EGrid2[fsgrids::efield::EY] - EGrid0[fsgrids::efield::EY]) +
-                                              dtdy * (EGrid0[fsgrids::efield::EZ] - EGrid1[fsgrids::efield::EZ]);
-         break;
-      }
-
-      default:
-         printf("%s:%d: Invalid RK case.\n", __FILE__, __LINE__);
-         assert(false);
-      }
-   }
-
-   if (doY == true) {
-      switch (RKCase) {
-      case RK_ORDER1: {
-         const auto& EGrid0 = e[stencil.ooo()];
-         const auto& EGrid1 = e[stencil.oop()];
-         const auto& EGrid2 = e[stencil.poo()];
-         perBGrid0[fsgrids::bfield::PERBY] += dtdx * (EGrid2[fsgrids::efield::EZ] - EGrid0[fsgrids::efield::EZ]) +
-                                              dtdz * (EGrid0[fsgrids::efield::EX] - EGrid1[fsgrids::efield::EX]);
-         break;
-      }
-      case RK_ORDER2_STEP1: {
-         auto& perBDt2Grid0 = perbdt2[stencil.ooo()];
-         const auto& EGrid0 = e[stencil.ooo()];
-         const auto& EGrid1 = e[stencil.oop()];
-         const auto& EGrid2 = e[stencil.poo()];
-         perBDt2Grid0[fsgrids::bfield::PERBY] = perBGrid0[fsgrids::bfield::PERBY] +
-             0.5 * (dtdx * (EGrid2[fsgrids::efield::EZ] - EGrid0[fsgrids::efield::EZ]) +
-                    dtdz * (EGrid0[fsgrids::efield::EX] - EGrid1[fsgrids::efield::EX]));
-         break;
-      }
-      case RK_ORDER2_STEP2: {
-         const auto& EGrid0 = edt2[stencil.ooo()];
-         const auto& EGrid1 = edt2[stencil.oop()];
-         const auto& EGrid2 = edt2[stencil.poo()];
-         perBGrid0[fsgrids::bfield::PERBY] += dtdx * (EGrid2[fsgrids::efield::EZ] - EGrid0[fsgrids::efield::EZ]) +
-                                              dtdz * (EGrid0[fsgrids::efield::EX] - EGrid1[fsgrids::efield::EX]);
-         break;
-      }
-      default:
-         printf("%s:%d: Invalid RK case.\n", __FILE__, __LINE__);
-         assert(false);
-      }
-   }
-
-   if (doZ == true) {
-      switch (RKCase) {
-      case RK_ORDER1: {
-         const auto& EGrid0 = e[stencil.ooo()];
-         const auto& EGrid1 = e[stencil.poo()];
-         const auto& EGrid2 = e[stencil.opo()];
-         perBGrid0[fsgrids::bfield::PERBZ] += dtdy * (EGrid2[fsgrids::efield::EX] - EGrid0[fsgrids::efield::EX]) +
-                                              dtdx * (EGrid0[fsgrids::efield::EY] - EGrid1[fsgrids::efield::EY]);
-         break;
-      }
-      case RK_ORDER2_STEP1: {
-         auto& perBDt2Grid0 = perbdt2[stencil.ooo()];
-         const auto& EGrid0 = e[stencil.ooo()];
-         const auto& EGrid1 = e[stencil.poo()];
-         const auto& EGrid2 = e[stencil.opo()];
-         perBDt2Grid0[fsgrids::bfield::PERBZ] = perBGrid0[fsgrids::bfield::PERBZ] +
-             0.5 * (dtdy * (EGrid2[fsgrids::efield::EX] - EGrid0[fsgrids::efield::EX]) +
-                    dtdx * (EGrid0[fsgrids::efield::EY] - EGrid1[fsgrids::efield::EY]));
-         break;
-      }
-      case RK_ORDER2_STEP2: {
-         const auto& EGrid0 = edt2[stencil.ooo()];
-         const auto& EGrid1 = edt2[stencil.poo()];
-         const auto& EGrid2 = edt2[stencil.opo()];
-         perBGrid0[fsgrids::bfield::PERBZ] += dtdy * (EGrid2[fsgrids::efield::EX] - EGrid0[fsgrids::efield::EX]) +
-                                              dtdx * (EGrid0[fsgrids::efield::EY] - EGrid1[fsgrids::efield::EY]);
-         break;
-      }
-      default:
-         printf("%s:%d: Invalid RK case.\n", __FILE__, __LINE__);
-         assert(false);
+         #endif
       }
    }
 }
@@ -326,18 +229,26 @@ void propagateMagneticFieldSimple(fsgrids::perbspan perb,
    const auto& gridSpacing = fsgrid.getGridSpacing();
    const size_t numCells = fsgrid.getNumCells();
 
-   fsgrids::perbElement *d_perb = nullptr;
-   fsgrids::perbElement *d_perbdt2 = nullptr;
-   fsgrids::efieldspanElement *d_e = nullptr;
-   fsgrids::efieldspanElement *d_edt2 = nullptr;
-   cudaMalloc(&d_perb, perb.size() * sizeof(fsgrids::perbElement));
-   cudaMalloc(&d_perbdt2, perbdt2.size() * sizeof(fsgrids::perbElement));
-   cudaMalloc(&d_e, e.size() * sizeof(fsgrids::efieldspanElement));
-   cudaMalloc(&d_edt2, edt2.size() * sizeof(fsgrids::efieldspanElement));
+   CREATE_UNIQUE_POINTER(gpuMemoryManager, d_perb);
+   CREATE_UNIQUE_POINTER(gpuMemoryManager, d_perbdt2);
+   CREATE_UNIQUE_POINTER(gpuMemoryManager, d_e);
+   CREATE_UNIQUE_POINTER(gpuMemoryManager, d_edt2);
+
+   ALLOCATE_GPU(gpuMemoryManager, d_perb, perb.size() * sizeof(fsgrids::perbElement));
+   ALLOCATE_GPU(gpuMemoryManager, d_perbdt2, perbdt2.size() * sizeof(fsgrids::perbElement));
+   ALLOCATE_GPU(gpuMemoryManager, d_e, e.size() * sizeof(fsgrids::efieldspanElement));
+   ALLOCATE_GPU(gpuMemoryManager, d_edt2, edt2.size() * sizeof(fsgrids::efieldspanElement));
+
+   fsgrids::perbElement *d_perb = GET_POINTER(gpuMemoryManager, fsgrids::perbElement, d_perb);
+   fsgrids::perbElement *d_perbdt2 = GET_POINTER(gpuMemoryManager, fsgrids::perbElement, d_perbdt2);
+   fsgrids::efieldspanElement *d_e = GET_POINTER(gpuMemoryManager, fsgrids::efieldspanElement, d_e);
+   fsgrids::efieldspanElement *d_edt2 = GET_POINTER(gpuMemoryManager, fsgrids::efieldspanElement, d_edt2);
+
    cudaMemcpy(d_perb, perb.data(),  perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyHostToDevice);
    cudaMemcpy(d_perbdt2, perbdt2.data(),  perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyHostToDevice);
    cudaMemcpy(d_e, e.data(),  e.size() * sizeof(fsgrids::efieldspanElement), cudaMemcpyHostToDevice);
    cudaMemcpy(d_edt2, edt2.data(),  edt2.size() * sizeof(fsgrids::efieldspanElement), cudaMemcpyHostToDevice);
+
    std::span<fsgrids::perbElement> dev_perb(d_perb, perb.size());
    std::span<fsgrids::perbElement> dev_perbdt2(d_perbdt2, perbdt2.size());
    std::span<fsgrids::efieldspanElement> dev_e(d_e, e.size());
@@ -348,20 +259,12 @@ void propagateMagneticFieldSimple(fsgrids::perbspan perb,
                        phiprof::initializeTimer("Magnetic Field compute cells"), technical,
                        [=] __device__ (const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
                           cuint bitfield = technical[stencil.ooo()].SOLVE;
-                          propagateMagneticFieldDevice(
+                          propagateMagneticField(
                              dev_perb, dev_perbdt2, dev_e, dev_edt2, stencil, dt, RKCase, ((bitfield & compute::BX) == compute::BX),
                              ((bitfield & compute::BY) == compute::BY), ((bitfield & compute::BZ) == compute::BZ), coordinates.physicalGridSpacing);
                        });
                        
    cudaDeviceSynchronize();
-
-   cudaMemcpy(perb.data(), d_perb, perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
-   cudaMemcpy(perbdt2.data(), d_perbdt2, perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
-
-   cudaFree(d_perb);
-   cudaFree(d_perbdt2);
-   cudaFree(d_e);
-   cudaFree(d_edt2);
 
    // This communication is needed for boundary conditions, in practice almost all
    // of the communication is going to be redone in calculateDerivativesSimple
@@ -375,6 +278,9 @@ void propagateMagneticFieldSimple(fsgrids::perbspan perb,
       fsgrid.updateGhostCells(perbdt2);
    }
    mpiTimer.stop();
+
+   cudaMemcpy(perb.data(), d_perb, perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
+   cudaMemcpy(perbdt2.data(), d_perbdt2, perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
 
    // The looping below was modified in https://github.com/fmihpc/vlasiator/pull/1110/files
    // with a reported performance gain of 10% of field solver performance in production-like
