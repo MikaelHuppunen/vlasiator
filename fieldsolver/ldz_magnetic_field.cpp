@@ -233,26 +233,31 @@ void propagateMagneticFieldSimple(fsgrids::perbspan perb,
    CREATE_UNIQUE_POINTER(gpuMemoryManager, d_perbdt2);
    CREATE_UNIQUE_POINTER(gpuMemoryManager, d_e);
    CREATE_UNIQUE_POINTER(gpuMemoryManager, d_edt2);
+   CREATE_UNIQUE_POINTER(gpuMemoryManager, d_bgb);
 
    ALLOCATE_GPU(gpuMemoryManager, d_perb, perb.size() * sizeof(fsgrids::perbElement));
    ALLOCATE_GPU(gpuMemoryManager, d_perbdt2, perbdt2.size() * sizeof(fsgrids::perbElement));
-   ALLOCATE_GPU(gpuMemoryManager, d_e, e.size() * sizeof(fsgrids::efieldspanElement));
-   ALLOCATE_GPU(gpuMemoryManager, d_edt2, edt2.size() * sizeof(fsgrids::efieldspanElement));
+   ALLOCATE_GPU(gpuMemoryManager, d_e, e.size() * sizeof(fsgrids::efieldElement));
+   ALLOCATE_GPU(gpuMemoryManager, d_edt2, edt2.size() * sizeof(fsgrids::efieldElement));
+   ALLOCATE_GPU(gpuMemoryManager, d_bgb, bgb.size() * sizeof(fsgrids::bgbElement));
 
    fsgrids::perbElement *d_perb = GET_POINTER(gpuMemoryManager, fsgrids::perbElement, d_perb);
    fsgrids::perbElement *d_perbdt2 = GET_POINTER(gpuMemoryManager, fsgrids::perbElement, d_perbdt2);
-   fsgrids::efieldspanElement *d_e = GET_POINTER(gpuMemoryManager, fsgrids::efieldspanElement, d_e);
-   fsgrids::efieldspanElement *d_edt2 = GET_POINTER(gpuMemoryManager, fsgrids::efieldspanElement, d_edt2);
+   fsgrids::efieldElement *d_e = GET_POINTER(gpuMemoryManager, fsgrids::efieldElement, d_e);
+   fsgrids::efieldElement *d_edt2 = GET_POINTER(gpuMemoryManager, fsgrids::efieldElement, d_edt2);
+   fsgrids::bgbElement *d_bgb = GET_POINTER(gpuMemoryManager, fsgrids::bgbElement, d_bgb);
 
    cudaMemcpy(d_perb, perb.data(),  perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyHostToDevice);
    cudaMemcpy(d_perbdt2, perbdt2.data(),  perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyHostToDevice);
-   cudaMemcpy(d_e, e.data(),  e.size() * sizeof(fsgrids::efieldspanElement), cudaMemcpyHostToDevice);
-   cudaMemcpy(d_edt2, edt2.data(),  edt2.size() * sizeof(fsgrids::efieldspanElement), cudaMemcpyHostToDevice);
+   cudaMemcpy(d_e, e.data(),  e.size() * sizeof(fsgrids::efieldElement), cudaMemcpyHostToDevice);
+   cudaMemcpy(d_edt2, edt2.data(),  edt2.size() * sizeof(fsgrids::efieldElement), cudaMemcpyHostToDevice);
+   cudaMemcpy(d_bgb, bgb.data(),  bgb.size() * sizeof(fsgrids::bgbElement), cudaMemcpyHostToDevice);
 
    std::span<fsgrids::perbElement> dev_perb(d_perb, perb.size());
    std::span<fsgrids::perbElement> dev_perbdt2(d_perbdt2, perbdt2.size());
-   std::span<fsgrids::efieldspanElement> dev_e(d_e, e.size());
-   std::span<fsgrids::efieldspanElement> dev_edt2(d_edt2, edt2.size());
+   std::span<fsgrids::efieldElement> dev_e(d_e, e.size());
+   std::span<fsgrids::efieldElement> dev_edt2(d_edt2, edt2.size());
+   std::span<fsgrids::bgbElement> dev_bgb(d_bgb, bgb.size());
 
    int sysBoundaryTimerId{phiprof::initializeTimer("Magnetic Field compute sysboundary cells")};
    fsgrid.parallel_for_GPU([](int timerId) -> phiprof::Timer { return phiprof::Timer{timerId}; },
