@@ -305,4 +305,32 @@ struct Parameters {
    static void getParameters();
 };
 
+__device__ Real dev_xmin;    /*!< X-coordinate of the lower left corner of the spatial grid. */
+__device__ Real dev_xmax;    /*!< X-coordinate of the upper right corner of the spatial grid. */
+__device__ Real dev_ymin;    /*!< Y-coordinate of the lower left corner of the spatial grid. */
+__device__ Real dev_ymax;    /*!< Y-coordinate of the upper right corner of the spatial grid. */
+__device__ Real dev_zmin;    /*!< Z-coordinate of the lower left corner of the spatial grid. */
+__device__ Real dev_zmax;    /*!< Z-coordinate of the upper right corner of the spatial grid. */
+__device__ Real dev_dx_ini;  /*!< Initial size of spatial cell in x-direction. */
+__device__ Real dev_dy_ini;  /*!< Initial size of spatial cell in y-direction. */
+__device__ Real dev_dz_ini;  /*!< Initial size of spatial cell in z-direction. */
+__device__ uint dev_xcells_ini; /*!< Initial number of spatial cells in x-direction. */
+__device__ uint dev_ycells_ini; /*!< Initial number of spatial cells in y-direction. */
+__device__ uint dev_zcells_ini; /*!< Initial number of spatial cells in z-direction. */
+
+inline void uploadParametersToDevice() {
+   cudaMemcpyToSymbol(dev_xmin, &Parameters::xmin, sizeof(Real));
+   cudaMemcpyToSymbol(dev_xmax, &Parameters::xmax, sizeof(Real));
+   cudaMemcpyToSymbol(dev_ymin, &Parameters::ymin, sizeof(Real));
+   cudaMemcpyToSymbol(dev_ymax, &Parameters::ymax, sizeof(Real));
+   cudaMemcpyToSymbol(dev_zmin, &Parameters::zmin, sizeof(Real));
+   cudaMemcpyToSymbol(dev_zmax, &Parameters::zmax, sizeof(Real));
+   cudaMemcpyToSymbol(dev_dx_ini, &Parameters::dx_ini, sizeof(Real));
+   cudaMemcpyToSymbol(dev_dy_ini, &Parameters::dy_ini, sizeof(Real));
+   cudaMemcpyToSymbol(dev_dz_ini, &Parameters::dz_ini, sizeof(Real));
+   cudaMemcpyToSymbol(dev_xcells_ini, &Parameters::xcells_ini, sizeof(uint));
+   cudaMemcpyToSymbol(dev_ycells_ini, &Parameters::ycells_ini, sizeof(uint));
+   cudaMemcpyToSymbol(dev_zcells_ini, &Parameters::zcells_ini, sizeof(uint));
+}
+
 #endif

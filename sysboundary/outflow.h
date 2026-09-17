@@ -126,6 +126,29 @@ namespace SBC {
          N_SCHEMES
       };
    }; // class Outflow
+
+   /*!\brief Outflow is a class applying copy/outflow boundary conditions.
+    *
+    * Outflow is a class handling cells tagged as sysboundarytype::OUTFLOW by this system boundary condition. It applies copy/outflow boundary conditions.
+    *
+    * These consist in:
+    * - Copy the distribution and moments from the nearest NOT_SYSBOUNDARY cell;
+    * - Copy the perturbed B components from the nearest NOT_SYSBOUNDARY cell. EXCEPTION: the face components adjacent to the simulation domain at the +x/+y/+z faces are propagated still.
+    */
+   class OutflowDevice: public OuterBoundaryConditionDevice {
+   public:
+      OutflowDevice() = default;
+      virtual ~OutflowDevice() = default;
+      __device__ inline Real fieldSolverBoundaryCondMagneticField(fsgrids::perbspan b,
+                                                        fsgrids::constbgbspan bgb,
+                                                        fsgrids::consttechnicalspan technical,
+                                                        const std::array<Real, 3>& gridSpacing,
+                                                        const std::array<fsgrid::FsSize_t, 3>& globalCoordinates,
+                                                        const fsgrid::FsStencil& stencil, cuint component) {
+         return fieldBoundaryCopyFromSolvingNbrMagneticField(b, technical, stencil, component, 1 << component);
+      }
+   protected:
+   }; // class Outflow
 } // namespace SBC
 
 #endif

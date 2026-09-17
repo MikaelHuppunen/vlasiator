@@ -32,6 +32,7 @@
 #include "../definitions.h"
 #include "../spatial_cells/spatial_cell_wrapper.hpp"
 #include "../projects/project.h"
+#include "../parameters.h"
 
 using namespace spatial_cell;
 using namespace projects;
@@ -279,12 +280,124 @@ namespace SBC {
          bool applyUponRestart;
    };
 
+   /*!\brief SBC::SysBoundaryCondition is the base class for system boundary conditions.
+    *
+    * SBC::SysBoundaryCondition defines a base class for applying boundary conditions.
+    * Specific system boundary conditions inherit from this base class, that's why most
+    * functions defined here are not meant to be called and contain a corresponding error
+    * message. The functions to be called are the inherited class members.
+    *
+    * The initSysBoundary function is used to initialise the internal workings needed by the
+    * system boundary condition to run (e.g. importing parameters, initialising class
+    * members). assignSysBoundary is used to determine whether a given cell is within the
+    * domain of system boundary condition. applyInitialState is called to initialise a system
+    * boundary cell's parameters and velocity space.
+    *
+    * If needed, a user can write his or her own SBC::SysBoundaryConditions, which
+    * are loaded when the simulation initializes.
+    */
+   class SysBoundaryConditionDevice {
+      public:
+         SysBoundaryConditionDevice() = default;
+         virtual ~SysBoundaryConditionDevice() = default;
+         virtual Real
+         __device__ fieldSolverBoundaryCondMagneticField(fsgrids::perbspan b,
+                                              fsgrids::constbgbspan bgb,
+                                              fsgrids::consttechnicalspan technical,
+                                              const std::array<Real, 3>& gridSpacing,
+                                              const std::array<fsgrid::FsSize_t, 3>& globalCoordinates,
+                                              const fsgrid::FsStencil& stencil, cuint component) = 0;
+
+         __device__ inline Real fieldBoundaryCopyFromSolvingNbrMagneticField(
+            fsgrids::perbspan b, fsgrids::consttechnicalspan technical,
+            const fsgrid::FsStencil& stencil, cuint component, cuint mask) {
+            int distance = numeric_limits<int>::max();
+            auto closestCellIndex = 0;
+
+            for (auto kk = -2; kk < 3; kk++) {
+               for (auto jj = -2; jj < 3; jj++) {
+                  for (auto ii = -2; ii < 3; ii++) {
+                     if (stencil.cellExists(ii, jj, kk)) {
+                        const auto index = stencil.indexFromOffset(ii, jj, kk);
+                        const auto& tech = technical[index];
+                        const bool copyable = (tech.SOLVE & mask) == mask &&
+                                             tech.sysBoundaryFlag != sysboundarytype::DO_NOT_COMPUTE &&
+                                             tech.sysBoundaryFlag != sysboundarytype::OUTER_BOUNDARY_PADDING;
+                        const int d = ii * ii + jj * jj + kk * kk;
+                        if (copyable && d < distance) {
+                           distance = d;
+                           closestCellIndex = index;
+                        }
+                     }
+                  }
+               }
+            }
+
+            if (distance == numeric_limits<int>::max()) {
+               //abort_mpi("No closest cell found!", 1);
+            }
+
+            return b[closestCellIndex][fsgrids::bfield::PERBX + component];
+         }
+
+         __device__ inline void determineFace(
+            bool* isThisCellOnAFace,
+            const creal x,const  creal y,const creal z,
+            const creal dx,const creal dy,const creal dz,
+            const bool excludeSlicesAndPeriodicDimensions = false
+         ){
+            for(uint i=0; i<6; i++) {
+               isThisCellOnAFace[i] = false;
+            }
+            if(x > dev_xmax - dx * 2) {
+               isThisCellOnAFace[0] = true;
+            }
+            if(x < dev_xmin + dx * 2) {
+               isThisCellOnAFace[1] = true;
+            }
+            if(y > dev_ymax - dy * 2) {
+               isThisCellOnAFace[2] = true;
+            }
+            if(y < dev_ymin + dy * 2) {
+               isThisCellOnAFace[3] = true;
+            }
+            if(z > dev_zmax - dz * 2) {
+               isThisCellOnAFace[4] = true;
+            }
+            if(z < dev_zmin + dz * 2) {
+               isThisCellOnAFace[5] = true;
+            }
+            if(excludeSlicesAndPeriodicDimensions == true) {
+               if (dev_xcells_ini == 1 || this->periodic[0]) {
+                  isThisCellOnAFace[0] = false;
+                  isThisCellOnAFace[1] = false;
+               }
+               if (dev_ycells_ini == 1 || this->periodic[1]) {
+                  isThisCellOnAFace[2] = false;
+                  isThisCellOnAFace[3] = false;
+               }
+               if (dev_zcells_ini == 1 || this->periodic[2]) {
+                  isThisCellOnAFace[4] = false;
+                  isThisCellOnAFace[5] = false;
+               }
+            }
+         }
+      protected:
+         /*! Array of bool telling whether the system is periodic in any direction. */
+         std::array<bool, 3> periodic;
+   };
+
    class OuterBoundaryCondition: public SysBoundaryCondition {
       public:
          virtual void assignSysBoundary(dccrg::Dccrg<SpatialCell, dccrg::Cartesian_Geometry>& mpiGrid, fsgrids::technicalspan technical, FieldSolverGrid &fsgrid);
       protected:
          /*! Array of bool telling which faces are going to be processed by the system boundary condition.*/
          std::array<bool, 6> facesToProcess;
+   };
+
+   class OuterBoundaryConditionDevice: public SysBoundaryConditionDevice {
+      public:
+      protected:
    };
 
    // Moved outside the class since it's a helper function that doesn't require member access

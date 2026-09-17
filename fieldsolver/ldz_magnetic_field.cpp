@@ -25,6 +25,9 @@
 #endif
 
 #include "ldz_magnetic_field.hpp"
+#include "../sysboundary/donotcompute.h"
+#include "../sysboundary/outflow.h"
+#include "../sysboundary/setmaxwellian.h"
 
 #ifdef USE_GPU
 #define functionDevice __device__
@@ -200,6 +203,53 @@ void propagateSysBoundaryMagneticField(fsgrids::perbspan perb,
                                                   component);
 }
 
+/*! \brief Low-level magnetic field propagation function.
+ *
+ * Propagates the magnetic field according to the system boundary conditions.
+ *
+ * \param perb fsGrid holding the perturbed B quantities at runge-kutta t=0
+ * \param perbdt2 fsGrid holding the perturbed B quantities at runge-kutta t=0.5
+ * \param bgb fsGrid holding the background field B quantities
+ * \param technical fsgrid holding the technical parameters
+ * \param gridSpacing cell size in x,y,z
+ * \param globalCoordinates cell global grid coordinate indices
+ * \param stencil fsgrid stencil for cell
+ * \param sysBoundaries System boundary conditions existing
+ * \param RKCase Element in the enum defining the Runge-Kutta method steps
+ * \param component component to compute
+ *
+ * \sa propagateMagneticFieldSimple propagateMagneticField
+ */
+__device__ void propagateSysBoundaryMagneticFieldDevice(fsgrids::perbspan perb,
+                                       fsgrids::perbspan perbdt2,
+                                       fsgrids::constbgbspan bgb,
+                                       fsgrids::consttechnicalspan technical,
+                                       const std::array<Real, 3>& gridSpacing,
+                                       const std::array<fsgrid::FsSize_t, 3>& globalCoordinates,
+                                       const fsgrid::FsStencil& stencil, SysBoundaryDevice *sysBoundaries, int32_t RKCase,
+                                       uint32_t component) {
+   const bool case0 = RKCase == RK_ORDER1 || RKCase == RK_ORDER2_STEP2;
+   auto& out = case0 ? perb[stencil.ooo()] : perbdt2[stencil.ooo()];
+   const auto& pb = case0 ? perb : perbdt2;
+
+   out[fsgrids::bfield::PERBX + component] =
+       sysBoundaries[0].getSysBoundary(technical[stencil.ooo()].sysBoundaryFlag)
+                        ->fieldSolverBoundaryCondMagneticField(pb, bgb, technical, gridSpacing, globalCoordinates, stencil,
+                                                  component);
+}
+
+__global__ void constructDoNotCompute(SBC::SysBoundaryConditionDevice* mem) {
+   new (mem) SBC::DoNotComputeDevice();
+}
+
+__global__ void constructMaxwellian(SBC::SysBoundaryConditionDevice* mem, const Real (*templateB)[3]) {
+   new (mem) SBC::MaxwellianDevice(templateB);
+}
+
+__global__ void constructOutflow(SBC::SysBoundaryConditionDevice* mem) {
+   new (mem) SBC::OutflowDevice();
+}
+
 /*! \brief High-level magnetic field propagation function.
  *
  * Propagates the magnetic field and applies the field boundary conditions defined in project.h where needed.
@@ -228,30 +278,83 @@ void propagateMagneticFieldSimple(fsgrids::perbspan perb,
    const auto* localSize = &fsgrid.getLocalSize()[0];
    const auto& gridSpacing = fsgrid.getGridSpacing();
    const size_t numCells = fsgrid.getNumCells();
+   SysBoundaryDevice host_sysBoundaries;
+
+   uploadParametersToDevice();
+
+   for (const auto& [type, host_condition] : sysBoundaries.getIndexToSysBoundary()) {
+      SBC::SysBoundaryConditionDevice* dev_condition = nullptr;
+      switch (type) {
+         case sysboundarytype::OUTFLOW: {
+            cudaMalloc(&dev_condition, sizeof(SBC::OutflowDevice));
+            constructOutflow<<<1,1>>>(dev_condition);
+            cudaDeviceSynchronize();
+            break;
+         }
+         case sysboundarytype::MAXWELLIAN: {
+            auto* host_maxwellian = static_cast<SBC::Maxwellian*>(host_condition);
+            Real (*dev_templateB)[3] = nullptr;
+            cudaMalloc(&dev_templateB, sizeof(Real[6][3]));
+            cudaMemcpy(dev_templateB, host_maxwellian->templateB, sizeof(Real[6][3]), cudaMemcpyHostToDevice);
+            cudaMalloc(&dev_condition, sizeof(SBC::MaxwellianDevice));
+            constructMaxwellian<<<1,1>>>(dev_condition, dev_templateB);
+            cudaDeviceSynchronize();
+            cudaFree(dev_templateB);
+            break;
+         }
+         case sysboundarytype::IONOSPHERE: {
+            std::cerr << "IONOSPHERE not implemented" << std::endl;
+            cudaMalloc(&dev_condition, sizeof(SBC::OutflowDevice));
+            constructOutflow<<<1,1>>>(dev_condition);
+            cudaDeviceSynchronize();
+            break;
+         }
+         case sysboundarytype::DO_NOT_COMPUTE: {
+            cudaMalloc(&dev_condition, sizeof(SBC::DoNotComputeDevice));
+            constructDoNotCompute<<<1,1>>>(dev_condition);
+            cudaDeviceSynchronize();
+            break;
+         }
+         case sysboundarytype::COPYSPHERE: {
+            std::cerr << "COPYSPHERE not implemented" << std::endl;
+            cudaMalloc(&dev_condition, sizeof(SBC::OutflowDevice));
+            constructOutflow<<<1,1>>>(dev_condition);
+            cudaDeviceSynchronize();
+            break;
+         }
+      }
+      host_sysBoundaries.indexToSysBoundary.insert(
+         Hashinator::hash_pair<uint, size_t>{ type, reinterpret_cast<size_t>(dev_condition) }
+      );
+   }
 
    CREATE_UNIQUE_POINTER(gpuMemoryManager, d_perb);
    CREATE_UNIQUE_POINTER(gpuMemoryManager, d_perbdt2);
    CREATE_UNIQUE_POINTER(gpuMemoryManager, d_e);
    CREATE_UNIQUE_POINTER(gpuMemoryManager, d_edt2);
    CREATE_UNIQUE_POINTER(gpuMemoryManager, d_bgb);
+   CREATE_UNIQUE_POINTER(gpuMemoryManager, dev_sysBoundaries);
 
    ALLOCATE_GPU(gpuMemoryManager, d_perb, perb.size() * sizeof(fsgrids::perbElement));
    ALLOCATE_GPU(gpuMemoryManager, d_perbdt2, perbdt2.size() * sizeof(fsgrids::perbElement));
    ALLOCATE_GPU(gpuMemoryManager, d_e, e.size() * sizeof(fsgrids::efieldElement));
    ALLOCATE_GPU(gpuMemoryManager, d_edt2, edt2.size() * sizeof(fsgrids::efieldElement));
    ALLOCATE_GPU(gpuMemoryManager, d_bgb, bgb.size() * sizeof(fsgrids::bgbElement));
+   ALLOCATE_GPU(gpuMemoryManager, dev_sysBoundaries, sizeof(SysBoundaryDevice));
 
    fsgrids::perbElement *d_perb = GET_POINTER(gpuMemoryManager, fsgrids::perbElement, d_perb);
    fsgrids::perbElement *d_perbdt2 = GET_POINTER(gpuMemoryManager, fsgrids::perbElement, d_perbdt2);
    fsgrids::efieldElement *d_e = GET_POINTER(gpuMemoryManager, fsgrids::efieldElement, d_e);
    fsgrids::efieldElement *d_edt2 = GET_POINTER(gpuMemoryManager, fsgrids::efieldElement, d_edt2);
    fsgrids::bgbElement *d_bgb = GET_POINTER(gpuMemoryManager, fsgrids::bgbElement, d_bgb);
+   SysBoundaryDevice *dev_sysBoundaries = GET_POINTER(gpuMemoryManager, SysBoundaryDevice, dev_sysBoundaries);
 
    cudaMemcpy(d_perb, perb.data(),  perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyHostToDevice);
    cudaMemcpy(d_perbdt2, perbdt2.data(),  perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyHostToDevice);
    cudaMemcpy(d_e, e.data(),  e.size() * sizeof(fsgrids::efieldElement), cudaMemcpyHostToDevice);
    cudaMemcpy(d_edt2, edt2.data(),  edt2.size() * sizeof(fsgrids::efieldElement), cudaMemcpyHostToDevice);
    cudaMemcpy(d_bgb, bgb.data(),  bgb.size() * sizeof(fsgrids::bgbElement), cudaMemcpyHostToDevice);
+   cudaMemcpy(dev_sysBoundaries, &host_sysBoundaries,  sizeof(SysBoundaryDevice), cudaMemcpyHostToDevice);
 
    std::span<fsgrids::perbElement> dev_perb(d_perb, perb.size());
    std::span<fsgrids::perbElement> dev_perbdt2(d_perbdt2, perbdt2.size());
@@ -284,8 +387,7 @@ void propagateMagneticFieldSimple(fsgrids::perbspan perb,
    }
    mpiTimer.stop();
 
-   cudaMemcpy(perb.data(), d_perb, perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
-   cudaMemcpy(perbdt2.data(), d_perbdt2, perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
+   cudaDeviceSynchronize();
 
    // The looping below was modified in https://github.com/fmihpc/vlasiator/pull/1110/files
    // with a reported performance gain of 10% of field solver performance in production-like
@@ -297,24 +399,28 @@ void propagateMagneticFieldSimple(fsgrids::perbspan perb,
    phiprof::Timer sysBoundaryTimer {sysBoundaryTimerId};
 
    // L1 pass
-   fsgrid.parallel_for([](int timerId) -> phiprof::Timer { return phiprof::Timer{timerId}; },
+   fsgrid.parallel_for_GPU([](int timerId) -> phiprof::Timer { return phiprof::Timer{timerId}; },
                        phiprof::initializeTimer("Magnetic field L1 pass"), technical,
-                       [=, &sysBoundaries](const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
+                       [=] __device__(const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
       if (sysBoundaryLayer == 1) {
          cuint bitfield = technical[stencil.ooo()].SOLVE;
          const auto globalCoordinates = coordinates.localToGlobal(stencil.i, stencil.j, stencil.k);
          if ((bitfield & compute::BX) != compute::BX) {
-            propagateSysBoundaryMagneticField(perb, perbdt2, bgb, technical, gridSpacing, globalCoordinates, stencil, sysBoundaries, RKCase, 0);
+            propagateSysBoundaryMagneticFieldDevice(dev_perb, dev_perbdt2, dev_bgb, technical, gridSpacing, globalCoordinates, stencil, dev_sysBoundaries, RKCase, 0);
          }
          if ((bitfield & compute::BY) != compute::BY) {
-            propagateSysBoundaryMagneticField(perb, perbdt2, bgb, technical, gridSpacing, globalCoordinates, stencil, sysBoundaries, RKCase, 1);
+            propagateSysBoundaryMagneticFieldDevice(dev_perb, dev_perbdt2, dev_bgb, technical, gridSpacing, globalCoordinates, stencil, dev_sysBoundaries, RKCase, 1);
          }
          if ((bitfield & compute::BZ) != compute::BZ) {
-            propagateSysBoundaryMagneticField(perb, perbdt2, bgb, technical, gridSpacing, globalCoordinates, stencil, sysBoundaries, RKCase, 2);
+            propagateSysBoundaryMagneticFieldDevice(dev_perb, dev_perbdt2, dev_bgb, technical, gridSpacing, globalCoordinates, stencil, dev_sysBoundaries, RKCase, 2);
          }
       }
    });
    sysBoundaryTimer.stop();
+
+   cudaDeviceSynchronize();
+   cudaMemcpy(perb.data(), d_perb, perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
+   cudaMemcpy(perbdt2.data(), d_perbdt2, perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
 
    mpiTimer.start();
    if (RKCase == RK_ORDER1 || RKCase == RK_ORDER2_STEP2) {

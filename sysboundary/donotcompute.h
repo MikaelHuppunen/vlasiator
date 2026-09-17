@@ -94,6 +94,20 @@ namespace SBC {
          std::cerr << "ERROR: DoNotCompute::vlasovBoundaryCondition called!" << std::endl;
       }
    };
+
+   class DoNotComputeDevice: public SysBoundaryConditionDevice {
+   public:
+      DoNotComputeDevice() = default;
+      virtual ~DoNotComputeDevice() = default;
+
+      inline __device__ Real fieldSolverBoundaryCondMagneticField(fsgrids::perbspan,
+                                                fsgrids::constbgbspan,
+                                                fsgrids::consttechnicalspan, const std::array<Real, 3>&,
+                                                const std::array<fsgrid::FsSize_t, 3>&, const fsgrid::FsStencil&,
+                                                cuint) override {;
+         return 0.;
+      }
+   };
 }
 
 #endif

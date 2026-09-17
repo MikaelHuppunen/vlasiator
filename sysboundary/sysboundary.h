@@ -92,6 +92,7 @@ class SysBoundary {
    void clear() { // Clears all conts of SBC (destructing template cells for GPU branch)
       sysBoundaries.clear();
    }
+   const std::map<uint, SBC::SysBoundaryCondition*>& getIndexToSysBoundary();
    private:
       /*! Private copy-constructor to prevent copying the class. */
       SysBoundary(const SysBoundary& bc);
@@ -109,6 +110,38 @@ class SysBoundary {
 
       /*! Array of bool telling whether the system is periodic in any direction. */
       std::array<bool, 3> periodic;
+};
+
+/*! \brief SysBoundary contains the SysBoundaryConditions used in the simulation.
+ *
+ * The purpose of SysBoundary is to contain SBC::SysBoundaryConditions, and apply
+ * them to the simulation volume cells if the cells pertain to a specific boundary type.
+ * If the simulation domain is not fully periodic then the behaviour at the edges or boundaries of the volume has to be properly defined.
+ *
+ * initSysBoundaries creates the instances of SBC::SysBoundaryConditions that are needed.
+ * They are then initialised, which means the internals are prepared for the system
+ * boundary condition to be applied (import and process parameters, generate template cells
+ * etc.). When the whole simulation domain is initialised, the boundary conditions are
+ * applied to the cells they have by calling applyInitialState.
+ *
+ * If needed, a user can write his or her own SBC::SysBoundaryConditions, which
+ * are loaded when the simulation initializes.
+ */
+class SysBoundaryDevice {
+ public:
+   SysBoundaryDevice();
+   ~SysBoundaryDevice();
+   inline __device__ SBC::SysBoundaryConditionDevice* getSysBoundary(cuint sysBoundaryType){
+      auto it = indexToSysBoundary.device_find(sysBoundaryType);
+      if (it != indexToSysBoundary.device_end()) {
+         return reinterpret_cast<SBC::SysBoundaryConditionDevice*>(it->second);
+      } else {
+         //abort_mpi("ERROR: Boundary " + to_string(sysBoundaryType) + " is invalid", 1);
+      }
+      return nullptr;
+   };
+   Hashinator::Hashmap<uint, size_t> indexToSysBoundary;
+ private:
 };
 
 bool precedenceSort(const SBC::SysBoundaryCondition* first,

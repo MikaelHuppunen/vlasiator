@@ -54,6 +54,21 @@ namespace SBC {
 
       void generateTemplateCell(spatial_cell::SpatialCell& templateCell, Real (&B)[3], int inputDataIndex, creal t) override;
    };
+
+   /*!\brief Maxwellian is a class applying fixed Maxwellian conditions according to parameters read from an input file.
+    *
+    * Maxwellian is a class handling cells tagged as sysboundarytype::MAXWELLIAN by this boundary condition.
+    *
+    * It applies fixed Maxwellian settings to the inflow boundary cells, the parameters of
+    * which are being read from an input file.
+    *
+    */
+   class MaxwellianDevice : public InflowDevice {
+   public:
+      MaxwellianDevice() = default;
+      __device__ MaxwellianDevice(const Real (*templateB)[3]) : InflowDevice(templateB) {}
+      virtual ~MaxwellianDevice() = default;
+   };
 }
 
 #endif

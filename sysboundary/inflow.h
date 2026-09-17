@@ -28,6 +28,7 @@
 #include "../readparameters.h"
 #include "../spatial_cells/spatial_cell_wrapper.hpp"
 #include "sysboundarycondition.h"
+#include "../parameters.h"
 
 namespace SBC {
 
@@ -98,13 +99,13 @@ public:
    //   std::cerr << "ERROR: base class Inflow::getIndex called!" << std::endl;
    //   return sysboundarytype::N_SYSBOUNDARY_CONDITIONS;
 //   }
+   Real templateB[6][3];
 
 protected:
    /*! Array of template spatial cells replicated over the corresponding
     * simulation volume face. Only the template for an active face is actually
     * being touched at all by the code. */
    spatial_cell::SpatialCell templateCells[6];
-   Real templateB[6][3];
    /*! Time interval for applying the dynamic BC. */
    Real tInterval;
    /*! Last simulation time the dynamic BC is applied. */
@@ -129,6 +130,61 @@ protected:
                          fsgrids::technicalspan technical,
                          FieldSolverGrid &fsgrid,
                          const bool resetSolved);
+};
+
+/*!\brief Base class for boundary conditions with settings and parameters read from file.
+ *
+ * Inflow is a base class for e.g. SysBoundaryConditon::Maxwellian. It defines methods to set boundary conditions on the
+ * faces of the simulation domain.
+ *
+ * This class handles the import and interpolation in time of the input parameters read from file as well as the
+ * assignment of the state from the template cells.
+ *
+ * The daughter classes have then to handle parameters and generate the template cells as wished from the data returned.
+ */
+class InflowDevice : public OuterBoundaryConditionDevice {
+public:
+   InflowDevice() = default;
+   __device__ InflowDevice(const Real (*templateB_in)[3]) {
+      for (int i = 0; i < 6; i++) {
+         for (int j = 0; j < 3; j++) {
+            templateB[i][j] = templateB_in[i][j];
+         }
+      }
+   }
+   virtual ~InflowDevice() = default;
+   __device__ inline Real fieldSolverBoundaryCondMagneticField(fsgrids::perbspan b,
+                                                     fsgrids::constbgbspan bgb,
+                                                     fsgrids::consttechnicalspan technical,
+                                                     const std::array<Real, 3>& gridSpacing,
+                                                     const std::array<fsgrid::FsSize_t, 3>& globalCoordinates,
+                                                     const fsgrid::FsStencil& stencil, cuint component){
+      Real result = 0.0;
+      creal dx = dev_dx_ini;
+      creal dy = dev_dy_ini;
+      creal dz = dev_dz_ini;
+      creal x = (static_cast<Real>(globalCoordinates[0]) + 0.5) * gridSpacing[0] + dev_xmin;
+      creal y = (static_cast<Real>(globalCoordinates[1]) + 0.5) * gridSpacing[1] + dev_ymin;
+      creal z = (static_cast<Real>(globalCoordinates[2]) + 0.5) * gridSpacing[2] + dev_zmin;
+
+      bool isThisCellOnAFace[6];
+      determineFace(&isThisCellOnAFace[0], x, y, z, dx, dy, dz, true);
+
+      for (uint i = 0; i < 6; i++) {
+         if (isThisCellOnAFace[i]) {
+            result = templateB[i][component];
+            break; // This effectively sets the precedence of faces through the order of faces.
+         }
+      }
+
+      // There are projects that have non-uniform and non-zero perturbed B, e.g. Magnetosphere with dipole type 4.
+      // We cannot jsut take the value from the templateCell, we also need a copy of the value from initialization.
+      // This value is stored in the BgBGrid at fsgrids::bgbfield::BGBXVDCORR,BGBYVDCORR,BGBZVDCORR
+      result += bgb[stencil.ooo()][fsgrids::bgbfield::BGBXVDCORR + component];
+      return result;
+   }
+protected:
+   Real templateB[6][3];
 };
 } // namespace SBC
 
