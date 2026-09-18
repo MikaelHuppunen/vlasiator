@@ -128,20 +128,28 @@ class SysBoundary {
  * are loaded when the simulation initializes.
  */
 class SysBoundaryDevice {
- public:
-   SysBoundaryDevice();
-   ~SysBoundaryDevice();
-   inline __device__ SBC::SysBoundaryConditionDevice* getSysBoundary(cuint sysBoundaryType){
-      auto it = indexToSysBoundary.device_find(sysBoundaryType);
-      if (it != indexToSysBoundary.device_end()) {
-         return reinterpret_cast<SBC::SysBoundaryConditionDevice*>(it->second);
-      } else {
+public:
+   SysBoundaryDevice() = default;
+   ~SysBoundaryDevice() = default;
+   SysBoundaryDevice(const SysBoundaryDevice&) = default;
+   SysBoundaryDevice& operator=(const SysBoundaryDevice&) = default;
+
+   __device__ inline SBC::SysBoundaryConditionDevice* getSysBoundary(cuint sysBoundaryType) const {
+      if (sysBoundaryType >= sysboundarytype::N_SYSBOUNDARY_CONDITIONS) {
          //abort_mpi("ERROR: Boundary " + to_string(sysBoundaryType) + " is invalid", 1);
+         return nullptr;
       }
-      return nullptr;
-   };
-   Hashinator::Hashmap<uint, size_t> indexToSysBoundary;
- private:
+      return indexToSysBoundary[sysBoundaryType];
+   }
+
+   void setSysBoundary(uint type, SBC::SysBoundaryConditionDevice* dev_condition) {
+      if (type < sysboundarytype::N_SYSBOUNDARY_CONDITIONS) {
+         indexToSysBoundary[type] = dev_condition;
+      }
+   }
+
+private:
+   SBC::SysBoundaryConditionDevice* indexToSysBoundary[sysboundarytype::N_SYSBOUNDARY_CONDITIONS] = {};
 };
 
 bool precedenceSort(const SBC::SysBoundaryCondition* first,

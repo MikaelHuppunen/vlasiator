@@ -25,6 +25,9 @@
 #include "../definitions.h"
 #include "../common.h"
 //#include "../spatial_cells/spatial_cell_wrapper.hpp"
+#include "../sysboundary/donotcompute.h"
+#include "../sysboundary/outflow.h"
+#include "../sysboundary/setmaxwellian.h"
 
 #include "fs_common.h"
 
@@ -34,6 +37,11 @@ void propagateMagneticFieldSimple(fsgrids::perbspan perb,
                                   fsgrids::efieldspan e,
                                   fsgrids::efieldspan edt2,
                                   fsgrids::technicalspan technical, FieldSolverGrid &fsgrid,
-                                  SysBoundary& sysBoundaries, creal& dt, cint& RKCase);
+                                  SysBoundaryDevice *sysBoundaries, creal& dt, cint& RKCase);
+
+__global__ void constructDoNotCompute(SBC::SysBoundaryConditionDevice* mem);
+__global__ void constructMaxwellian(SBC::SysBoundaryConditionDevice* mem, const Real (*templateB)[3]);
+__global__ void constructOutflow(SBC::SysBoundaryConditionDevice* mem);
+void uploadIndexToSysBoundary(SysBoundary& sysBoundaries, SysBoundaryDevice& host_sysBoundaries);
 
 #endif

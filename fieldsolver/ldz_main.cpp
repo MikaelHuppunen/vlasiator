@@ -123,7 +123,48 @@ bool propagateFields(fsgrids::perbspan perb,
 
    if (subcycles == 1) {
 #ifdef FS_1ST_ORDER_TIME
-      propagateMagneticFieldSimple(perb, perbdt2, bgb, e, edt2, technical, fsgrid, sysBoundaries, dt, RK_ORDER1);
+      {
+         SysBoundaryDevice host_sysBoundaries;
+         uploadParametersToDevice();
+         uploadIndexToSysBoundary(sysBoundaries,  host_sysBoundaries);
+         CREATE_UNIQUE_POINTER(gpuMemoryManager, d_perb);
+         CREATE_UNIQUE_POINTER(gpuMemoryManager, d_perbdt2);
+         CREATE_UNIQUE_POINTER(gpuMemoryManager, d_e);
+         CREATE_UNIQUE_POINTER(gpuMemoryManager, d_edt2);
+         CREATE_UNIQUE_POINTER(gpuMemoryManager, d_bgb);
+         CREATE_UNIQUE_POINTER(gpuMemoryManager, dev_sysBoundaries);
+         CREATE_UNIQUE_POINTER(gpuMemoryManager, d_technical);
+         ALLOCATE_GPU(gpuMemoryManager, d_perb, perb.size() * sizeof(fsgrids::perbElement));
+         ALLOCATE_GPU(gpuMemoryManager, d_perbdt2, perbdt2.size() * sizeof(fsgrids::perbElement));
+         ALLOCATE_GPU(gpuMemoryManager, d_e, e.size() * sizeof(fsgrids::efieldElement));
+         ALLOCATE_GPU(gpuMemoryManager, d_edt2, edt2.size() * sizeof(fsgrids::efieldElement));
+         ALLOCATE_GPU(gpuMemoryManager, d_bgb, bgb.size() * sizeof(fsgrids::bgbElement));
+         ALLOCATE_GPU(gpuMemoryManager, dev_sysBoundaries, sizeof(SysBoundaryDevice));
+         ALLOCATE_GPU(gpuMemoryManager, d_technical, technical.size() * sizeof(fsgrids::technical));
+         fsgrids::perbElement *d_perb = GET_POINTER(gpuMemoryManager, fsgrids::perbElement, d_perb);
+         fsgrids::perbElement *d_perbdt2 = GET_POINTER(gpuMemoryManager, fsgrids::perbElement, d_perbdt2);
+         fsgrids::efieldElement *d_e = GET_POINTER(gpuMemoryManager, fsgrids::efieldElement, d_e);
+         fsgrids::efieldElement *d_edt2 = GET_POINTER(gpuMemoryManager, fsgrids::efieldElement, d_edt2);
+         fsgrids::bgbElement *d_bgb = GET_POINTER(gpuMemoryManager, fsgrids::bgbElement, d_bgb);
+         SysBoundaryDevice *dev_sysBoundaries = GET_POINTER(gpuMemoryManager, SysBoundaryDevice, dev_sysBoundaries);
+         fsgrids::technical *d_technical = GET_POINTER(gpuMemoryManager, fsgrids::technical, d_technical);
+         cudaMemcpy(d_perb, perb.data(),  perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyHostToDevice);
+         cudaMemcpy(d_perbdt2, perbdt2.data(),  perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyHostToDevice);
+         cudaMemcpy(d_e, e.data(),  e.size() * sizeof(fsgrids::efieldElement), cudaMemcpyHostToDevice);
+         cudaMemcpy(d_edt2, edt2.data(),  edt2.size() * sizeof(fsgrids::efieldElement), cudaMemcpyHostToDevice);
+         cudaMemcpy(d_bgb, bgb.data(),  bgb.size() * sizeof(fsgrids::bgbElement), cudaMemcpyHostToDevice);
+         cudaMemcpy(dev_sysBoundaries, &host_sysBoundaries,  sizeof(SysBoundaryDevice), cudaMemcpyHostToDevice);
+         cudaMemcpy(d_technical, technical.data(), technical.size() * sizeof(fsgrids::technical), cudaMemcpyHostToDevice);
+         std::span<fsgrids::perbElement> dev_perb(d_perb, perb.size());
+         std::span<fsgrids::perbElement> dev_perbdt2(d_perbdt2, perbdt2.size());
+         std::span<fsgrids::efieldElement> dev_e(d_e, e.size());
+         std::span<fsgrids::efieldElement> dev_edt2(d_edt2, edt2.size());
+         std::span<fsgrids::bgbElement> dev_bgb(d_bgb, bgb.size());
+         std::span<fsgrids::technical> dev_technical(d_technical, technical.size());
+         propagateMagneticFieldSimple(dev_perb, dev_perbdt2, dev_bgb, dev_e, dev_edt2, dev_technical, fsgrid, dev_sysBoundaries, dt, RK_ORDER1);
+         cudaMemcpy(perb.data(), d_perb, perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
+         cudaMemcpy(perbdt2.data(), d_perbdt2, perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
+      }
       calculateDerivativesSimple(perb, moments, dperb, dmoments, technical, fsgrid, true /*doMoments*/);
       if (P::ohmGradPeTerm > 0) {
          calculateGradPeTermSimple(egradpe, egradpedt2, moments, momentsdt2, dmoments, dmomentsdt2, technical, fsgrid, sysBoundaries, RK_ORDER1);
@@ -167,7 +208,48 @@ bool propagateFields(fsgrids::perbspan perb,
          true // communicateEGradPeOrMomentsDerivatives
       );
 #else
-      propagateMagneticFieldSimple(perb, perbdt2, bgb, e, edt2, technical, fsgrid, sysBoundaries, dt, RK_ORDER2_STEP1);
+      {
+         SysBoundaryDevice host_sysBoundaries;
+         uploadParametersToDevice();
+         uploadIndexToSysBoundary(sysBoundaries,  host_sysBoundaries);
+         CREATE_UNIQUE_POINTER(gpuMemoryManager, d_perb);
+         CREATE_UNIQUE_POINTER(gpuMemoryManager, d_perbdt2);
+         CREATE_UNIQUE_POINTER(gpuMemoryManager, d_e);
+         CREATE_UNIQUE_POINTER(gpuMemoryManager, d_edt2);
+         CREATE_UNIQUE_POINTER(gpuMemoryManager, d_bgb);
+         CREATE_UNIQUE_POINTER(gpuMemoryManager, dev_sysBoundaries);
+         CREATE_UNIQUE_POINTER(gpuMemoryManager, d_technical);
+         ALLOCATE_GPU(gpuMemoryManager, d_perb, perb.size() * sizeof(fsgrids::perbElement));
+         ALLOCATE_GPU(gpuMemoryManager, d_perbdt2, perbdt2.size() * sizeof(fsgrids::perbElement));
+         ALLOCATE_GPU(gpuMemoryManager, d_e, e.size() * sizeof(fsgrids::efieldElement));
+         ALLOCATE_GPU(gpuMemoryManager, d_edt2, edt2.size() * sizeof(fsgrids::efieldElement));
+         ALLOCATE_GPU(gpuMemoryManager, d_bgb, bgb.size() * sizeof(fsgrids::bgbElement));
+         ALLOCATE_GPU(gpuMemoryManager, dev_sysBoundaries, sizeof(SysBoundaryDevice));
+         ALLOCATE_GPU(gpuMemoryManager, d_technical, technical.size() * sizeof(fsgrids::technical));
+         fsgrids::perbElement *d_perb = GET_POINTER(gpuMemoryManager, fsgrids::perbElement, d_perb);
+         fsgrids::perbElement *d_perbdt2 = GET_POINTER(gpuMemoryManager, fsgrids::perbElement, d_perbdt2);
+         fsgrids::efieldElement *d_e = GET_POINTER(gpuMemoryManager, fsgrids::efieldElement, d_e);
+         fsgrids::efieldElement *d_edt2 = GET_POINTER(gpuMemoryManager, fsgrids::efieldElement, d_edt2);
+         fsgrids::bgbElement *d_bgb = GET_POINTER(gpuMemoryManager, fsgrids::bgbElement, d_bgb);
+         SysBoundaryDevice *dev_sysBoundaries = GET_POINTER(gpuMemoryManager, SysBoundaryDevice, dev_sysBoundaries);
+         fsgrids::technical *d_technical = GET_POINTER(gpuMemoryManager, fsgrids::technical, d_technical);
+         cudaMemcpy(d_perb, perb.data(),  perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyHostToDevice);
+         cudaMemcpy(d_perbdt2, perbdt2.data(),  perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyHostToDevice);
+         cudaMemcpy(d_e, e.data(),  e.size() * sizeof(fsgrids::efieldElement), cudaMemcpyHostToDevice);
+         cudaMemcpy(d_edt2, edt2.data(),  edt2.size() * sizeof(fsgrids::efieldElement), cudaMemcpyHostToDevice);
+         cudaMemcpy(d_bgb, bgb.data(),  bgb.size() * sizeof(fsgrids::bgbElement), cudaMemcpyHostToDevice);
+         cudaMemcpy(dev_sysBoundaries, &host_sysBoundaries,  sizeof(SysBoundaryDevice), cudaMemcpyHostToDevice);
+         cudaMemcpy(d_technical, technical.data(), technical.size() * sizeof(fsgrids::technical), cudaMemcpyHostToDevice);
+         std::span<fsgrids::perbElement> dev_perb(d_perb, perb.size());
+         std::span<fsgrids::perbElement> dev_perbdt2(d_perbdt2, perbdt2.size());
+         std::span<fsgrids::efieldElement> dev_e(d_e, e.size());
+         std::span<fsgrids::efieldElement> dev_edt2(d_edt2, edt2.size());
+         std::span<fsgrids::bgbElement> dev_bgb(d_bgb, bgb.size());
+         std::span<fsgrids::technical> dev_technical(d_technical, technical.size());
+         propagateMagneticFieldSimple(dev_perb, dev_perbdt2, dev_bgb, dev_e, dev_edt2, dev_technical, fsgrid, dev_sysBoundaries, dt, RK_ORDER2_STEP1);
+         cudaMemcpy(perb.data(), d_perb, perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
+         cudaMemcpy(perbdt2.data(), d_perbdt2, perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
+      }
       calculateDerivativesSimple(perbdt2, momentsdt2, dperb, dmomentsdt2, technical, fsgrid, true /*doMoments*/);
       if (P::ohmGradPeTerm > 0) {
          calculateGradPeTermSimple(egradpe, egradpedt2, moments, momentsdt2, dmoments, dmomentsdt2, technical, fsgrid, sysBoundaries, RK_ORDER2_STEP1);
@@ -211,8 +293,49 @@ bool propagateFields(fsgrids::perbspan perb,
          true // communicateEGradPeOrMomentsDerivatives
       );
 
-      propagateMagneticFieldSimple(perb, perbdt2, bgb, e, edt2, technical, fsgrid, sysBoundaries, dt, RK_ORDER2_STEP2);
-      calculateDerivativesSimple(perb, moments, dperb, dmoments, technical, fsgrid, true /*doMoments*/);
+      {
+         SysBoundaryDevice host_sysBoundaries;
+         uploadParametersToDevice();
+         uploadIndexToSysBoundary(sysBoundaries,  host_sysBoundaries);
+         CREATE_UNIQUE_POINTER(gpuMemoryManager, d_perb);
+         CREATE_UNIQUE_POINTER(gpuMemoryManager, d_perbdt2);
+         CREATE_UNIQUE_POINTER(gpuMemoryManager, d_e);
+         CREATE_UNIQUE_POINTER(gpuMemoryManager, d_edt2);
+         CREATE_UNIQUE_POINTER(gpuMemoryManager, d_bgb);
+         CREATE_UNIQUE_POINTER(gpuMemoryManager, dev_sysBoundaries);
+         CREATE_UNIQUE_POINTER(gpuMemoryManager, d_technical);
+         ALLOCATE_GPU(gpuMemoryManager, d_perb, perb.size() * sizeof(fsgrids::perbElement));
+         ALLOCATE_GPU(gpuMemoryManager, d_perbdt2, perbdt2.size() * sizeof(fsgrids::perbElement));
+         ALLOCATE_GPU(gpuMemoryManager, d_e, e.size() * sizeof(fsgrids::efieldElement));
+         ALLOCATE_GPU(gpuMemoryManager, d_edt2, edt2.size() * sizeof(fsgrids::efieldElement));
+         ALLOCATE_GPU(gpuMemoryManager, d_bgb, bgb.size() * sizeof(fsgrids::bgbElement));
+         ALLOCATE_GPU(gpuMemoryManager, dev_sysBoundaries, sizeof(SysBoundaryDevice));
+         ALLOCATE_GPU(gpuMemoryManager, d_technical, technical.size() * sizeof(fsgrids::technical));
+         fsgrids::perbElement *d_perb = GET_POINTER(gpuMemoryManager, fsgrids::perbElement, d_perb);
+         fsgrids::perbElement *d_perbdt2 = GET_POINTER(gpuMemoryManager, fsgrids::perbElement, d_perbdt2);
+         fsgrids::efieldElement *d_e = GET_POINTER(gpuMemoryManager, fsgrids::efieldElement, d_e);
+         fsgrids::efieldElement *d_edt2 = GET_POINTER(gpuMemoryManager, fsgrids::efieldElement, d_edt2);
+         fsgrids::bgbElement *d_bgb = GET_POINTER(gpuMemoryManager, fsgrids::bgbElement, d_bgb);
+         SysBoundaryDevice *dev_sysBoundaries = GET_POINTER(gpuMemoryManager, SysBoundaryDevice, dev_sysBoundaries);
+         fsgrids::technical *d_technical = GET_POINTER(gpuMemoryManager, fsgrids::technical, d_technical);
+         cudaMemcpy(d_perb, perb.data(),  perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyHostToDevice);
+         cudaMemcpy(d_perbdt2, perbdt2.data(),  perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyHostToDevice);
+         cudaMemcpy(d_e, e.data(),  e.size() * sizeof(fsgrids::efieldElement), cudaMemcpyHostToDevice);
+         cudaMemcpy(d_edt2, edt2.data(),  edt2.size() * sizeof(fsgrids::efieldElement), cudaMemcpyHostToDevice);
+         cudaMemcpy(d_bgb, bgb.data(),  bgb.size() * sizeof(fsgrids::bgbElement), cudaMemcpyHostToDevice);
+         cudaMemcpy(dev_sysBoundaries, &host_sysBoundaries,  sizeof(SysBoundaryDevice), cudaMemcpyHostToDevice);
+         cudaMemcpy(d_technical, technical.data(), technical.size() * sizeof(fsgrids::technical), cudaMemcpyHostToDevice);
+         std::span<fsgrids::perbElement> dev_perb(d_perb, perb.size());
+         std::span<fsgrids::perbElement> dev_perbdt2(d_perbdt2, perbdt2.size());
+         std::span<fsgrids::efieldElement> dev_e(d_e, e.size());
+         std::span<fsgrids::efieldElement> dev_edt2(d_edt2, edt2.size());
+         std::span<fsgrids::bgbElement> dev_bgb(d_bgb, bgb.size());
+         std::span<fsgrids::technical> dev_technical(d_technical, technical.size());
+         propagateMagneticFieldSimple(dev_perb, dev_perbdt2, dev_bgb, dev_e, dev_edt2, dev_technical, fsgrid, dev_sysBoundaries, dt, RK_ORDER2_STEP2);
+         cudaMemcpy(perb.data(), d_perb, perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
+         cudaMemcpy(perbdt2.data(), d_perbdt2, perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
+         calculateDerivativesSimple(perb, moments, dperb, dmoments, technical, fsgrid, true /*doMoments*/);
+      }
       if (P::ohmGradPeTerm > 0) {
          calculateGradPeTermSimple(egradpe, egradpedt2, moments, momentsdt2, dmoments, dmomentsdt2, technical, fsgrid, sysBoundaries, RK_ORDER2_STEP2);
       }
@@ -267,7 +390,48 @@ bool propagateFields(fsgrids::perbspan perb,
          // In case of subcycling, we decided to go for a blunt Runge-Kutta subcycling even though e.g. moments are not
          // going along. Result of the Summer of Debugging 2016, the behaviour in wave dispersion was much improved with
          // this.
-         propagateMagneticFieldSimple(perb, perbdt2, bgb, e, edt2, technical, fsgrid, sysBoundaries, subcycleDt, RK_ORDER2_STEP1);
+         {
+            SysBoundaryDevice host_sysBoundaries;
+            uploadParametersToDevice();
+            uploadIndexToSysBoundary(sysBoundaries,  host_sysBoundaries);
+            CREATE_UNIQUE_POINTER(gpuMemoryManager, d_perb);
+            CREATE_UNIQUE_POINTER(gpuMemoryManager, d_perbdt2);
+            CREATE_UNIQUE_POINTER(gpuMemoryManager, d_e);
+            CREATE_UNIQUE_POINTER(gpuMemoryManager, d_edt2);
+            CREATE_UNIQUE_POINTER(gpuMemoryManager, d_bgb);
+            CREATE_UNIQUE_POINTER(gpuMemoryManager, dev_sysBoundaries);
+            CREATE_UNIQUE_POINTER(gpuMemoryManager, d_technical);
+            ALLOCATE_GPU(gpuMemoryManager, d_perb, perb.size() * sizeof(fsgrids::perbElement));
+            ALLOCATE_GPU(gpuMemoryManager, d_perbdt2, perbdt2.size() * sizeof(fsgrids::perbElement));
+            ALLOCATE_GPU(gpuMemoryManager, d_e, e.size() * sizeof(fsgrids::efieldElement));
+            ALLOCATE_GPU(gpuMemoryManager, d_edt2, edt2.size() * sizeof(fsgrids::efieldElement));
+            ALLOCATE_GPU(gpuMemoryManager, d_bgb, bgb.size() * sizeof(fsgrids::bgbElement));
+            ALLOCATE_GPU(gpuMemoryManager, dev_sysBoundaries, sizeof(SysBoundaryDevice));
+            ALLOCATE_GPU(gpuMemoryManager, d_technical, technical.size() * sizeof(fsgrids::technical));
+            fsgrids::perbElement *d_perb = GET_POINTER(gpuMemoryManager, fsgrids::perbElement, d_perb);
+            fsgrids::perbElement *d_perbdt2 = GET_POINTER(gpuMemoryManager, fsgrids::perbElement, d_perbdt2);
+            fsgrids::efieldElement *d_e = GET_POINTER(gpuMemoryManager, fsgrids::efieldElement, d_e);
+            fsgrids::efieldElement *d_edt2 = GET_POINTER(gpuMemoryManager, fsgrids::efieldElement, d_edt2);
+            fsgrids::bgbElement *d_bgb = GET_POINTER(gpuMemoryManager, fsgrids::bgbElement, d_bgb);
+            SysBoundaryDevice *dev_sysBoundaries = GET_POINTER(gpuMemoryManager, SysBoundaryDevice, dev_sysBoundaries);
+            fsgrids::technical *d_technical = GET_POINTER(gpuMemoryManager, fsgrids::technical, d_technical);
+            cudaMemcpy(d_perb, perb.data(),  perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyHostToDevice);
+            cudaMemcpy(d_perbdt2, perbdt2.data(),  perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyHostToDevice);
+            cudaMemcpy(d_e, e.data(),  e.size() * sizeof(fsgrids::efieldElement), cudaMemcpyHostToDevice);
+            cudaMemcpy(d_edt2, edt2.data(),  edt2.size() * sizeof(fsgrids::efieldElement), cudaMemcpyHostToDevice);
+            cudaMemcpy(d_bgb, bgb.data(),  bgb.size() * sizeof(fsgrids::bgbElement), cudaMemcpyHostToDevice);
+            cudaMemcpy(dev_sysBoundaries, &host_sysBoundaries,  sizeof(SysBoundaryDevice), cudaMemcpyHostToDevice);
+            cudaMemcpy(d_technical, technical.data(), technical.size() * sizeof(fsgrids::technical), cudaMemcpyHostToDevice);
+            std::span<fsgrids::perbElement> dev_perb(d_perb, perb.size());
+            std::span<fsgrids::perbElement> dev_perbdt2(d_perbdt2, perbdt2.size());
+            std::span<fsgrids::efieldElement> dev_e(d_e, e.size());
+            std::span<fsgrids::efieldElement> dev_edt2(d_edt2, edt2.size());
+            std::span<fsgrids::bgbElement> dev_bgb(d_bgb, bgb.size());
+            std::span<fsgrids::technical> dev_technical(d_technical, technical.size());
+            propagateMagneticFieldSimple(dev_perb, dev_perbdt2, dev_bgb, dev_e, dev_edt2, dev_technical, fsgrid, dev_sysBoundaries, subcycleDt, RK_ORDER2_STEP1);
+            cudaMemcpy(perb.data(), d_perb, perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
+            cudaMemcpy(perbdt2.data(), d_perbdt2, perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
+         }
 
          // We need to calculate derivatives of the moments at every substep, but the moments only
          // need to be communicated in the first one.
@@ -314,7 +478,48 @@ bool propagateFields(fsgrids::perbspan perb,
             subcycleCount == 0 // communicateEGradPeOrMomentsDerivatives
          );
 
-         propagateMagneticFieldSimple(perb, perbdt2, bgb, e, edt2, technical, fsgrid, sysBoundaries, subcycleDt, RK_ORDER2_STEP2);
+         {
+            SysBoundaryDevice host_sysBoundaries;
+            uploadParametersToDevice();
+            uploadIndexToSysBoundary(sysBoundaries,  host_sysBoundaries);
+            CREATE_UNIQUE_POINTER(gpuMemoryManager, d_perb);
+            CREATE_UNIQUE_POINTER(gpuMemoryManager, d_perbdt2);
+            CREATE_UNIQUE_POINTER(gpuMemoryManager, d_e);
+            CREATE_UNIQUE_POINTER(gpuMemoryManager, d_edt2);
+            CREATE_UNIQUE_POINTER(gpuMemoryManager, d_bgb);
+            CREATE_UNIQUE_POINTER(gpuMemoryManager, dev_sysBoundaries);
+            CREATE_UNIQUE_POINTER(gpuMemoryManager, d_technical);
+            ALLOCATE_GPU(gpuMemoryManager, d_perb, perb.size() * sizeof(fsgrids::perbElement));
+            ALLOCATE_GPU(gpuMemoryManager, d_perbdt2, perbdt2.size() * sizeof(fsgrids::perbElement));
+            ALLOCATE_GPU(gpuMemoryManager, d_e, e.size() * sizeof(fsgrids::efieldElement));
+            ALLOCATE_GPU(gpuMemoryManager, d_edt2, edt2.size() * sizeof(fsgrids::efieldElement));
+            ALLOCATE_GPU(gpuMemoryManager, d_bgb, bgb.size() * sizeof(fsgrids::bgbElement));
+            ALLOCATE_GPU(gpuMemoryManager, dev_sysBoundaries, sizeof(SysBoundaryDevice));
+            ALLOCATE_GPU(gpuMemoryManager, d_technical, technical.size() * sizeof(fsgrids::technical));
+            fsgrids::perbElement *d_perb = GET_POINTER(gpuMemoryManager, fsgrids::perbElement, d_perb);
+            fsgrids::perbElement *d_perbdt2 = GET_POINTER(gpuMemoryManager, fsgrids::perbElement, d_perbdt2);
+            fsgrids::efieldElement *d_e = GET_POINTER(gpuMemoryManager, fsgrids::efieldElement, d_e);
+            fsgrids::efieldElement *d_edt2 = GET_POINTER(gpuMemoryManager, fsgrids::efieldElement, d_edt2);
+            fsgrids::bgbElement *d_bgb = GET_POINTER(gpuMemoryManager, fsgrids::bgbElement, d_bgb);
+            SysBoundaryDevice *dev_sysBoundaries = GET_POINTER(gpuMemoryManager, SysBoundaryDevice, dev_sysBoundaries);
+            fsgrids::technical *d_technical = GET_POINTER(gpuMemoryManager, fsgrids::technical, d_technical);
+            cudaMemcpy(d_perb, perb.data(),  perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyHostToDevice);
+            cudaMemcpy(d_perbdt2, perbdt2.data(),  perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyHostToDevice);
+            cudaMemcpy(d_e, e.data(),  e.size() * sizeof(fsgrids::efieldElement), cudaMemcpyHostToDevice);
+            cudaMemcpy(d_edt2, edt2.data(),  edt2.size() * sizeof(fsgrids::efieldElement), cudaMemcpyHostToDevice);
+            cudaMemcpy(d_bgb, bgb.data(),  bgb.size() * sizeof(fsgrids::bgbElement), cudaMemcpyHostToDevice);
+            cudaMemcpy(dev_sysBoundaries, &host_sysBoundaries,  sizeof(SysBoundaryDevice), cudaMemcpyHostToDevice);
+            cudaMemcpy(d_technical, technical.data(), technical.size() * sizeof(fsgrids::technical), cudaMemcpyHostToDevice);
+            std::span<fsgrids::perbElement> dev_perb(d_perb, perb.size());
+            std::span<fsgrids::perbElement> dev_perbdt2(d_perbdt2, perbdt2.size());
+            std::span<fsgrids::efieldElement> dev_e(d_e, e.size());
+            std::span<fsgrids::efieldElement> dev_edt2(d_edt2, edt2.size());
+            std::span<fsgrids::bgbElement> dev_bgb(d_bgb, bgb.size());
+            std::span<fsgrids::technical> dev_technical(d_technical, technical.size());
+            propagateMagneticFieldSimple(dev_perb, dev_perbdt2, dev_bgb, dev_e, dev_edt2, dev_technical, fsgrid, dev_sysBoundaries, subcycleDt, RK_ORDER2_STEP2);
+            cudaMemcpy(perb.data(), d_perb, perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
+            cudaMemcpy(perbdt2.data(), d_perbdt2, perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
+         }
 
          // We need to calculate derivatives of the moments at every substep, but the moments only
          // need to be communicated in the first one.

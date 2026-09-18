@@ -56,7 +56,6 @@ bool precedenceSort(const SBC::SysBoundaryCondition* first, const SBC::SysBounda
 // ************************************************************
 
 SysBoundary::SysBoundary() : anyDynamic(false) {}
-SysBoundaryDevice::SysBoundaryDevice() {}
 
 /*!\brief Destructor for class SysBoundary.
  *
@@ -69,14 +68,6 @@ SysBoundary::~SysBoundary() {
       delete *it;
       *it = NULL;
    }
-}
-
-/*!\brief Destructor for class SysBoundary.
- *
- * Reduces the value of SysBoundary::nSysBoundaries by one,
- * and if after the destruction SysBoundary::nSysBoundaries equals zero all stored SysBoundaries are deleted.
- */
-SysBoundaryDevice::~SysBoundaryDevice() {
 }
 
 /*!\brief Add its own and all existing SysBoundaryConditions' parameters.
