@@ -382,6 +382,73 @@ namespace SBC {
                }
             }
          }
+
+         __device__ static inline void setCellDerivativesToZero(fsgrids::dperbspan dperb,
+                                                      fsgrids::dmomentsspan dmoments,
+                                                      const fsgrid::FsStencil& stencil, cuint component) {
+            auto& dPerBGrid0 = dperb[stencil.ooo()];
+            auto& dMomentsGrid0 = dmoments[stencil.ooo()];
+            switch(component) {
+               case 0: // x, xx
+                  dMomentsGrid0[fsgrids::dmoments::drhomdx] = 0.0;
+                  dMomentsGrid0[fsgrids::dmoments::drhoqdx] = 0.0;
+                  dMomentsGrid0[fsgrids::dmoments::dp11dx] = 0.0;
+                  dMomentsGrid0[fsgrids::dmoments::dp22dx] = 0.0;
+                  dMomentsGrid0[fsgrids::dmoments::dp33dx] = 0.0;
+                  dMomentsGrid0[fsgrids::dmoments::dVxdx] = 0.0;
+                  dMomentsGrid0[fsgrids::dmoments::dVydx] = 0.0;
+                  dMomentsGrid0[fsgrids::dmoments::dVzdx] = 0.0;
+
+                  dPerBGrid0[fsgrids::dperb::dPERBydx] = 0.0;
+                  dPerBGrid0[fsgrids::dperb::dPERBzdx] = 0.0;
+                  dPerBGrid0[fsgrids::dperb::dPERBydxx] = 0.0;
+                  dPerBGrid0[fsgrids::dperb::dPERBzdxx] = 0.0;
+                  break;
+               case 1: // y, yy
+                  dMomentsGrid0[fsgrids::dmoments::drhomdy] = 0.0;
+                  dMomentsGrid0[fsgrids::dmoments::drhoqdy] = 0.0;
+                  dMomentsGrid0[fsgrids::dmoments::dp11dy] = 0.0;
+                  dMomentsGrid0[fsgrids::dmoments::dp22dy] = 0.0;
+                  dMomentsGrid0[fsgrids::dmoments::dp33dy] = 0.0;
+                  dMomentsGrid0[fsgrids::dmoments::dVxdy] = 0.0;
+                  dMomentsGrid0[fsgrids::dmoments::dVydy] = 0.0;
+                  dMomentsGrid0[fsgrids::dmoments::dVzdy] = 0.0;
+
+                  dPerBGrid0[fsgrids::dperb::dPERBxdy] = 0.0;
+                  dPerBGrid0[fsgrids::dperb::dPERBzdy] = 0.0;
+                  dPerBGrid0[fsgrids::dperb::dPERBxdyy] = 0.0;
+                  dPerBGrid0[fsgrids::dperb::dPERBzdyy] = 0.0;
+                  break;
+               case 2: // z, zz
+                  dMomentsGrid0[fsgrids::dmoments::drhomdz] = 0.0;
+                  dMomentsGrid0[fsgrids::dmoments::drhoqdz] = 0.0;
+                  dMomentsGrid0[fsgrids::dmoments::dp11dz] = 0.0;
+                  dMomentsGrid0[fsgrids::dmoments::dp22dz] = 0.0;
+                  dMomentsGrid0[fsgrids::dmoments::dp33dz] = 0.0;
+                  dMomentsGrid0[fsgrids::dmoments::dVxdz] = 0.0;
+                  dMomentsGrid0[fsgrids::dmoments::dVydz] = 0.0;
+                  dMomentsGrid0[fsgrids::dmoments::dVzdz] = 0.0;
+
+                  dPerBGrid0[fsgrids::dperb::dPERBxdz] = 0.0;
+                  dPerBGrid0[fsgrids::dperb::dPERBydz] = 0.0;
+                  dPerBGrid0[fsgrids::dperb::dPERBxdzz] = 0.0;
+                  dPerBGrid0[fsgrids::dperb::dPERBydzz] = 0.0;
+                  break;
+               case 3: // xy
+                  dPerBGrid0[fsgrids::dperb::dPERBzdxy] = 0.0;
+                  break;
+               case 4: // xz
+                  dPerBGrid0[fsgrids::dperb::dPERBydxz] = 0.0;
+                  break;
+               case 5: // yz
+                  dPerBGrid0[fsgrids::dperb::dPERBxdyz] = 0.0;
+                  break;
+               default:
+                  assert(false);
+                  //cerr << __FILE__ << ":" << __LINE__ << ":" << " Invalid component" << endl;
+                  //abort_mpi("Invalid component", 1);
+            }
+         }
       protected:
          /*! Array of bool telling whether the system is periodic in any direction. */
          std::array<bool, 3> periodic;

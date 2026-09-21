@@ -26,6 +26,7 @@
 #include "derivatives.hpp"
 #include "fs_limiters.h"
 #include <Eigen/Geometry>
+#include "../parameters.h"
 
 template <typename T, size_t N> struct DerivativesData {
    const std::array<T, N>& ooo = {};
@@ -121,6 +122,90 @@ void computeMomentsDerivatives(fsgrids::constmomentsspan moments,
    }
 }
 
+__device__ void computeMomentsDerivativesDevice(fsgrids::constmomentsspan moments,
+                               fsgrids::dmomentsspan dmoments,
+                               const fsgrid::FsStencil& stencil, const bool atSysBoundary) {
+   using dmo = fsgrids::dmoments;
+   using mom = fsgrids::moments;
+
+   std::array<Real, dmo::N_DMOMENTS>& dMoments = dmoments[stencil.ooo()];
+
+   auto computeDiff = [](const auto& i, const auto& right, const auto& left) { return 0.5 * (right[i] - left[i]); };
+
+   auto computeLimiter = [](const auto& i, const auto& right, const auto& left, const auto& center) {
+      return deviceLimiter(left[i], center[i], right[i]);
+   };
+
+   // Constants for electron pressure derivatives, see also ldz_gradpe.cpp
+   // Calculate anchor point constants: First the pressure, then a derived constant.
+   const Real Pe_anchor = dev_electronTemperature * dev_electronDensity * physicalconstants::K_B;
+   const Real Pe_const = Pe_anchor * pow(dev_electronDensity, -dev_electronPTindex);
+   auto computeGradPeLimiter = [=](const auto& right, const auto& left, const auto& center) {
+      // pres_e = const * np.power(rho_e, index)
+      return Pe_const * deviceLimiter(pow(left[mom::RHOQ]   / physicalconstants::CHARGE, dev_electronPTindex),
+                                pow(center[mom::RHOQ] / physicalconstants::CHARGE, dev_electronPTindex),
+                                pow(right[mom::RHOQ]  / physicalconstants::CHARGE, dev_electronPTindex));
+   };
+
+   auto computeGradPeDiff = [=](const auto& right, const auto& left) {
+      return Pe_const * 0.5 * (pow(right[mom::RHOQ] / physicalconstants::CHARGE, dev_electronPTindex) - pow(left[mom::RHOQ] / physicalconstants::CHARGE, dev_electronPTindex));
+   };
+
+   const DerivativesData momData{
+       moments[stencil.ooo()],
+       moments[stencil.poo()], moments[stencil.moo()],
+       moments[stencil.opo()], moments[stencil.omo()],
+       moments[stencil.oop()], moments[stencil.oom()],
+   };
+
+   {
+#ifdef DEBUG_SOLVERS
+      const auto& cv = momData.ooo[mom::RHOM];
+      if (cv <= 0) {
+         std::cerr << __FILE__ << ":" << __LINE__ << (cv < 0 ? " Negative" : " Zero") << " density in fsgrid cell " << stencil.indexFromOffset( 0,0,0) << std::endl;
+         abort();
+      }
+
+      const auto& lv = momData.moo[mom::RHOM];
+      if (lv <= 0) {
+         std::cerr << __FILE__ << ":" << __LINE__ << (lv < 0 ? " Negative" : " Zero") << " density in fsgrid cell " << stencil.indexFromOffset(-1,0,0) << std::endl;
+         abort();
+      }
+
+      const auto& rv = momData.poo[mom::RHOM];
+      if (rv <= 0) {
+         std::cerr << __FILE__ << ":" << __LINE__ << (rv < 0 ? " Negative" : " Zero") << " density in fsgrid cell " << stencil.indexFromOffset( 1,0,0) << std::endl;
+         abort();
+      }
+#endif
+   }
+
+   static constexpr std::array moms{mom::RHOM, mom::RHOQ, mom::P_11, mom::P_22, mom::P_33, mom::VX, mom::VY, mom::VZ};
+   static constexpr std::array dmix{dmo::drhomdx, dmo::drhoqdx, dmo::dp11dx, dmo::dp22dx, dmo::dp33dx, dmo::dVxdx, dmo::dVydx, dmo::dVzdx};
+   static constexpr std::array dmiy{dmo::drhomdy, dmo::drhoqdy, dmo::dp11dy, dmo::dp22dy, dmo::dp33dy, dmo::dVxdy, dmo::dVydy, dmo::dVzdy};
+   static constexpr std::array dmiz{dmo::drhomdz, dmo::drhoqdz, dmo::dp11dz, dmo::dp22dz, dmo::dp33dz, dmo::dVxdz, dmo::dVydz, dmo::dVzdz};
+
+   if (dev_fieldSolverFiniteDifferencingAtBoundaries && atSysBoundary) {
+      for (size_t i = 0; i < moms.size(); i++) {
+         dMoments[dmix[i]] = computeDiff(moms[i], momData.poo, momData.moo);
+         dMoments[dmiy[i]] = computeDiff(moms[i], momData.opo, momData.omo);
+         dMoments[dmiz[i]] = computeDiff(moms[i], momData.oop, momData.oom);
+      }
+      dMoments[dmo::dPedx] = computeGradPeDiff(momData.poo, momData.moo);
+      dMoments[dmo::dPedy] = computeGradPeDiff(momData.opo, momData.omo);
+      dMoments[dmo::dPedz] = computeGradPeDiff(momData.oop, momData.oom);
+   } else {
+      for (size_t i = 0; i < moms.size(); i++) {
+         dMoments[dmix[i]] = computeLimiter(moms[i], momData.poo, momData.moo, momData.ooo);
+         dMoments[dmiy[i]] = computeLimiter(moms[i], momData.opo, momData.omo, momData.ooo);
+         dMoments[dmiz[i]] = computeLimiter(moms[i], momData.oop, momData.oom, momData.ooo);
+      }
+      dMoments[dmo::dPedx] = computeGradPeLimiter(momData.poo, momData.moo, momData.ooo);
+      dMoments[dmo::dPedy] = computeGradPeLimiter(momData.opo, momData.omo, momData.ooo);
+      dMoments[dmo::dPedz] = computeGradPeLimiter(momData.oop, momData.oom, momData.ooo);
+   }
+}
+
 void computePerbDerivatives(fsgrids::perbspan perb,
                             fsgrids::dperbspan dperb, const fsgrid::FsStencil& stencil,
                             bool dontCompute2ndDerivatives, bool atSysBoundary, cuint sysBoundaryFlag) {
@@ -139,6 +224,76 @@ void computePerbDerivatives(fsgrids::perbspan perb,
    };
 
    if (P::fieldSolverFiniteDifferencingAtBoundaries && atSysBoundary) {
+      dPerB[dpb::dPERBydx] = computeDiff(bfi::PERBY, perbData.poo, perbData.moo);
+      dPerB[dpb::dPERBzdx] = computeDiff(bfi::PERBZ, perbData.poo, perbData.moo);
+      dPerB[dpb::dPERBxdy] = computeDiff(bfi::PERBX, perbData.opo, perbData.omo);
+      dPerB[dpb::dPERBzdy] = computeDiff(bfi::PERBZ, perbData.opo, perbData.omo);
+      dPerB[dpb::dPERBxdz] = computeDiff(bfi::PERBX, perbData.oop, perbData.oom);
+      dPerB[dpb::dPERBydz] = computeDiff(bfi::PERBY, perbData.oop, perbData.oom);
+   } else {
+      dPerB[dpb::dPERBydx] = computeLimiter(bfi::PERBY, perbData.poo, perbData.moo, perbData.ooo);
+      dPerB[dpb::dPERBzdx] = computeLimiter(bfi::PERBZ, perbData.poo, perbData.moo, perbData.ooo);
+      dPerB[dpb::dPERBxdy] = computeLimiter(bfi::PERBX, perbData.opo, perbData.omo, perbData.ooo);
+      dPerB[dpb::dPERBzdy] = computeLimiter(bfi::PERBZ, perbData.opo, perbData.omo, perbData.ooo);
+      dPerB[dpb::dPERBxdz] = computeLimiter(bfi::PERBX, perbData.oop, perbData.oom, perbData.ooo);
+      dPerB[dpb::dPERBydz] = computeLimiter(bfi::PERBY, perbData.oop, perbData.oom, perbData.ooo);
+   }
+
+   if (dontCompute2ndDerivatives) {
+      dPerB[dpb::dPERBydxx] = 0.0;
+      dPerB[dpb::dPERBzdxx] = 0.0;
+      dPerB[dpb::dPERBxdyy] = 0.0;
+      dPerB[dpb::dPERBzdyy] = 0.0;
+      dPerB[dpb::dPERBxdzz] = 0.0;
+      dPerB[dpb::dPERBydzz] = 0.0;
+      dPerB[dpb::dPERBxdyz] = 0.0;
+      dPerB[dpb::dPERBydxz] = 0.0;
+      dPerB[dpb::dPERBzdxy] = 0.0;
+   } else {
+      auto compute2ndDerivative = [](auto i, const auto& right, const auto& left, const auto& center) {
+         return left[i] + right[i] - 2.0 * center[i];
+      };
+      dPerB[dpb::dPERBydxx] = compute2ndDerivative(bfi::PERBY, perbData.poo, perbData.moo, perbData.ooo);
+      dPerB[dpb::dPERBzdxx] = compute2ndDerivative(bfi::PERBZ, perbData.poo, perbData.moo, perbData.ooo);
+      dPerB[dpb::dPERBxdyy] = compute2ndDerivative(bfi::PERBX, perbData.opo, perbData.omo, perbData.ooo);
+      dPerB[dpb::dPERBzdyy] = compute2ndDerivative(bfi::PERBZ, perbData.opo, perbData.omo, perbData.ooo);
+      dPerB[dpb::dPERBxdzz] = compute2ndDerivative(bfi::PERBX, perbData.oop, perbData.oom, perbData.ooo);
+      dPerB[dpb::dPERBydzz] = compute2ndDerivative(bfi::PERBY, perbData.oop, perbData.oom, perbData.ooo);
+
+      if (sysBoundaryFlag == sysboundarytype::NOT_SYSBOUNDARY) {
+         auto crossDerivative = [&perb](auto bl, auto br, auto tl, auto tr, auto i) {
+            const auto& botLeft = perb[bl];
+            const auto& botRght = perb[br];
+            const auto& topLeft = perb[tl];
+            const auto& topRght = perb[tr];
+            return FOURTH * (botLeft[i] + topRght[i] - botRght[i] - topLeft[i]);
+         };
+
+         dPerB[dpb::dPERBxdyz] = crossDerivative(stencil.omm(), stencil.opm(), stencil.omp(), stencil.opp(), bfi::PERBX);
+         dPerB[dpb::dPERBydxz] = crossDerivative(stencil.mom(), stencil.pom(), stencil.mop(), stencil.pop(), bfi::PERBY);
+         dPerB[dpb::dPERBzdxy] = crossDerivative(stencil.mmo(), stencil.pmo(), stencil.mpo(), stencil.ppo(), bfi::PERBZ);
+      }
+   }
+}
+
+__device__ void computePerbDerivativesDevice(fsgrids::perbspan perb,
+                            fsgrids::dperbspan dperb, const fsgrid::FsStencil& stencil,
+                            bool dontCompute2ndDerivatives, bool atSysBoundary, cuint sysBoundaryFlag) {
+   using dpb = fsgrids::dperb;
+   using bfi = fsgrids::bfield;
+   std::array<Real, dpb::N_DPERB>& dPerB = dperb[stencil.ooo()];
+
+   auto computeDiff = [](const auto& i, const auto& right, const auto& left) { return 0.5 * (right[i] - left[i]); };
+
+   auto computeLimiter = [](const auto& i, const auto& right, const auto& left, const auto& center) {
+      return deviceLimiter(left[i], center[i], right[i]);
+   };
+   const DerivativesData perbData{
+       perb[stencil.ooo()], perb[stencil.poo()], perb[stencil.moo()], perb[stencil.opo()],
+       perb[stencil.omo()],   perb[stencil.oop()],  perb[stencil.oom()],
+   };
+
+   if (dev_fieldSolverFiniteDifferencingAtBoundaries && atSysBoundary) {
       dPerB[dpb::dPERBydx] = computeDiff(bfi::PERBY, perbData.poo, perbData.moo);
       dPerB[dpb::dPERBzdx] = computeDiff(bfi::PERBZ, perbData.poo, perbData.moo);
       dPerB[dpb::dPERBxdy] = computeDiff(bfi::PERBX, perbData.opo, perbData.omo);
@@ -233,6 +388,48 @@ void calculateDerivatives(fsgrids::perbspan perb,
    }
 }
 
+/*! \brief Low-level spatial derivatives calculation.
+ *
+ * Calculate the spatial derivatives or apply the derivative boundary conditions.
+ *
+ * \param perb fsGrid holding the perturbed B quantities
+ * \param moments fsGrid holding the moment quantities
+ * \param dperb fsGrid holding the derivatives of perturbed B
+ * \param dmoments fsGrid holding the derviatives of moments
+ * \param stencil fsgrid stencil for the cell
+ * \param sysBoundaryFlag system boundary flag for the cell
+ * \param sysBoundaryLayer system boundary layer for the cell
+ * \param doMoments Bool telling whether the derivatives for moments need updating too.
+ *
+ * \sa calculateDerivativesSimple calculateBVOLDerivativesSimple calculateBVOLDerivatives
+ */
+__device__ void calculateDerivativesDevice(fsgrids::perbspan perb,
+                          fsgrids::constmomentsspan moments,
+                          fsgrids::dperbspan dperb,
+                          fsgrids::dmomentsspan dmoments,
+                          const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer,
+                          const bool doMoments) {
+   /*
+    * For sysBoundaryLayer 1 or 2, we are near a boundary, and we wish to use regular centered differences instead of
+    * slope limiter-adjusted values. This is to minimize oscillations as a smooth behaviour is required near artificial
+    * boundaries, unlike at boundaries and shocks inside the simulation domain.
+    */
+   const bool atSysBoundary = sysBoundaryLayer == 1 || (sysBoundaryLayer == 2 && sysBoundaryFlag == sysboundarytype::NOT_SYSBOUNDARY);
+   const bool dontCompute2ndDerivatives = dev_ohmHallTerm < 2 || sysBoundaryLayer == 1;
+
+   if (doMoments) {
+      computeMomentsDerivativesDevice(moments, dmoments, stencil, atSysBoundary);
+   }
+
+   computePerbDerivativesDevice(perb, dperb, stencil, dontCompute2ndDerivatives, atSysBoundary, sysBoundaryFlag);
+
+   if (sysBoundaryFlag != sysboundarytype::NOT_SYSBOUNDARY) {
+      SBC::SysBoundaryConditionDevice::setCellDerivativesToZero(dperb, dmoments, stencil, 3);
+      SBC::SysBoundaryConditionDevice::setCellDerivativesToZero(dperb, dmoments, stencil, 4);
+      SBC::SysBoundaryConditionDevice::setCellDerivativesToZero(dperb, dmoments, stencil, 5);
+   }
+}
+
 /*! \brief High-level derivative calculation wrapper function.
  *
 
@@ -273,6 +470,62 @@ void calculateDerivativesSimple(fsgrids::perbspan perb,
                        [=](const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
                           calculateDerivatives(perb, moments, dperb, dmoments, stencil, sysBoundaryFlag, sysBoundaryLayer, doMoments);
                        });
+
+   derivativesTimer.stop(numCells, "Spatial Cells");
+}
+
+/*! \brief High-level derivative calculation wrapper function.
+ *
+
+ * B has to be updated because after the system boundary update in propagateMagneticFieldSimple there is no consistent
+ state of B yet everywhere.
+ *
+ * Then the derivatives are calculated.
+ *
+ * \param perb fsGrid holding the perturbed B quantities
+ * \param moments fsGrid holding the moment quantities
+ * \param dperb fsGrid holding the derivatives of perturbed B
+ * \param dmoments fsGrid holding the derviatives of moments
+ * \param technical fsGrid holding technical information (such as boundary types)
+ * \param fsgrid fsgrid container
+ * \param doMoments If true, the derivatives of moments (rho, V, P) are communicated to neighbours and their derivatives updated.
+
+ * \sa calculateDerivatives calculateBVOLDerivativesSimple calculateBVOLDerivatives
+ */
+void calculateDerivativesSimpleDevice(fsgrids::perbspan perb,
+                                fsgrids::momentsspan moments,
+                                fsgrids::dperbspan dperb,
+                                fsgrids::dmomentsspan dmoments,
+                                fsgrids::technicalspan technical, FieldSolverGrid &fsgrid,
+                                const bool doMoments) {
+   phiprof::Timer derivativesTimer{"Calculate face derivatives"};
+   const size_t numCells = fsgrid.getNumCells();
+
+   phiprof::Timer mpiTimer{"FS derivatives ghost updates MPI", {"MPI"}};
+   cudaDeviceSynchronize();
+
+   {
+      std::vector<fsgrids::perbElement> hostStagingBuffer(perb.size());
+      cudaMemcpy(hostStagingBuffer.data(), perb.data(), perb.size_bytes(), cudaMemcpyDeviceToHost);
+      fsgrid.updateGhostCells(std::span(hostStagingBuffer));
+      cudaMemcpy(perb.data(), hostStagingBuffer.data(), perb.size_bytes(), cudaMemcpyHostToDevice);
+   }
+   if (doMoments) {
+      std::vector<fsgrids::momentsElement> hostStagingBuffer(moments.size());
+      cudaMemcpy(hostStagingBuffer.data(), moments.data(), moments.size_bytes(), cudaMemcpyDeviceToHost);
+      fsgrid.updateGhostCells(std::span(hostStagingBuffer));
+      cudaMemcpy(moments.data(), hostStagingBuffer.data(), moments.size_bytes(), cudaMemcpyHostToDevice);
+   }
+   mpiTimer.stop();
+   cudaDeviceSynchronize();
+
+   // Calculate derivatives
+   fsgrid.parallel_for_GPU([](int timerId) -> phiprof::Timer { return phiprof::Timer{timerId}; },
+                       phiprof::initializeTimer("FS derivatives compute cells"), technical,
+                       [=] __device__(const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
+                          calculateDerivativesDevice(perb, moments, dperb, dmoments, stencil, sysBoundaryFlag, sysBoundaryLayer, doMoments);
+                       });
+   cudaDeviceSynchronize();
 
    derivativesTimer.stop(numCells, "Spatial Cells");
 }

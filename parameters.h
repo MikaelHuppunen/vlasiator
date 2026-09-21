@@ -317,6 +317,15 @@ __device__ Real dev_dz_ini;  /*!< Initial size of spatial cell in z-direction. *
 __device__ uint dev_xcells_ini; /*!< Initial number of spatial cells in x-direction. */
 __device__ uint dev_ycells_ini; /*!< Initial number of spatial cells in y-direction. */
 __device__ uint dev_zcells_ini; /*!< Initial number of spatial cells in z-direction. */
+__device__ uint dev_ohmHallTerm; /*!< Enable/choose spatial order of Hall term in Ohm's law JXB term. 0: off, 1: 1st spatial
+                              order, 2: 2nd spatial order. */
+__device__ Real dev_electronTemperature; /*!< Upstream electron temperature to be used for the electron pressure gradient
+                                    term (K). */
+__device__ Real
+      dev_electronDensity; /*!< Upstream electron density to be used for the electron pressure gradient term (m^-3). */
+__device__ Real dev_electronPTindex; /*!> Polytropic index for electron pressure gradient term. 0 is isobaric, 1 is
+                                 isothermal, 1.667 is adiabatic electrons */
+__device__ bool dev_fieldSolverFiniteDifferencingAtBoundaries; /*!< Enable finite differencing at sysboundaries*/
 
 inline void uploadParametersToDevice() {
    cudaMemcpyToSymbol(dev_xmin, &Parameters::xmin, sizeof(Real));
@@ -331,6 +340,11 @@ inline void uploadParametersToDevice() {
    cudaMemcpyToSymbol(dev_xcells_ini, &Parameters::xcells_ini, sizeof(uint));
    cudaMemcpyToSymbol(dev_ycells_ini, &Parameters::ycells_ini, sizeof(uint));
    cudaMemcpyToSymbol(dev_zcells_ini, &Parameters::zcells_ini, sizeof(uint));
+   cudaMemcpyToSymbol(dev_ohmHallTerm, &Parameters::ohmHallTerm, sizeof(uint));
+   cudaMemcpyToSymbol(dev_electronTemperature, &Parameters::electronTemperature, sizeof(Real));
+   cudaMemcpyToSymbol(dev_electronDensity, &Parameters::electronDensity, sizeof(Real));
+   cudaMemcpyToSymbol(dev_electronPTindex, &Parameters::electronPTindex, sizeof(Real));
+   cudaMemcpyToSymbol(dev_fieldSolverFiniteDifferencingAtBoundaries, &Parameters::fieldSolverFiniteDifferencingAtBoundaries, sizeof(bool));
 }
 
 #endif

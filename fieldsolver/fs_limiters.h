@@ -82,8 +82,22 @@ template<typename T> inline T vanLeer(const T& left,const T& cent,const T& right
    return fabs(denumerator) < EPSILON ? ZERO : TWO * numerator / denumerator;
 }
 
+template<typename T> __device__ inline T vanLeerDevice(const T& left,const T& cent,const T& right) {
+   static constexpr T EPSILON = std::numeric_limits<T>::min();
+   static constexpr T ZERO = 0.0;
+   static constexpr T TWO = 2.0;
+
+   const T numerator = std::max((right - cent) * (cent - left), ZERO);
+   const T denumerator = right - left;
+   return fabs(denumerator) < EPSILON ? ZERO : TWO * numerator / denumerator;
+}
+
 template<typename T> inline T limiter(const T& left,const T& cent,const T& rght) {
    return vanLeer(left, cent, rght);
+}
+
+template<typename T> __device__ inline T deviceLimiter(const T& left,const T& cent,const T& rght) {
+   return vanLeerDevice(left, cent, rght);
 }
 
 /*! Select the limiter to be used in the field solver. */

@@ -658,15 +658,38 @@ int simulate(int argn,char* args[]) {
    SBC::ionosphereGrid.updateIonosphereCommunicator(mpiGrid, technical.view(), fsgrid);
    // If not a restart, perBGrid and dPerBGrid are up to date after propagateFields just above. Otherwise, we should compute them.
    if(P::isRestart) {
-      calculateDerivativesSimple(
-         perb.view(),
-         moments.view(),
-         dperb.view(),
-         dmoments.view(),
-         technical.view(),
+      uploadParametersToDevice();
+      ALLOCATE_GPU(gpuMemoryManager, d_perb, perb.size() * sizeof(fsgrids::perbElement));
+      ALLOCATE_GPU(gpuMemoryManager, d_dmoments, dmoments.size() * sizeof(fsgrids::dmomentsElement));
+      ALLOCATE_GPU(gpuMemoryManager, d_technical, technical.size() * sizeof(fsgrids::technical));
+      ALLOCATE_GPU(gpuMemoryManager, d_dperb, dperb.size() * sizeof(fsgrids::dperbElement));
+      ALLOCATE_GPU(gpuMemoryManager, d_moments, moments.size() * sizeof(fsgrids::momentsElement));
+      fsgrids::perbElement *d_perb = GET_POINTER(gpuMemoryManager, fsgrids::perbElement, d_perb);
+      fsgrids::technical *d_technical = GET_POINTER(gpuMemoryManager, fsgrids::technical, d_technical);
+      fsgrids::dmomentsElement *d_dmoments = GET_POINTER(gpuMemoryManager, fsgrids::dmomentsElement, d_dmoments);
+      fsgrids::dperbElement *d_dperb = GET_POINTER(gpuMemoryManager, fsgrids::dperbElement, d_dperb);
+      fsgrids::momentsElement *d_moments = GET_POINTER(gpuMemoryManager, fsgrids::momentsElement, d_moments);
+      cudaMemcpy(d_perb, perb.data(),  perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyHostToDevice);
+      cudaMemcpy(d_technical, technical.data(), technical.size() * sizeof(fsgrids::technical), cudaMemcpyHostToDevice);
+      cudaMemcpy(d_dmoments, dmoments.data(),  dmoments.size() * sizeof(fsgrids::dmomentsElement), cudaMemcpyHostToDevice);
+      cudaMemcpy(d_dperb, dperb.data(),  dperb.size() * sizeof(fsgrids::dperbElement), cudaMemcpyHostToDevice);
+      cudaMemcpy(d_moments, moments.data(),  moments.size() * sizeof(fsgrids::momentsElement), cudaMemcpyHostToDevice);
+      std::span<fsgrids::perbElement> dev_perb(d_perb, perb.size());
+      std::span<fsgrids::technical> dev_technical(d_technical, technical.size());
+      std::span<fsgrids::dmomentsElement> dev_dmoments(d_dmoments, dmoments.size());
+      std::span<fsgrids::dperbElement> dev_dperb(d_dperb, dperb.size());
+      std::span<fsgrids::momentsElement> dev_moments(d_moments, moments.size());
+      calculateDerivativesSimpleDevice(
+         dev_perb,
+         dev_moments,
+         dev_dperb,
+         dev_dmoments,
+         dev_technical,
          fsgrid,
          false // Don't communicate moments, they are not needed here.
       );
+      cudaMemcpy(dperb.data(), d_dperb, dperb.size() * sizeof(fsgrids::dperbElement), cudaMemcpyDeviceToHost);
+      cudaMemcpy(dmoments.data(), d_dmoments, dmoments.size() * sizeof(fsgrids::dmomentsElement), cudaMemcpyDeviceToHost);
       fsgrid.updateGhostCells(dperb.view());
    }
    FieldTracing::calculateIonosphereFsgridCoupling(technical.view(), fsgrid, perb.view(), dperb.view(), SBC::ionosphereGrid.nodes, SBC::Ionosphere::radius);

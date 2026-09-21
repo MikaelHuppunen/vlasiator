@@ -442,13 +442,16 @@ namespace fsgrids {
    typedef std::span<std::array<Real, fsgrids::egradpe::N_EGRADPE>> egradpespan;
    typedef std::span<const std::array<Real, fsgrids::egradpe::N_EGRADPE>> constegradpespan;
    typedef std::span<std::array<Real, fsgrids::dperb::N_DPERB>> dperbspan;
+   typedef std::array<Real, fsgrids::dperb::N_DPERB> dperbElement;
    typedef std::span<const std::array<Real, fsgrids::dperb::N_DPERB>> constdperbspan;
    typedef std::span<std::array<Real, bgbfield::N_BGB>> bgbspan;
    typedef std::array<Real, bgbfield::N_BGB> bgbElement;
    typedef std::span<const std::array<Real, bgbfield::N_BGB>> constbgbspan;
    typedef std::span<std::array<Real, fsgrids::moments::N_MOMENTS>> momentsspan;
+   typedef std::array<Real, fsgrids::moments::N_MOMENTS> momentsElement;
    typedef std::span<const std::array<Real, fsgrids::moments::N_MOMENTS>> constmomentsspan;
    typedef std::span<std::array<Real, fsgrids::dmoments::N_DMOMENTS>> dmomentsspan;
+   typedef std::array<Real, fsgrids::dmoments::N_DMOMENTS> dmomentsElement;
    typedef std::span<const std::array<Real, fsgrids::dmoments::N_DMOMENTS>> constdmomentsspan;
    typedef std::span<std::array<Real, fsgrids::volfields::N_VOL>> volspan;
    typedef std::span<const std::array<Real, fsgrids::volfields::N_VOL>> constvolspan;
