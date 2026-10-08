@@ -2182,6 +2182,29 @@ void calculateElectricField(fsgrids::perbspan perb,
    }
 }
 
+__device__ inline void fieldSolverBoundaryCondElectricFieldDevice(cuint cellSysBoundaryFlag, SysBoundaryDevice *sysBoundaries, fsgrids::efieldspan e, const fsgrid::FsStencil& stencil, cuint component) {
+   switch (cellSysBoundaryFlag) {
+      case sysboundarytype::OUTFLOW: {
+         static_cast<SBC::OutflowDevice*>(sysBoundaries[0].getSysBoundary(cellSysBoundaryFlag))->SBC::OutflowDevice::fieldSolverBoundaryCondElectricField(e, stencil, component);
+         break;
+      }
+      case sysboundarytype::MAXWELLIAN: {
+         static_cast<SBC::MaxwellianDevice*>(sysBoundaries[0].getSysBoundary(cellSysBoundaryFlag))->SBC::MaxwellianDevice::fieldSolverBoundaryCondElectricField(e, stencil, component);
+         break;
+      }
+      case sysboundarytype::IONOSPHERE: {
+         break;
+      }
+      case sysboundarytype::DO_NOT_COMPUTE: {
+         static_cast<SBC::DoNotComputeDevice*>(sysBoundaries[0].getSysBoundary(cellSysBoundaryFlag))->SBC::DoNotComputeDevice::fieldSolverBoundaryCondElectricField(e, stencil, component);
+         break;
+      }
+      case sysboundarytype::COPYSPHERE: {
+         break;
+      }
+   }
+}
+
 /*! \brief Electric field propagation function.
  *
  * Calls the general or the system boundary electric field propagation functions.
@@ -2225,46 +2248,22 @@ __device__ void calculateElectricFieldDevice(fsgrids::perbspan perb,
       calculateEdgeElectricFieldXDevice(perb, dperb, e, ehall, egradpe, moments, dmoments, bgb, technical, stencil, RKCase,
                                   gridSpacing);
    } else {
-      switch (cellSysBoundaryFlag) {
-         case sysboundarytype::OUTFLOW: {
-            printf("OUTFLOW\n");
-            break;
-         }
-         case sysboundarytype::MAXWELLIAN: {
-            printf("MAXWELLIAN\n");
-            break;
-         }
-         case sysboundarytype::IONOSPHERE: {
-            printf("IONOSPHERE\n");
-            break;
-         }
-         case sysboundarytype::DO_NOT_COMPUTE: {
-            printf("DO_NOT_COMPUTE\n");
-            break;
-         }
-         case sysboundarytype::COPYSPHERE: {
-            printf("COPYSPHERE\n");
-            break;
-         }
-      }
-      sysBoundaries[0].getSysBoundary(cellSysBoundaryFlag)->fieldSolverBoundaryCondElectricField(e, stencil, 0);
+      fieldSolverBoundaryCondElectricFieldDevice(cellSysBoundaryFlag, sysBoundaries, e, stencil, 0);
    }
 
-   /*
    if ((bitfield & compute::EY) == compute::EY) {
       calculateEdgeElectricFieldYDevice(perb, dperb, e, ehall, egradpe, moments, dmoments, bgb, technical, stencil, RKCase,
                                   gridSpacing);
    } else {
-      sysBoundaries[0].getSysBoundary(cellSysBoundaryFlag)->fieldSolverBoundaryCondElectricField(e, stencil, 1);
+      fieldSolverBoundaryCondElectricFieldDevice(cellSysBoundaryFlag, sysBoundaries, e, stencil, 1);
    }
 
    if ((bitfield & compute::EZ) == compute::EZ) {
       calculateEdgeElectricFieldZDevice(perb, dperb, e, ehall, egradpe, moments, dmoments, bgb, technical, stencil, RKCase,
                                   gridSpacing);
    } else {
-      sysBoundaries[0].getSysBoundary(cellSysBoundaryFlag)->fieldSolverBoundaryCondElectricField(e, stencil, 2);
+      fieldSolverBoundaryCondElectricFieldDevice(cellSysBoundaryFlag, sysBoundaries, e, stencil, 2);
    }
-   */
 }
 
 /*! \brief High-level electric field computation function.

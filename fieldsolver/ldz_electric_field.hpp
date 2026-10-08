@@ -21,6 +21,9 @@
 #define LDZ_ELECTRIC_FIELD_HPP
 
 #include "fs_common.h"
+#include "../sysboundary/donotcompute.h"
+#include "../sysboundary/outflow.h"
+#include "../sysboundary/setmaxwellian.h"
 
 void calculateUpwindedElectricFieldSimple(fsgrids::perbspan perb,
                                           fsgrids::perbspan perbdt2,
