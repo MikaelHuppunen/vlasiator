@@ -81,6 +81,21 @@ bool propagateFields(fsgrids::perbspan perb,
 
 Real divideIfNonZero(creal rhoV, creal rho);
 
+/*! \brief Helper function
+ *
+ * Divides the first value by the second or returns zero if the denominator is zero.
+ *
+ * \param numerator Numerator
+ * \param denominator Denominator
+ */
+__device__ inline Real divideIfNonZeroDevice(creal numerator, creal denominator) {
+   if (denominator <= 0.0) {
+      return 0.0;
+   } else {
+      return numerator / denominator;
+   }
+}
+
 /*! Namespace encompassing the enum defining the list of reconstruction coefficients used in field component reconstructions.*/
 namespace Rec {
    /*! Enum defining the list of reconstruction coefficients used in field component reconstructions.*/

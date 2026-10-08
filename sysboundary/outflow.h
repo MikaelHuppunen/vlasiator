@@ -147,6 +147,10 @@ namespace SBC {
                                                         const fsgrid::FsStencil& stencil, cuint component) {
          return fieldBoundaryCopyFromSolvingNbrMagneticField(b, technical, stencil, component, 1 << component);
       }
+      __device__ inline void fieldSolverBoundaryCondElectricField(fsgrids::efieldspan e,
+                                           const fsgrid::FsStencil& stencil, cuint component) {
+         //e[stencil.ooo()][fsgrids::efield::EX + component] = 0.0;
+      }
    protected:
    }; // class Outflow
 } // namespace SBC

@@ -300,13 +300,15 @@ namespace SBC {
       public:
          SysBoundaryConditionDevice() = default;
          virtual ~SysBoundaryConditionDevice() = default;
-         virtual Real
-         __device__ fieldSolverBoundaryCondMagneticField(fsgrids::perbspan b,
+         virtual Real __device__ fieldSolverBoundaryCondMagneticField(fsgrids::perbspan b,
                                               fsgrids::constbgbspan bgb,
                                               fsgrids::consttechnicalspan technical,
                                               const std::array<Real, 3>& gridSpacing,
                                               const std::array<fsgrid::FsSize_t, 3>& globalCoordinates,
                                               const fsgrid::FsStencil& stencil, cuint component) = 0;
+         
+         virtual void __device__ fieldSolverBoundaryCondElectricField(fsgrids::efieldspan e,
+                                                     const fsgrid::FsStencil& stencil, cuint component) = 0;
 
          __device__ inline Real fieldBoundaryCopyFromSolvingNbrMagneticField(
             fsgrids::perbspan b, fsgrids::consttechnicalspan technical,

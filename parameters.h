@@ -326,6 +326,11 @@ __device__ Real
 __device__ Real dev_electronPTindex; /*!> Polytropic index for electron pressure gradient term. 0 is isobaric, 1 is
                                  isothermal, 1.667 is adiabatic electrons */
 __device__ bool dev_fieldSolverFiniteDifferencingAtBoundaries; /*!< Enable finite differencing at sysboundaries*/
+__device__ Real dev_maxWaveVelocity;         /*!< Maximum wave velocity allowed in LDZ. */
+__device__ Real dev_resistivity;             /*!< Resistivity in Ohm's law eta*J term. */
+__device__ uint dev_ohmGradPeTerm; /*!< Enable/choose spatial order of the electron pressure gradient term in Ohm's law. 0:
+                                 off, 1: 1st spatial order. */
+__device__ bool dev_fieldSolverDiffusiveEterms; /*!< Enable resistive terms in the computation of E*/
 
 inline void uploadParametersToDevice() {
    cudaMemcpyToSymbol(dev_xmin, &Parameters::xmin, sizeof(Real));
@@ -345,6 +350,10 @@ inline void uploadParametersToDevice() {
    cudaMemcpyToSymbol(dev_electronDensity, &Parameters::electronDensity, sizeof(Real));
    cudaMemcpyToSymbol(dev_electronPTindex, &Parameters::electronPTindex, sizeof(Real));
    cudaMemcpyToSymbol(dev_fieldSolverFiniteDifferencingAtBoundaries, &Parameters::fieldSolverFiniteDifferencingAtBoundaries, sizeof(bool));
+   cudaMemcpyToSymbol(dev_maxWaveVelocity, &Parameters::maxWaveVelocity, sizeof(Real));
+   cudaMemcpyToSymbol(dev_resistivity, &Parameters::resistivity, sizeof(Real));
+   cudaMemcpyToSymbol(dev_ohmGradPeTerm, &Parameters::ohmGradPeTerm, sizeof(uint));
+   cudaMemcpyToSymbol(dev_fieldSolverDiffusiveEterms, &Parameters::fieldSolverDiffusiveEterms, sizeof(bool));
 }
 
 #endif

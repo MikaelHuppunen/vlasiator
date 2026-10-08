@@ -183,6 +183,10 @@ public:
       result += bgb[stencil.ooo()][fsgrids::bgbfield::BGBXVDCORR + component];
       return result;
    }
+   __device__ inline void fieldSolverBoundaryCondElectricField(fsgrids::efieldspan e,
+                                                     const fsgrid::FsStencil& stencil, cuint component) {
+      //e[stencil.ooo()][fsgrids::efield::EX + component] = 0.0;
+   }
 protected:
    Real templateB[6][3];
 };

@@ -137,6 +137,7 @@ public:
    __device__ inline SBC::SysBoundaryConditionDevice* getSysBoundary(cuint sysBoundaryType) const {
       if (sysBoundaryType >= sysboundarytype::N_SYSBOUNDARY_CONDITIONS) {
          //abort_mpi("ERROR: Boundary " + to_string(sysBoundaryType) + " is invalid", 1);
+         assert(false);
          return nullptr;
       }
       return indexToSysBoundary[sysBoundaryType];

@@ -121,6 +121,9 @@ bool propagateFields(fsgrids::perbspan perb,
    CREATE_UNIQUE_POINTER(gpuMemoryManager, d_dperbdt2);
    CREATE_UNIQUE_POINTER(gpuMemoryManager, d_moments);
    CREATE_UNIQUE_POINTER(gpuMemoryManager, d_momentsdt2);
+   CREATE_UNIQUE_POINTER(gpuMemoryManager, d_ehall);
+   CREATE_UNIQUE_POINTER(gpuMemoryManager, d_egradpe);
+   CREATE_UNIQUE_POINTER(gpuMemoryManager, d_egradpedt2);
 
    if (subcycles == 0) {
       cerr << "Field solver subcycles cannot be 0." << endl;
@@ -129,69 +132,79 @@ bool propagateFields(fsgrids::perbspan perb,
 
    const auto* localSize = &fsgrid.getLocalSize()[0];
 
-   {
-      ALLOCATE_GPU(gpuMemoryManager, d_technical, technical.size() * sizeof(fsgrids::technical));
-      fsgrids::technical *d_technical = GET_POINTER(gpuMemoryManager, fsgrids::technical, d_technical);
-      cudaMemcpy(d_technical, technical.data(), technical.size() * sizeof(fsgrids::technical), cudaMemcpyHostToDevice);
-      std::span<fsgrids::technical> dev_technical(d_technical, technical.size());
+   ALLOCATE_GPU(gpuMemoryManager, d_technical, technical.size() * sizeof(fsgrids::technical));
+   fsgrids::technical *d_technical = GET_POINTER(gpuMemoryManager, fsgrids::technical, d_technical);
+   cudaMemcpy(d_technical, technical.data(), technical.size() * sizeof(fsgrids::technical), cudaMemcpyHostToDevice);
+   std::span<fsgrids::technical> dev_technical(d_technical, technical.size());
 
-      fsgrid.parallel_for_GPU([](int timerId) -> phiprof::Timer { return phiprof::Timer{timerId}; },
-                        phiprof::initializeTimer("Initialize technical.maxFsDt"), dev_technical,
-                        [=] __device__(const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
-                           dev_technical[stencil.ooo()].maxFsDt = std::numeric_limits<Real>::max();
-                        });
-      cudaMemcpy(technical.data(), d_technical, technical.size() * sizeof(fsgrids::technical), cudaMemcpyDeviceToHost);
-   }
+   fsgrid.parallel_for_GPU([](int timerId) -> phiprof::Timer { return phiprof::Timer{timerId}; },
+                     phiprof::initializeTimer("Initialize technical.maxFsDt"), dev_technical,
+                     [=] __device__(const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
+                        dev_technical[stencil.ooo()].maxFsDt = std::numeric_limits<Real>::max();
+                     });
 
    if (subcycles == 1) {
+      SysBoundaryDevice host_sysBoundaries;
+      uploadParametersToDevice();
+      uploadIndexToSysBoundary(sysBoundaries,  host_sysBoundaries);
+      ALLOCATE_GPU(gpuMemoryManager, d_perb, perb.size() * sizeof(fsgrids::perbElement));
+      ALLOCATE_GPU(gpuMemoryManager, d_perbdt2, perbdt2.size() * sizeof(fsgrids::perbElement));
+      ALLOCATE_GPU(gpuMemoryManager, d_e, e.size() * sizeof(fsgrids::efieldElement));
+      ALLOCATE_GPU(gpuMemoryManager, d_edt2, edt2.size() * sizeof(fsgrids::efieldElement));
+      ALLOCATE_GPU(gpuMemoryManager, d_bgb, bgb.size() * sizeof(fsgrids::bgbElement));
+      ALLOCATE_GPU(gpuMemoryManager, dev_sysBoundaries, sizeof(SysBoundaryDevice));
+      ALLOCATE_GPU(gpuMemoryManager, d_dmoments, dmoments.size() * sizeof(fsgrids::dmomentsElement));
+      ALLOCATE_GPU(gpuMemoryManager, d_dperb, dperb.size() * sizeof(fsgrids::dperbElement));
+      ALLOCATE_GPU(gpuMemoryManager, d_moments, moments.size() * sizeof(fsgrids::momentsElement));
+      ALLOCATE_GPU(gpuMemoryManager, d_dmomentsdt2, dmomentsdt2.size() * sizeof(fsgrids::dmomentsElement));
+      ALLOCATE_GPU(gpuMemoryManager, d_momentsdt2, momentsdt2.size() * sizeof(fsgrids::momentsElement));
+      ALLOCATE_GPU(gpuMemoryManager, d_ehall, ehall.size() * sizeof(fsgrids::ehallElement));
+      ALLOCATE_GPU(gpuMemoryManager, d_egradpe, egradpe.size() * sizeof(fsgrids::egradpeElement));
+      ALLOCATE_GPU(gpuMemoryManager, d_egradpedt2, egradpedt2.size() * sizeof(fsgrids::egradpeElement));
+      fsgrids::perbElement *d_perb = GET_POINTER(gpuMemoryManager, fsgrids::perbElement, d_perb);
+      fsgrids::perbElement *d_perbdt2 = GET_POINTER(gpuMemoryManager, fsgrids::perbElement, d_perbdt2);
+      fsgrids::efieldElement *d_e = GET_POINTER(gpuMemoryManager, fsgrids::efieldElement, d_e);
+      fsgrids::efieldElement *d_edt2 = GET_POINTER(gpuMemoryManager, fsgrids::efieldElement, d_edt2);
+      fsgrids::bgbElement *d_bgb = GET_POINTER(gpuMemoryManager, fsgrids::bgbElement, d_bgb);
+      SysBoundaryDevice *dev_sysBoundaries = GET_POINTER(gpuMemoryManager, SysBoundaryDevice, dev_sysBoundaries);
+      fsgrids::dmomentsElement *d_dmoments = GET_POINTER(gpuMemoryManager, fsgrids::dmomentsElement, d_dmoments);
+      fsgrids::dperbElement *d_dperb = GET_POINTER(gpuMemoryManager, fsgrids::dperbElement, d_dperb);
+      fsgrids::momentsElement *d_moments = GET_POINTER(gpuMemoryManager, fsgrids::momentsElement, d_moments);
+      fsgrids::dmomentsElement *d_dmomentsdt2 = GET_POINTER(gpuMemoryManager, fsgrids::dmomentsElement, d_dmomentsdt2);
+      fsgrids::momentsElement *d_momentsdt2 = GET_POINTER(gpuMemoryManager, fsgrids::momentsElement, d_momentsdt2);
+      fsgrids::ehallElement *d_ehall = GET_POINTER(gpuMemoryManager, fsgrids::ehallElement, d_ehall);
+      fsgrids::egradpeElement *d_egradpe = GET_POINTER(gpuMemoryManager, fsgrids::egradpeElement, d_egradpe);
+      fsgrids::egradpeElement *d_egradpedt2 = GET_POINTER(gpuMemoryManager, fsgrids::egradpeElement, d_egradpedt2);
+      cudaMemcpy(d_perb, perb.data(),  perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyHostToDevice);
+      cudaMemcpy(d_perbdt2, perbdt2.data(),  perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyHostToDevice);
+      cudaMemcpy(d_e, e.data(),  e.size() * sizeof(fsgrids::efieldElement), cudaMemcpyHostToDevice);
+      cudaMemcpy(d_edt2, edt2.data(),  edt2.size() * sizeof(fsgrids::efieldElement), cudaMemcpyHostToDevice);
+      cudaMemcpy(d_bgb, bgb.data(),  bgb.size() * sizeof(fsgrids::bgbElement), cudaMemcpyHostToDevice);
+      cudaMemcpy(dev_sysBoundaries, &host_sysBoundaries,  sizeof(SysBoundaryDevice), cudaMemcpyHostToDevice);
+      cudaMemcpy(d_dmoments, dmoments.data(),  dmoments.size() * sizeof(fsgrids::dmomentsElement), cudaMemcpyHostToDevice);
+      cudaMemcpy(d_dperb, dperb.data(),  dperb.size() * sizeof(fsgrids::dperbElement), cudaMemcpyHostToDevice);
+      cudaMemcpy(d_moments, moments.data(),  moments.size() * sizeof(fsgrids::momentsElement), cudaMemcpyHostToDevice);
+      cudaMemcpy(d_dmomentsdt2, dmomentsdt2.data(),  dmomentsdt2.size() * sizeof(fsgrids::dmomentsElement), cudaMemcpyHostToDevice);
+      cudaMemcpy(d_momentsdt2, momentsdt2.data(),  momentsdt2.size() * sizeof(fsgrids::momentsElement), cudaMemcpyHostToDevice);
+      cudaMemcpy(d_ehall, ehall.data(),  ehall.size() * sizeof(fsgrids::ehallElement), cudaMemcpyHostToDevice);
+      cudaMemcpy(d_egradpe, egradpe.data(),  egradpe.size() * sizeof(fsgrids::egradpeElement), cudaMemcpyHostToDevice);
+      cudaMemcpy(d_egradpedt2, egradpedt2.data(),  egradpedt2.size() * sizeof(fsgrids::egradpeElement), cudaMemcpyHostToDevice);
+      std::span<fsgrids::perbElement> dev_perb(d_perb, perb.size());
+      std::span<fsgrids::perbElement> dev_perbdt2(d_perbdt2, perbdt2.size());
+      std::span<fsgrids::efieldElement> dev_e(d_e, e.size());
+      std::span<fsgrids::efieldElement> dev_edt2(d_edt2, edt2.size());
+      std::span<fsgrids::bgbElement> dev_bgb(d_bgb, bgb.size());
+      std::span<fsgrids::dmomentsElement> dev_dmoments(d_dmoments, dmoments.size());
+      std::span<fsgrids::dperbElement> dev_dperb(d_dperb, dperb.size());
+      std::span<fsgrids::momentsElement> dev_moments(d_moments, moments.size());
+      std::span<fsgrids::dmomentsElement> dev_dmomentsdt2(d_dmomentsdt2, dmomentsdt2.size());
+      std::span<fsgrids::momentsElement> dev_momentsdt2(d_momentsdt2, moments.size());
+      std::span<fsgrids::ehallElement> dev_ehall(d_ehall, ehall.size());
+      std::span<fsgrids::egradpeElement> dev_egradpe(d_egradpe, egradpe.size());
+      std::span<fsgrids::egradpeElement> dev_egradpedt2(d_egradpedt2, egradpedt2.size());
 #ifdef FS_1ST_ORDER_TIME
-      {
-         SysBoundaryDevice host_sysBoundaries;
-         uploadParametersToDevice();
-         uploadIndexToSysBoundary(sysBoundaries,  host_sysBoundaries);
-         ALLOCATE_GPU(gpuMemoryManager, d_perb, perb.size() * sizeof(fsgrids::perbElement));
-         ALLOCATE_GPU(gpuMemoryManager, d_perbdt2, perbdt2.size() * sizeof(fsgrids::perbElement));
-         ALLOCATE_GPU(gpuMemoryManager, d_e, e.size() * sizeof(fsgrids::efieldElement));
-         ALLOCATE_GPU(gpuMemoryManager, d_edt2, edt2.size() * sizeof(fsgrids::efieldElement));
-         ALLOCATE_GPU(gpuMemoryManager, d_bgb, bgb.size() * sizeof(fsgrids::bgbElement));
-         ALLOCATE_GPU(gpuMemoryManager, dev_sysBoundaries, sizeof(SysBoundaryDevice));
-         ALLOCATE_GPU(gpuMemoryManager, d_dmoments, dmoments.size() * sizeof(fsgrids::dmomentsElement));
-         ALLOCATE_GPU(gpuMemoryManager, d_dperb, dperb.size() * sizeof(fsgrids::dperbElement));
-         ALLOCATE_GPU(gpuMemoryManager, d_moments, moments.size() * sizeof(fsgrids::momentsElement));
-         fsgrids::perbElement *d_perb = GET_POINTER(gpuMemoryManager, fsgrids::perbElement, d_perb);
-         fsgrids::perbElement *d_perbdt2 = GET_POINTER(gpuMemoryManager, fsgrids::perbElement, d_perbdt2);
-         fsgrids::efieldElement *d_e = GET_POINTER(gpuMemoryManager, fsgrids::efieldElement, d_e);
-         fsgrids::efieldElement *d_edt2 = GET_POINTER(gpuMemoryManager, fsgrids::efieldElement, d_edt2);
-         fsgrids::bgbElement *d_bgb = GET_POINTER(gpuMemoryManager, fsgrids::bgbElement, d_bgb);
-         SysBoundaryDevice *dev_sysBoundaries = GET_POINTER(gpuMemoryManager, SysBoundaryDevice, dev_sysBoundaries);
-         fsgrids::technical *d_technical = GET_POINTER(gpuMemoryManager, fsgrids::technical, d_technical);
-         fsgrids::dmomentsElement *d_dmoments = GET_POINTER(gpuMemoryManager, fsgrids::dmomentsElement, d_dmoments);
-         fsgrids::dperbElement *d_dperb = GET_POINTER(gpuMemoryManager, fsgrids::dperbElement, d_dperb);
-         fsgrids::momentsElement *d_moments = GET_POINTER(gpuMemoryManager, fsgrids::momentsElement, d_moments);
-         cudaMemcpy(d_perb, perb.data(),  perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyHostToDevice);
-         cudaMemcpy(d_perbdt2, perbdt2.data(),  perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyHostToDevice);
-         cudaMemcpy(d_e, e.data(),  e.size() * sizeof(fsgrids::efieldElement), cudaMemcpyHostToDevice);
-         cudaMemcpy(d_edt2, edt2.data(),  edt2.size() * sizeof(fsgrids::efieldElement), cudaMemcpyHostToDevice);
-         cudaMemcpy(d_bgb, bgb.data(),  bgb.size() * sizeof(fsgrids::bgbElement), cudaMemcpyHostToDevice);
-         cudaMemcpy(dev_sysBoundaries, &host_sysBoundaries,  sizeof(SysBoundaryDevice), cudaMemcpyHostToDevice);
-         cudaMemcpy(d_dmoments, dmoments.data(),  dmoments.size() * sizeof(fsgrids::dmomentsElement), cudaMemcpyHostToDevice);
-         cudaMemcpy(d_dperb, dperb.data(),  dperb.size() * sizeof(fsgrids::dperbElement), cudaMemcpyHostToDevice);
-         cudaMemcpy(d_moments, moments.data(),  moments.size() * sizeof(fsgrids::momentsElement), cudaMemcpyHostToDevice);
-         std::span<fsgrids::perbElement> dev_perb(d_perb, perb.size());
-         std::span<fsgrids::perbElement> dev_perbdt2(d_perbdt2, perbdt2.size());
-         std::span<fsgrids::efieldElement> dev_e(d_e, e.size());
-         std::span<fsgrids::efieldElement> dev_edt2(d_edt2, edt2.size());
-         std::span<fsgrids::bgbElement> dev_bgb(d_bgb, bgb.size());
-         std::span<fsgrids::dmomentsElement> dev_dmoments(d_dmoments, dmoments.size());
-         std::span<fsgrids::dperbElement> dev_dperb(d_dperb, dperb.size());
-         std::span<fsgrids::momentsElement> dev_moments(d_moments, moments.size());
-         propagateMagneticFieldSimple(dev_perb, dev_perbdt2, dev_bgb, dev_e, dev_edt2, dev_technical, fsgrid, dev_sysBoundaries, dt, RK_ORDER1);
-         calculateDerivativesSimpleDevice(dev_perb, dev_moments, dev_dperb, dev_dmoments, dev_technical, fsgrid, true /*doMoments*/);
-         cudaMemcpy(perb.data(), d_perb, perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
-         cudaMemcpy(perbdt2.data(), d_perbdt2, perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
-         cudaMemcpy(dperb.data(), d_dperb, dperb.size() * sizeof(fsgrids::dperbElement), cudaMemcpyDeviceToHost);
-         cudaMemcpy(dmoments.data(), d_dmoments, dmoments.size() * sizeof(fsgrids::dmomentsElement), cudaMemcpyDeviceToHost);
-      }
+      propagateMagneticFieldSimple(dev_perb, dev_perbdt2, dev_bgb, dev_e, dev_edt2, dev_technical, fsgrid, dev_sysBoundaries, dt, RK_ORDER1);
+      calculateDerivativesSimpleDevice(dev_perb, dev_moments, dev_dperb, dev_dmoments, dev_technical, fsgrid, true /*doMoments*/);
       if (P::ohmGradPeTerm > 0) {
          calculateGradPeTermSimple(egradpe, egradpedt2, moments, momentsdt2, dmoments, dmomentsdt2, technical, fsgrid, sysBoundaries, RK_ORDER1);
       }
@@ -213,77 +226,29 @@ bool propagateFields(fsgrids::perbspan perb,
             true // communicateMomentsDerivatives
          );
       }
-      calculateUpwindedElectricFieldSimple(
-         perb,
-         perbdt2,
-         e,
-         edt2,
-         ehall,
-         egradpe,
-         egradpedt2,
-         moments,
-         momentsdt2,
-         dperb,
-         dmoments,
-         dmomentsdt2,
-         bgb,
-         technical,
+      calculateUpwindedElectricFieldSimpleDevice(
+         dev_perb,
+         dev_perbdt2,
+         dev_e,
+         dev_edt2,
+         dev_ehall,
+         dev_egradpe,
+         dev_egradpedt2,
+         dev_moments,
+         dev_momentsdt2,
+         dev_dperb,
+         dev_dmoments,
+         dev_dmomentsdt2,
+         dev_bgb,
+         dev_technical,
          fsgrid,
-         sysBoundaries,
+         dev_sysBoundaries,
          RK_ORDER1,
          true // communicateEGradPeOrMomentsDerivatives
       );
 #else
-      {
-         SysBoundaryDevice host_sysBoundaries;
-         uploadParametersToDevice();
-         uploadIndexToSysBoundary(sysBoundaries,  host_sysBoundaries);
-         ALLOCATE_GPU(gpuMemoryManager, d_perb, perb.size() * sizeof(fsgrids::perbElement));
-         ALLOCATE_GPU(gpuMemoryManager, d_perbdt2, perbdt2.size() * sizeof(fsgrids::perbElement));
-         ALLOCATE_GPU(gpuMemoryManager, d_e, e.size() * sizeof(fsgrids::efieldElement));
-         ALLOCATE_GPU(gpuMemoryManager, d_edt2, edt2.size() * sizeof(fsgrids::efieldElement));
-         ALLOCATE_GPU(gpuMemoryManager, d_bgb, bgb.size() * sizeof(fsgrids::bgbElement));
-         ALLOCATE_GPU(gpuMemoryManager, dev_sysBoundaries, sizeof(SysBoundaryDevice));
-         ALLOCATE_GPU(gpuMemoryManager, d_technical, technical.size() * sizeof(fsgrids::technical));
-         ALLOCATE_GPU(gpuMemoryManager, d_dmomentsdt2, dmomentsdt2.size() * sizeof(fsgrids::dmomentsElement));
-         ALLOCATE_GPU(gpuMemoryManager, d_dperb, dperb.size() * sizeof(fsgrids::dperbElement));
-         ALLOCATE_GPU(gpuMemoryManager, d_momentsdt2, momentsdt2.size() * sizeof(fsgrids::momentsElement));
-         fsgrids::perbElement *d_perb = GET_POINTER(gpuMemoryManager, fsgrids::perbElement, d_perb);
-         fsgrids::perbElement *d_perbdt2 = GET_POINTER(gpuMemoryManager, fsgrids::perbElement, d_perbdt2);
-         fsgrids::efieldElement *d_e = GET_POINTER(gpuMemoryManager, fsgrids::efieldElement, d_e);
-         fsgrids::efieldElement *d_edt2 = GET_POINTER(gpuMemoryManager, fsgrids::efieldElement, d_edt2);
-         fsgrids::bgbElement *d_bgb = GET_POINTER(gpuMemoryManager, fsgrids::bgbElement, d_bgb);
-         SysBoundaryDevice *dev_sysBoundaries = GET_POINTER(gpuMemoryManager, SysBoundaryDevice, dev_sysBoundaries);
-         fsgrids::technical *d_technical = GET_POINTER(gpuMemoryManager, fsgrids::technical, d_technical);
-         fsgrids::dmomentsElement *d_dmomentsdt2 = GET_POINTER(gpuMemoryManager, fsgrids::dmomentsElement, d_dmomentsdt2);
-         fsgrids::dperbElement *d_dperb = GET_POINTER(gpuMemoryManager, fsgrids::dperbElement, d_dperb);
-         fsgrids::momentsElement *d_momentsdt2 = GET_POINTER(gpuMemoryManager, fsgrids::momentsElement, d_momentsdt2);
-         cudaMemcpy(d_perb, perb.data(),  perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyHostToDevice);
-         cudaMemcpy(d_perbdt2, perbdt2.data(),  perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyHostToDevice);
-         cudaMemcpy(d_e, e.data(),  e.size() * sizeof(fsgrids::efieldElement), cudaMemcpyHostToDevice);
-         cudaMemcpy(d_edt2, edt2.data(),  edt2.size() * sizeof(fsgrids::efieldElement), cudaMemcpyHostToDevice);
-         cudaMemcpy(d_bgb, bgb.data(),  bgb.size() * sizeof(fsgrids::bgbElement), cudaMemcpyHostToDevice);
-         cudaMemcpy(dev_sysBoundaries, &host_sysBoundaries,  sizeof(SysBoundaryDevice), cudaMemcpyHostToDevice);
-         cudaMemcpy(d_technical, technical.data(), technical.size() * sizeof(fsgrids::technical), cudaMemcpyHostToDevice);
-         cudaMemcpy(d_dmomentsdt2, dmomentsdt2.data(),  dmomentsdt2.size() * sizeof(fsgrids::dmomentsElement), cudaMemcpyHostToDevice);
-         cudaMemcpy(d_dperb, dperb.data(),  dperb.size() * sizeof(fsgrids::dperbElement), cudaMemcpyHostToDevice);
-         cudaMemcpy(d_momentsdt2, momentsdt2.data(),  momentsdt2.size() * sizeof(fsgrids::momentsElement), cudaMemcpyHostToDevice);
-         std::span<fsgrids::perbElement> dev_perb(d_perb, perb.size());
-         std::span<fsgrids::perbElement> dev_perbdt2(d_perbdt2, perbdt2.size());
-         std::span<fsgrids::efieldElement> dev_e(d_e, e.size());
-         std::span<fsgrids::efieldElement> dev_edt2(d_edt2, edt2.size());
-         std::span<fsgrids::bgbElement> dev_bgb(d_bgb, bgb.size());
-         std::span<fsgrids::technical> dev_technical(d_technical, technical.size());
-         std::span<fsgrids::dmomentsElement> dev_dmomentsdt2(d_dmomentsdt2, dmomentsdt2.size());
-         std::span<fsgrids::dperbElement> dev_dperb(d_dperb, dperb.size());
-         std::span<fsgrids::momentsElement> dev_momentsdt2(d_momentsdt2, moments.size());
-         propagateMagneticFieldSimple(dev_perb, dev_perbdt2, dev_bgb, dev_e, dev_edt2, dev_technical, fsgrid, dev_sysBoundaries, dt, RK_ORDER2_STEP1);
-         calculateDerivativesSimpleDevice(dev_perbdt2, dev_momentsdt2, dev_dperb, dev_dmomentsdt2, dev_technical, fsgrid, true /*doMoments*/);
-         cudaMemcpy(perb.data(), d_perb, perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
-         cudaMemcpy(perbdt2.data(), d_perbdt2, perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
-         cudaMemcpy(dperb.data(), d_dperb, dperb.size() * sizeof(fsgrids::dperbElement), cudaMemcpyDeviceToHost);
-         cudaMemcpy(dmomentsdt2.data(), d_dmomentsdt2, dmomentsdt2.size() * sizeof(fsgrids::dmomentsElement), cudaMemcpyDeviceToHost);
-      }
+      propagateMagneticFieldSimple(dev_perb, dev_perbdt2, dev_bgb, dev_e, dev_edt2, dev_technical, fsgrid, dev_sysBoundaries, dt, RK_ORDER2_STEP1);
+      calculateDerivativesSimpleDevice(dev_perbdt2, dev_momentsdt2, dev_dperb, dev_dmomentsdt2, dev_technical, fsgrid, true /*doMoments*/);
       if (P::ohmGradPeTerm > 0) {
          calculateGradPeTermSimple(egradpe, egradpedt2, moments, momentsdt2, dmoments, dmomentsdt2, technical, fsgrid, sysBoundaries, RK_ORDER2_STEP1);
       }
@@ -305,77 +270,29 @@ bool propagateFields(fsgrids::perbspan perb,
             true // communicateMomentsDerivatives
          );
       }
-      calculateUpwindedElectricFieldSimple(
-         perb,
-         perbdt2,
-         e,
-         edt2,
-         ehall,
-         egradpe,
-         egradpedt2,
-         moments,
-         momentsdt2,
-         dperb,
-         dmoments,
-         dmomentsdt2,
-         bgb,
-         technical,
+      calculateUpwindedElectricFieldSimpleDevice(
+         dev_perb,
+         dev_perbdt2,
+         dev_e,
+         dev_edt2,
+         dev_ehall,
+         dev_egradpe,
+         dev_egradpedt2,
+         dev_moments,
+         dev_momentsdt2,
+         dev_dperb,
+         dev_dmoments,
+         dev_dmomentsdt2,
+         dev_bgb,
+         dev_technical,
          fsgrid,
-         sysBoundaries,
+         dev_sysBoundaries,
          RK_ORDER2_STEP1,
          true // communicateEGradPeOrMomentsDerivatives
       );
 
-      {
-         SysBoundaryDevice host_sysBoundaries;
-         uploadParametersToDevice();
-         uploadIndexToSysBoundary(sysBoundaries,  host_sysBoundaries);
-         ALLOCATE_GPU(gpuMemoryManager, d_perb, perb.size() * sizeof(fsgrids::perbElement));
-         ALLOCATE_GPU(gpuMemoryManager, d_perbdt2, perbdt2.size() * sizeof(fsgrids::perbElement));
-         ALLOCATE_GPU(gpuMemoryManager, d_e, e.size() * sizeof(fsgrids::efieldElement));
-         ALLOCATE_GPU(gpuMemoryManager, d_edt2, edt2.size() * sizeof(fsgrids::efieldElement));
-         ALLOCATE_GPU(gpuMemoryManager, d_bgb, bgb.size() * sizeof(fsgrids::bgbElement));
-         ALLOCATE_GPU(gpuMemoryManager, dev_sysBoundaries, sizeof(SysBoundaryDevice));
-         ALLOCATE_GPU(gpuMemoryManager, d_technical, technical.size() * sizeof(fsgrids::technical));
-         ALLOCATE_GPU(gpuMemoryManager, d_dmoments, dmoments.size() * sizeof(fsgrids::dmomentsElement));
-         ALLOCATE_GPU(gpuMemoryManager, d_dperb, dperb.size() * sizeof(fsgrids::dperbElement));
-         ALLOCATE_GPU(gpuMemoryManager, d_moments, moments.size() * sizeof(fsgrids::momentsElement));
-         fsgrids::perbElement *d_perb = GET_POINTER(gpuMemoryManager, fsgrids::perbElement, d_perb);
-         fsgrids::perbElement *d_perbdt2 = GET_POINTER(gpuMemoryManager, fsgrids::perbElement, d_perbdt2);
-         fsgrids::efieldElement *d_e = GET_POINTER(gpuMemoryManager, fsgrids::efieldElement, d_e);
-         fsgrids::efieldElement *d_edt2 = GET_POINTER(gpuMemoryManager, fsgrids::efieldElement, d_edt2);
-         fsgrids::bgbElement *d_bgb = GET_POINTER(gpuMemoryManager, fsgrids::bgbElement, d_bgb);
-         SysBoundaryDevice *dev_sysBoundaries = GET_POINTER(gpuMemoryManager, SysBoundaryDevice, dev_sysBoundaries);
-         fsgrids::technical *d_technical = GET_POINTER(gpuMemoryManager, fsgrids::technical, d_technical);
-         fsgrids::dmomentsElement *d_dmoments = GET_POINTER(gpuMemoryManager, fsgrids::dmomentsElement, d_dmoments);
-         fsgrids::dperbElement *d_dperb = GET_POINTER(gpuMemoryManager, fsgrids::dperbElement, d_dperb);
-         fsgrids::momentsElement *d_moments = GET_POINTER(gpuMemoryManager, fsgrids::momentsElement, d_moments);
-         cudaMemcpy(d_perb, perb.data(),  perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyHostToDevice);
-         cudaMemcpy(d_perbdt2, perbdt2.data(),  perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyHostToDevice);
-         cudaMemcpy(d_e, e.data(),  e.size() * sizeof(fsgrids::efieldElement), cudaMemcpyHostToDevice);
-         cudaMemcpy(d_edt2, edt2.data(),  edt2.size() * sizeof(fsgrids::efieldElement), cudaMemcpyHostToDevice);
-         cudaMemcpy(d_bgb, bgb.data(),  bgb.size() * sizeof(fsgrids::bgbElement), cudaMemcpyHostToDevice);
-         cudaMemcpy(dev_sysBoundaries, &host_sysBoundaries,  sizeof(SysBoundaryDevice), cudaMemcpyHostToDevice);
-         cudaMemcpy(d_technical, technical.data(), technical.size() * sizeof(fsgrids::technical), cudaMemcpyHostToDevice);
-         cudaMemcpy(d_dmoments, dmoments.data(),  dmoments.size() * sizeof(fsgrids::dmomentsElement), cudaMemcpyHostToDevice);
-         cudaMemcpy(d_dperb, dperb.data(),  dperb.size() * sizeof(fsgrids::dperbElement), cudaMemcpyHostToDevice);
-         cudaMemcpy(d_moments, moments.data(),  moments.size() * sizeof(fsgrids::momentsElement), cudaMemcpyHostToDevice);
-         std::span<fsgrids::perbElement> dev_perb(d_perb, perb.size());
-         std::span<fsgrids::perbElement> dev_perbdt2(d_perbdt2, perbdt2.size());
-         std::span<fsgrids::efieldElement> dev_e(d_e, e.size());
-         std::span<fsgrids::efieldElement> dev_edt2(d_edt2, edt2.size());
-         std::span<fsgrids::bgbElement> dev_bgb(d_bgb, bgb.size());
-         std::span<fsgrids::technical> dev_technical(d_technical, technical.size());
-         std::span<fsgrids::dmomentsElement> dev_dmoments(d_dmoments, dmoments.size());
-         std::span<fsgrids::dperbElement> dev_dperb(d_dperb, dperb.size());
-         std::span<fsgrids::momentsElement> dev_moments(d_moments, moments.size());
-         propagateMagneticFieldSimple(dev_perb, dev_perbdt2, dev_bgb, dev_e, dev_edt2, dev_technical, fsgrid, dev_sysBoundaries, dt, RK_ORDER2_STEP2);
-         calculateDerivativesSimpleDevice(dev_perb, dev_moments, dev_dperb, dev_dmoments, dev_technical, fsgrid, true /*doMoments*/);
-         cudaMemcpy(perb.data(), d_perb, perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
-         cudaMemcpy(perbdt2.data(), d_perbdt2, perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
-         cudaMemcpy(dperb.data(), d_dperb, dperb.size() * sizeof(fsgrids::dperbElement), cudaMemcpyDeviceToHost);
-         cudaMemcpy(dmoments.data(), d_dmoments, dmoments.size() * sizeof(fsgrids::dmomentsElement), cudaMemcpyDeviceToHost);
-      }
+      propagateMagneticFieldSimple(dev_perb, dev_perbdt2, dev_bgb, dev_e, dev_edt2, dev_technical, fsgrid, dev_sysBoundaries, dt, RK_ORDER2_STEP2);
+      calculateDerivativesSimpleDevice(dev_perb, dev_moments, dev_dperb, dev_dmoments, dev_technical, fsgrid, true /*doMoments*/);
       if (P::ohmGradPeTerm > 0) {
          calculateGradPeTermSimple(egradpe, egradpedt2, moments, momentsdt2, dmoments, dmomentsdt2, technical, fsgrid, sysBoundaries, RK_ORDER2_STEP2);
       }
@@ -397,27 +314,33 @@ bool propagateFields(fsgrids::perbspan perb,
             true // communicateMomentsDerivatives
          );
       }
-      calculateUpwindedElectricFieldSimple(
-         perb,
-         perbdt2,
-         e,
-         edt2,
-         ehall,
-         egradpe,
-         egradpedt2,
-         moments,
-         momentsdt2,
-         dperb,
-         dmoments,
-         dmomentsdt2,
-         bgb,
-         technical,
+      calculateUpwindedElectricFieldSimpleDevice(
+         dev_perb,
+         dev_perbdt2,
+         dev_e,
+         dev_edt2,
+         dev_ehall,
+         dev_egradpe,
+         dev_egradpedt2,
+         dev_moments,
+         dev_momentsdt2,
+         dev_dperb,
+         dev_dmoments,
+         dev_dmomentsdt2,
+         dev_bgb,
+         dev_technical,
          fsgrid,
-         sysBoundaries,
+         dev_sysBoundaries,
          RK_ORDER2_STEP2,
          true // communicateEGradPeOrMomentsDerivatives
       );
 #endif
+      cudaMemcpy(perb.data(), d_perb, perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
+      cudaMemcpy(perbdt2.data(), d_perbdt2, perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
+      cudaMemcpy(dperb.data(), d_dperb, dperb.size() * sizeof(fsgrids::dperbElement), cudaMemcpyDeviceToHost);
+      cudaMemcpy(dmoments.data(), d_dmoments, dmoments.size() * sizeof(fsgrids::dmomentsElement), cudaMemcpyDeviceToHost);
+      cudaMemcpy(dmomentsdt2.data(), d_dmomentsdt2, dmomentsdt2.size() * sizeof(fsgrids::dmomentsElement), cudaMemcpyDeviceToHost);
+      cudaMemcpy(technical.data(), d_technical, technical.size() * sizeof(fsgrids::technical), cudaMemcpyDeviceToHost);
    } else {
       Real subcycleDt = dt / convert<Real>(subcycles);
       Real subcycleT = P::t;
@@ -577,7 +500,6 @@ bool propagateFields(fsgrids::perbspan perb,
             cudaMemcpy(dperb.data(), d_dperb, dperb.size() * sizeof(fsgrids::dperbElement), cudaMemcpyDeviceToHost);
             cudaMemcpy(dmoments.data(), d_dmoments, dmoments.size() * sizeof(fsgrids::dmomentsElement), cudaMemcpyDeviceToHost);
          }
-
          if (P::ohmGradPeTerm > 0 && subcycleCount == 0) {
             calculateGradPeTermSimple(egradpe, egradpedt2, moments, momentsdt2, dmoments, dmomentsdt2, technical, fsgrid, sysBoundaries, RK_ORDER2_STEP2);
          }

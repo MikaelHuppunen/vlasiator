@@ -39,4 +39,21 @@ void calculateUpwindedElectricFieldSimple(fsgrids::perbspan perb,
                                           SysBoundary& sysBoundaries, int32_t RKCase,
                                           const bool communicateEGradPeOrMomentsDerivatives);
 
+void calculateUpwindedElectricFieldSimpleDevice(fsgrids::perbspan perb,
+                                          fsgrids::perbspan perbdt2,
+                                          fsgrids::efieldspan e,
+                                          fsgrids::efieldspan edt2,
+                                          fsgrids::ehallspan ehall,
+                                          fsgrids::egradpespan egradpe,
+                                          fsgrids::egradpespan egradpedt2,
+                                          fsgrids::momentsspan moments,
+                                          fsgrids::momentsspan momentsdt2,
+                                          fsgrids::dperbspan dperb,
+                                          fsgrids::dmomentsspan dmoments,
+                                          fsgrids::dmomentsspan dmomentsdt2,
+                                          fsgrids::bgbspan bgb,
+                                          fsgrids::technicalspan technical, FieldSolverGrid &fsgrid,
+                                          SysBoundaryDevice *sysBoundaries, int32_t RKCase,
+                                          const bool communicateEGradPeOrMomentsDerivatives);
+
 #endif
