@@ -12,9 +12,9 @@ fi
 echo "Fetching library files for platform $PLATFORM"
 
 PHIPROF_COMMIT="605a7247c85d967fe22fe079c96c817b461c92b1"
-VLSV_COMMIT="95cac1bb4a4a52c2eed5bbfe8c74f0ee22e64a1b"
+VLSV_COMMIT="4b5c1e3f44d70b0388a1fbda651ddf8404eec6a4"
 PAPI_COMMIT="721ba0013473af6f9b7aa8ce5a2205e8403af2d1"
-JEMALLOC_COMMIT="fe336672309b724764093bff8253276bd600ce27"
+JEMALLOC_COMMIT="7a34f18502e7b222724097cdcd499b437d189acc"
 
 TRILINOS_BRANCH="zoltanLBSafeAllreduce-issue15235"
 #TRILINOS_COMMIT="16ceeebdfbe0809a549e0543f2824a79ebc2aa2d"
@@ -29,16 +29,22 @@ git_use_commit() {
 	fi
 }
 
+# Header-only / source dependencies that used to be git submodules
+bash "$(dirname "$0")/fetch_submodules.sh"
+
 mkdir -p library-build
 cd library-build
 
 # Phiprof
+echo "################# Fetching phiprof ######################"
+
 git clone --depth=1 https://github.com/fmihpc/phiprof/
 cd phiprof
 git_use_commit $PHIPROF_COMMIT
 cd ..
 
 # VLSV
+echo "################# Fetching VLSV #########################"
 if [[ $PLATFORM != "-appleM1" ]]; then
    git clone --depth=1 https://github.com/fmihpc/vlsv.git
    cd vlsv
@@ -51,10 +57,13 @@ else
    cd ..
 fi
 
+
+
 # PAPI
 if [[ $PLATFORM != "-arriesgado" && $PLATFORM != "-appleM1" && $PLATFORM != "-ukko_dgx" && $PLATFORM != "-hile_cpu" && $PLATFORM != "-hile_gpu" && $PLATFORM != "-lumi_hipcc"  && $PLATFORM != "-lumi_2503" && $PLATFORM != "-mahti_cuda" && $PLATFORM != "-mahti_gcc_build" && $PLATFORM != "-frankenstein_hopper2_cuda" && $PLATFORM != "-roihu_cpu" && $PLATFORM != "-roihu_cpu_aocc" && $PLATFORM != "-roihu_gpu" ]]; then
     # This fails on RISCV and MacOS
     # Mahti, LUMI, UkkoGPU and HILE use system module
+    echo "################# Fetching papi #########################"
     git clone --depth=1 https://github.com/icl-utk-edu/papi
     cd papi
     git_use_commit "$PAPI_COMMIT"
@@ -63,28 +72,35 @@ fi
 
 # jemalloc (not for GPU versions, on Mahti use system module)
 if [[ $PLATFORM != "-leonardo_booster" && $PLATFORM != "-karolina_cuda" && $PLATFORM != "-ukko_dgx" && $PLATFORM != "-hile_gpu" && $PLATFORM != "-lumi_hipcc" && $PLATFORM != "-mahti_cuda" && $PLATFORM != "-mahti_gcc_build" && $PLATFORM != "-frankenstein_hopper2_cuda" && $PLATFORM != "-roihu_gpu" ]]; then
-    #curl -O -L https://github.com/jemalloc/jemalloc/releases/download/5.3.1/jemalloc-5.3.1.tar.bz2
-    #tar xjf jemalloc-5.3.1.tar.bz2
-    git clone --depth=1 https://github.com/jemalloc/jemalloc
+    echo "################# Fetching jemalloc #####################"
+    #curl -O -L https://github.com/jemalloc/jemalloc/releases/download/5.4.0/jemalloc-5.4.0.tar.bz2
+    #tar xjf jemalloc-5.4.0.tar.bz2
+    git clone --depth=1 --branch 5.4.0 https://github.com/jemalloc/jemalloc
     cd jemalloc
-    git fetch --tags origin 
     git_use_commit "$JEMALLOC_COMMIT"
     cd ..
 fi
 
 # Zoltan
+echo "################# Fetching Zoltan #######################"
 git clone --depth=1 --branch="$TRILINOS_BRANCH" https://github.com/ykempf/Trilinos.git
 cd Trilinos
 git_use_commit $TRILINOS_COMMIT
 cd ..
 
 #ZFP and OCTREE
+echo "################# Fetching ZFP ##########################"
 git clone --depth=1 https://github.com/LLNL/zfp.git
 cd zfp
 git_use_commit $ZFP_COMMIT
 cd ..
 
+echo "################# Fetching OCTREE #######################"
+
 git clone --depth=1 https://github.com/cschpc/tucker-octree.git
 cd tucker-octree
 git_use_commit $TUCKER_OCTREE_COMMIT
 cd ..
+
+echo "################# END FETCHES ###########################"
+
