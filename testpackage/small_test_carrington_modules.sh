@@ -1,16 +1,16 @@
 #!/bin/bash
 #SBATCH -t 01:30:00        # Run time (hh:mm:ss)
 #SBATCH --job-name=ctestpackage
-##SBATCH -A spacephysics
-#SBATCH --constraint="carrington"
 # test short medium 20min1d 3d
-#SBATCH -p short
+#SBATCH -p turso
 #SBATCH --exclusive
 #SBATCH --nodes=1
+#SBATCH -w ukko3-[814-816]
 #SBATCH -c 4                 # CPU cores per task
 #SBATCH -n 16                  # number of tasks
-#SBATCH --mem-per-cpu=5G
+#SBATCH --mem=64G
 #SBATCH --hint=multithread
+#SBATCH --array=0-2
 
 # If 1, the reference vlsv files are generated
 # if 0 then we check the v1 against reference files
@@ -20,14 +20,45 @@ create_verification_files=0
 reference_dir="/turso/group/spacephysics/vlasiator/testpackage/"
 cd $SLURM_SUBMIT_DIR
 
-bin="/proj/USERNAME/BINARYNAME"
-diffbin="/turso/group/spacephysics/vlasiator/testpackage/vlsvdiff_DP_carrington"
+# module spider Vlasiator prerequisite lines, nonfunctional ones commented out
+PrgEnvs=(
+"PrgEnv-amd/5.1.0  AOCC/5.1.0  MPICH/5.0.1"
+#"PrgEnv-amd/5.1.0  GCC/15.2.0  MPICH/5.0.1"
+#"PrgEnv-amd/5.1.0  intel-compilers/2026.1.0  MPICH/5.0.1"
+#"PrgEnv-gnu/15.2.0  AOCC/5.1.0  MPICH/5.0.1"
+"PrgEnv-gnu/15.2.0  GCC/15.2.0  MPICH/5.0.1"
+#"PrgEnv-gnu/15.2.0  intel-compilers/2026.1.0  MPICH/5.0.1"
+#"PrgEnv-intel/2026.1.0  AOCC/5.1.0  MPICH/5.0.1"
+#"PrgEnv-intel/2026.1.0  GCC/15.2.0  MPICH/5.0.1"
+"PrgEnv-intel/2026.1.0  intel-compilers/2026.1.0  MPICH/5.0.1"
+)
+
+set -e
+
+if [ -z $"SLURM_ARRAY_TASK_ID"} ]; then
+   echo "No SLURM_ARRAY_TASK_ID, using default PrgEnv"
+   PrgEnv="PrgEnv-gnu/15.2.0  GCC/15.2.0  MPICH/5.0.1"
+else
+   echo "Array job #$SLURM_ARRAY_TASK_ID"
+   PrgEnv="${PrgEnvs[$SLURM_ARRAY_TASK_ID]}"
+fi
+
+echo "Using PrgEnv $PrgEnv"
+
+module purge
+module load $PrgEnv
+module load Vlasiator
+
+bin="$(which vlasiator)"
+diffbin="$(which vlsvdiff_DP)"
+
+echo "Using Vlasiator binary from $bin"
+echo "Using vlsvdiff_DP binary from $diffbin"
 
 #compare agains which revision
 #reference_revision="CI_reference"
 reference_revision="current"
 
-source ../modules/carrington_gcc_openmpi.sh
 # export UCX_NET_DEVICES=eth5,mlx5_0:1 # This is important for multi-node performance!
 export UCX_TLS=dc_mlx5
 export UCX_NET_DEVICES=mlx5_0:1
@@ -41,9 +72,9 @@ t=$SLURM_CPUS_PER_TASK
 export OMP_NUM_THREADS=$t
 
 #command for running stuff
-run_command="srun --mpi=pmix_v3 -n $SLURM_NTASKS "
-small_run_command="srun --mpi=pmix_v3 -n 1"
-run_command_tools="mpirun -np 1 "
+run_command="srun --mpi=pmix -n $SLURM_NTASKS "
+small_run_command="srun --mpi=pmix -n 1"
+run_command_tools="srun -n 1 "
 
 umask 007
 # Launch the OpenMP job to the allocated compute node
@@ -57,6 +88,12 @@ echo "Running $exec on $SLURM_NTASKS mpi tasks, with $t threads per task on $SLU
 # Define test
 source test_definitions_small.sh
 wait
+
+# Set a more descriptive run folder path for the array job
+PrgEnvStr="${PrgEnv// /_}"
+PrgEnvStr="${PrgEnvStr//\//-}"
+run_dir="run_$PrgEnvStr"
+
 # Run tests
 source run_tests.sh
 wait

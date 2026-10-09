@@ -6,12 +6,9 @@ $(shell echo "============[recommended by 9 out of 10 doctors]=\n" 1>&2)
 #set default architecture, can be overridden from the compile line
 ARCH = ${VLASIATOR_ARCH}
 
-# NB updating git submodules require e.g. using the --recurse-submodules flag, e.g.:
-# submodules currently include the header library fsgrid
-# git clone --recurse-submodules
-# git pull --recurse-submodules
-# or if you cloned without --recurse-submodules:
-# git submodule update --init --recursive
+# NB fsgrid, dccrg, eigen, vectorclass, vectorclass-addon and hashinator are
+# no longer git submodules: run ./fetch_libraries.sh (or
+# ./fetch_and_build_libraries.sh) to clone them into ./submodules/
 
 #set FP precision to SP (single) or DP (double)
 FP_PRECISION = DP
@@ -213,7 +210,7 @@ OBJS = 	version.o memoryallocation.o memory_report.o backgroundfield.o quadr.o d
 	fieldtracing.o compression.o arch_moments.o \
 	sysboundary.o sysboundarycondition.o particle_species.o\
 	project.o projectTriAxisSearch.o read_gaussian_population.o\
-	Alfven.o Diffusion.o Dispersion.o Distributions.o Firehose.o\
+	Alfven.o Dispersion.o Distributions.o\
 	Flowthrough.o Fluctuations.o Harris.o KHB.o Larmor.o Magnetosphere.o MultiPeak.o LossCone.o\
 	Riemann1.o Shock.o Template.o test_fp.o testHall.o IPShock.o object_wrapper.o\
 	verificationLarmor.o Shocktest.o grid.o ioread.o iowrite.o vlasiator.o logger.o\
@@ -380,9 +377,9 @@ DEPS_PARTICLES = particles/particles.h particles/particles.cpp particles/field.h
 OBJS_PARTICLES = particles/physconst.o particles/particles.o particles/readfields.o particles/particleparameters.o particles/distribution.o readparameters.o version.o particles/scenario.o particles/histogram.o
 
 # todo: verify compilation and working of tools other than vlsvdiff
-vlsvextract: ${DEPS_VLSVREADER} ${DEPS_VLSVREADERINTERFACE} tools/vlsvextract.h tools/vlsvextract.cpp ${OBJS_VLSVREADER} ${OBJS_VLSVREADERINTERFACE}
+vlsvextract: ${DEPS_VLSVREADER} ${DEPS_VLSVREADERINTERFACE} tools/vlsvextract.h tools/vlsvextract.cpp readparameters.o version.o ${OBJS_VLSVREADER} ${OBJS_VLSVREADERINTERFACE}
 	${CMP} ${CXXFLAGS} ${FLAGS} -c tools/vlsvextract.cpp ${INC_DCCRG} ${INC_EIGEN} ${INC_VLSV} -I$(CURDIR)
-	${LNK} -o vlsvextract_${FP_PRECISION} vlsvextract.o  ${OBJS_VLSVREADERINTERFACE} ${LIB_DCCRG}  ${LIB_VLSV} ${LDFLAGS}
+	${LNK} -o vlsvextract_${FP_PRECISION} vlsvextract.o readparameters.o version.o ${OBJS_VLSVREADERINTERFACE} ${LIB_DCCRG}  ${LIB_VLSV} ${LDFLAGS}
 
 vlsv2silo:  ${DEPS_VLSVREADERINTERFACE} tools/vlsv2silo.cpp  ${OBJS_VLSVREADERINTERFACE}
 	${CMP} ${CXXFLAGS} ${FLAGS} -c tools/vlsv2silo.cpp ${INC_SILO} ${INC_VLSV} -I$(CURDIR)

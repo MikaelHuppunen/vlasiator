@@ -10,38 +10,74 @@ fi
 
 #Flags for core/node counts etc for compiling/heavier srun calls
 declare -A core_flags
-core_flags["carrington_gcc_openmpi"]="-n 1 -c 16"
+core_flags["turso-amd_GNU_MPICH"]="-n 1 -c 16"
 core_flags["ukko_dgx"]="-n 1 -c 64"
 core_flags["pioneer"]="-n 1 -c 64"
 core_flags["hile_gpu"]="-n 1 -c 16"
 core_flags["hile_cpu"]="-n 1 -c 16"
+core_flags["lumi_2503"]="-n 1 -c 16"
+
+if [[ -z ${core_flags[$VLASIATOR_ARCH]} ]]; then
+  echo "No matching core_flags (and likely no constraints, etc) for VLASIATOR_ARCH $VLASIATOR_ARCH!"
+  exit 1
+fi
+
+declare -A lib_flags
+lib_flags["turso-amd_GNU_MPICH"]="-n 1 -c 16 --mem=64G"
+lib_flags["ukko_dgx"]="-n 1 -c 16 --mem=64G"
+lib_flags["pioneer"]="-n 1 -c 16 --mem=64G"
+lib_flags["hile_gpu"]="-n 1 -c 16 --mem=64G"
+lib_flags["hile_cpu"]="-n 1 -c 16 --mem=64G"
+lib_flags["lumi_2503"]="-n 1 -c 16 --mem=64G"
+
+if [[ -z ${lib_flags[$VLASIATOR_ARCH]} ]]; then
+  echo "No matching lib_flags for VLASIATOR_ARCH $VLASIATOR_ARCH!"
+  exit 1
+fi
 
 #Constraints for compiling stuff
 declare -A constraint
-constraint["carrington_gcc_openmpi"]="--constraint=ukko|carrington -p short"
-# constraint["ukko_dgx"]="--constraint="v100" -gres="gpu:V100" -p gpu"
-constraint["ukko_dgx"]="--constraint=ukko -p gpu"
+constraint["turso-amd_GNU_MPICH"]="--constraint=amd"
+constraint["ukko_dgx"]="--constraint=amd -G 1"  # "Give me a GPU, whichever it may be"
 constraint["pioneer"]="-p pioneer -t 01:00:00" #not sure if pty needed for pioneer
 constraint["hile_gpu"]="-C g"
 constraint["hile_cpu"]="-C c"
+constraint["lumi_2503"]="--partition=standard --account=project_462001599 -t 01:00:00"
+
+if [[ -z ${constraint[$VLASIATOR_ARCH]} ]]; then
+  echo "No matching constraint for VLASIATOR_ARCH $VLASIATOR_ARCH!"
+  exit 1
+fi
 
 #Constraints used for smaller jobs like compiling/removing files/catting etc
 declare -A constraint_small
-constraint_small["carrington_gcc_openmpi"]="--constraint=ukko|carrington"
-constraint_small["ukko_dgx"]="--constraint=ukko"
+constraint_small["turso-amd_GNU_MPICH"]="--constraint=amd"
+constraint_small["ukko_dgx"]="--constraint=amd"
 constraint_small["pioneer"]="-p pioneer -t 01:00:00"
 constraint_small["hile_gpu"]="-C g"
 constraint_small["hile_cpu"]="-C c"
+constraint_small["lumi_2503"]="--partition=standard --account=project_462001599 -t 00:15:00"
+
+if [[ -z ${constraint_small[$VLASIATOR_ARCH]} ]]; then
+  echo "No matching constraint_small for VLASIATOR_ARCH $VLASIATOR_ARCH!"
+  exit 1
+fi
 
 #Memory flags for compiling, note that with --exclusive it is better to use --mem since --mem-per-cpu counts the whole node apparently
 declare -A mem_flags
 
 #Could be unified with core_flags but it's nice to have them here separately and maybe this separation has a future use
-mem_flags["carrington_gcc_openmpi"]="--mem=40G"
+mem_flags["turso-amd_GNU_MPICH"]="--mem=40G"
 mem_flags["ukko_dgx"]="--mem=64G"
-mem_flags["pioneer"]=""
+mem_flags["pioneer"]=" "
 mem_flags["hile_gpu"]="--mem=32G"
 mem_flags["hile_cpu"]="--mem=32G"
+mem_flags["lumi_2503"]="--mem=220G"
+
+if [[ -z ${mem_flags[$VLASIATOR_ARCH]} ]]; then
+  echo "No matching mem_flags for VLASIATOR_ARCH $VLASIATOR_ARCH!"
+  exit 1
+fi
 
 #Production compile flags
 declare -A compile_flags_prod
@@ -64,7 +100,7 @@ modules="hostname; realpath modules/modules.sh; source modules/$VLASIATOR_ARCH.s
 if [[ $1 == "CLEANUP" ]]; then
   CLEAN_STRING=$(
     cat <<MORO
-rm -rf libraries-$VLASIATOR_ARCH library-build testpackage libraries
+rm -rf libraries-$VLASIATOR_ARCH library-build testpackage libraries submodules
 rm -f libraries-$VLASIATOR_ARCH.tar.gz testpackage_check_description.txt testpackage-output.tar.gz metrics.txt stdout.txt stderr.txt testpackage_output_variables.txt
 rm -f *.xml
 echo "Cleaned up workspace"
@@ -78,7 +114,7 @@ fi
 #|         BUILD LIBS           |
 #0++++++++++++++++++++++++++++++0
 if [[ $1 == "BUILD_LIBS" ]]; then
-  srun ${constraint_small[$VLASIATOR_ARCH]} -n 1 -c 1 --mem=8G -J build_libraries_CI bash -lc "$modules ; ./fetch_and_build_libraries.sh $VLASIATOR_ARCH"
+  srun ${constraint_small[$VLASIATOR_ARCH]} ${lib_flags[$VLASIATOR_ARCH]} -J build_libraries_CI bash -lc "$modules ; ./fetch_and_build_libraries.sh $VLASIATOR_ARCH"
   exit $?
 fi
 
@@ -87,7 +123,7 @@ fi
 #0++++++++++++++++++++++++++++++0
 if [[ $1 == "BUILD_TOOLS" ]]; then
   #not constraint small since some platforms used gpu partition here but not build libs previously
-  srun ${constraint[$VLASIATOR_ARCH]} --job-name CI_TOOLS_COMPILE --interactive --nodes=1 -n 1 -c 1 --mem=4G -t 0:10:0 bash -c "$modules ; make vlsvextract vlsvdiff fluxfunction ; sleep 10s"
+  srun ${constraint[$VLASIATOR_ARCH]} --job-name CI_TOOLS_COMPILE --interactive --nodes=1 -n 1 -c 1 --mem=4G -t 0:10:0 bash -lc "$modules ; make vlsvextract vlsvdiff fluxfunction ; RC=$?; sleep 10s; exit $RC"
   exit $?
 fi
 
@@ -97,7 +133,7 @@ COMPILE_STRING="$modules ; make -j $(echo ${core_flags[$VLASIATOR_ARCH]} | grep 
 #|         COMPILE PROD         |
 #0++++++++++++++++++++++++++++++0
 if [[ $1 == "COMPILE_PROD" ]]; then
-  srun ${constraint[$VLASIATOR_ARCH]} --job-name CI_PROD_COMPILE --interactive ${mem_flags[$VLASIATOR_ARCH]} ${core_flags[$VLASIATOR_ARCH]} -t 0:10:0 bash -c "${compile_flags_prod[$VLASIATOR_ARCH]} $COMPILE_STRING ; sleep 10s"
+  srun ${constraint[$VLASIATOR_ARCH]} --job-name CI_PROD_COMPILE --interactive ${mem_flags[$VLASIATOR_ARCH]} ${core_flags[$VLASIATOR_ARCH]} -t 0:30:0 bash -lc "${compile_flags_prod[$VLASIATOR_ARCH]} $COMPILE_STRING ; RC=$?; sleep 10s; exit $RC"
   exit $?
 fi
 
@@ -105,7 +141,7 @@ fi
 #|         COMPILE TP           |
 #0++++++++++++++++++++++++++++++0
 if [[ $1 == "COMPILE_TP" ]]; then
-  srun ${constraint[$VLASIATOR_ARCH]} --job-name CI_TP_COMPILE --interactive ${mem_flags[$VLASIATOR_ARCH]} ${core_flags[$VLASIATOR_ARCH]} -t 0:10:0 bash -c "${compile_flags_tp[$VLASIATOR_ARCH]} $COMPILE_STRING testpackage ; sleep 10s"
+  srun ${constraint[$VLASIATOR_ARCH]} --job-name CI_TP_COMPILE --interactive ${mem_flags[$VLASIATOR_ARCH]} ${core_flags[$VLASIATOR_ARCH]} -t 0:30:0 bash -lc "${compile_flags_tp[$VLASIATOR_ARCH]} $COMPILE_STRING testpackage ; RC=$?; sleep 10s; exit $RC"
   exit $?
 fi
 
@@ -113,11 +149,11 @@ fi
 #|         RUN TP               |
 #0++++++++++++++++++++++++++++++0
 if [[ $1 == "RUN_TP" ]]; then
-  if [[ "$VLASIATOR_ARCH" == "carrington_gcc_openmpi" || "$VLASIATOR_ARCH" == "hile_cpu" ]]; then
+  if [[ "$VLASIATOR_ARCH" == "turso-amd_GNU_MPICH" || "$VLASIATOR_ARCH" == "hile_cpu" || "$VLASIATOR_ARCH" == "lumi_2503" ]]; then
 
     #Platform specific expections can be added here
-    if [[ "$VLASIATOR_ARCH" == "carrington_gcc_openmpi" ]]; then
-      export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$GITHUB_WORKSPACE/libraries-carrington_gcc_openmpi/lib
+    if [[ "$VLASIATOR_ARCH" == "turso-amd_GNU_MPICH" ]]; then
+      export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$GITHUB_WORKSPACE/libraries-turso-amd_GNU_MPICH/lib
     fi
 
     chmod +x $GITHUB_WORKSPACE/vlasiator
@@ -138,7 +174,7 @@ ls -halB testpackage_check_description.txt
 tar -czf testpackage-output-$VLASIATOR_ARCH.tar.gz testpackage_check_description.txt testpackage_output_variables.txt
 MORO
     )
-    srun --job-name CI_package_results ${constraint_small[$VLASIATOR_ARCH]} -N 1 -c 1 --mem=3G bash -c "$PARSE_OUTPUT_CMD"
+    srun --job-name CI_package_results ${constraint_small[$VLASIATOR_ARCH]} -N 1 -n 1 -c 1 --mem=3G bash -c "$PARSE_OUTPUT_CMD"
     if [ -f $GITHUB_WORKSPACE/testpackage_failed ]; then
       # Fail this step if any test failed.
       exit 1
@@ -155,8 +191,15 @@ fi
 if [[ $1 == "FLUXTEST" ]]; then
   FLUXTEST_STRING="$modules ; $GITHUB_WORKSPACE/fluxfunction testpackage/run_*/Magnetosphere_small/bulk.0000001.vlsv equatorial.bin ; $GITHUB_WORKSPACE/fluxfunction testpackage/run_*/Magnetosphere_polar_small/bulk.0000001.vlsv polar.bin"
   chmod +x $GITHUB_WORKSPACE/fluxfunction
-  srun ${constraint_small[$VLASIATOR_ARCH]} --job-name CI_FLUXTEST -N 1 -c 1 --mem=2G -t 0:10:0 bash -c "$FLUXTEST_STRING"
+  srun ${constraint_small[$VLASIATOR_ARCH]} --job-name CI_FLUXTEST -N 1 -n 1 -c 1 --mem=2G -t 0:10:0 bash -lc "$FLUXTEST_STRING"
 
-  diff -q equatorial.bin /turso/group/spacephysics/vlasiator/testpackage/CI_reference/equatorial.bin || if [ $? -eq 1 ]; then true; else false; fi
-  diff -q polar.bin /turso/group/spacephysics/vlasiator/testpackage/CI_reference/polar.bin || if [ $? -eq 1 ]; then true; else false; fi
+  #Platform specific expections can be added here
+  if [[ "$VLASIATOR_ARCH" == "lumi_2503" ]]; then
+    export CI_REFERENCE_LOCATION=/projappl/project_462001599/testpackage/CI_reference/;
+  else
+    export CI_REFERENCE_LOCATION=/turso/group/spacephysics/vlasiator/testpackage/CI_reference/;
+  fi
+
+  diff -q equatorial.bin $CI_REFERENCE_LOCATION/equatorial.bin || if [ $? -eq 1 ]; then true; else false; fi
+  diff -q polar.bin      $CI_REFERENCE_LOCATION/polar.bin      || if [ $? -eq 1 ]; then true; else false; fi
 fi

@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -t 01:30:00        # Run time (hh:mm:ss)
 #SBATCH --job-name=ctestpackage
-#SBATCH -A project_462000358
+#SBATCH -A project_462001599
 #SBATCH -p standard
 #SBATCH --nodes=1
 #SBATCH -c 16                 # CPU cores per task
@@ -15,26 +15,26 @@
 create_verification_files=0
 
 # folder for all reference data
-reference_dir="/scratch/project_462000358/testpackage/"
+reference_dir="/projappl/project_462001599/testpackage"
 cd $SLURM_SUBMIT_DIR
 #cd $reference_dir # don't run on /proj
 
-bin="/scratch/project_462000358/testpackage/vlasiator_dev_tp"
-diffbin="/scratch/project_462000358/testpackage/vlsvdiff_DP"
+bin="/projappl/project_462001599/actions-runner-linux-x64-2.337.0/_work/vlasiator/vlasiator/vlasiator"
+diffbin="/projappl/project_462001599/actions-runner-linux-x64-2.337.0/_work/vlasiator/vlasiator/vlsvdiff_DP"
 
 #compare agains which revision
 reference_revision="current"
 
 # threads per job (equal to -c )
 t=16
-module load LUMI/24.03
+module load LUMI/25.03
 module load partition/C
-module load papi/7.1.0.1
+module load papi/7.2.0.1
+
 
 #--------------------------------------------------------------------
 #---------------------DO NOT TOUCH-----------------------------------
 nodes=$SLURM_NNODES
-#Carrington has 2 x 16 cores
 cores_per_node=128
 # Hyperthreading
 ht=2
