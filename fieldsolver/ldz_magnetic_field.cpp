@@ -224,7 +224,7 @@ __device__ void propagateSysBoundaryMagneticFieldDevice(fsgrids::perbspan perb,
                                        const std::array<Real, 3>& gridSpacing,
                                        const std::array<fsgrid::FsSize_t, 3>& globalCoordinates,
                                        const fsgrid::FsStencil& stencil, SysBoundaryDevice *sysBoundaries, int32_t RKCase,
-                                       uint32_t component) {
+                                       uint32_t component, const DeviceParameters& parameters) {
    const bool case0 = RKCase == RK_ORDER1 || RKCase == RK_ORDER2_STEP2;
    auto& out = case0 ? perb[stencil.ooo()] : perbdt2[stencil.ooo()];
    const auto& pb = case0 ? perb : perbdt2;
@@ -232,28 +232,31 @@ __device__ void propagateSysBoundaryMagneticFieldDevice(fsgrids::perbspan perb,
    out[fsgrids::bfield::PERBX + component] =
        sysBoundaries[0].getSysBoundary(technical[stencil.ooo()].sysBoundaryFlag)
                         ->fieldSolverBoundaryCondMagneticField(pb, bgb, technical, gridSpacing, globalCoordinates, stencil,
-                                                  component);
+                                                  component, parameters);
 }
 
-__global__ void constructDoNotCompute(SBC::SysBoundaryConditionDevice* mem) {
-   new (mem) SBC::DoNotComputeDevice();
+__global__ void constructDoNotCompute(SBC::SysBoundaryConditionDevice* mem, const bool* periodic) {
+   new (mem) SBC::DoNotComputeDevice(periodic);
 }
 
-__global__ void constructMaxwellian(SBC::SysBoundaryConditionDevice* mem, const Real (*templateB)[3]) {
-   new (mem) SBC::MaxwellianDevice(templateB);
+__global__ void constructMaxwellian(SBC::SysBoundaryConditionDevice* mem, const bool* periodic, const Real (*templateB)[3]) {
+   new (mem) SBC::MaxwellianDevice(periodic, templateB);
 }
 
-__global__ void constructOutflow(SBC::SysBoundaryConditionDevice* mem) {
-   new (mem) SBC::OutflowDevice();
+__global__ void constructOutflow(SBC::SysBoundaryConditionDevice* mem, const bool* periodic) {
+   new (mem) SBC::OutflowDevice(periodic);
 }
 
 void uploadIndexToSysBoundary(SysBoundary& sysBoundaries, SysBoundaryDevice& host_sysBoundaries) {
    for (const auto& [type, host_condition] : sysBoundaries.getIndexToSysBoundary()) {
       SBC::SysBoundaryConditionDevice* dev_condition = nullptr;
+      bool *dev_periodic = nullptr;
+      cudaMalloc(&dev_periodic, sizeof(bool[3]));
+      cudaMemcpy(dev_periodic, host_condition->periodic.data(), sizeof(bool[3]), cudaMemcpyHostToDevice);
       switch (type) {
          case sysboundarytype::OUTFLOW: {
             cudaMalloc(&dev_condition, sizeof(SBC::OutflowDevice));
-            constructOutflow<<<1,1>>>(dev_condition);
+            constructOutflow<<<1,1>>>(dev_condition, dev_periodic);
             cudaDeviceSynchronize();
             break;
          }
@@ -263,7 +266,7 @@ void uploadIndexToSysBoundary(SysBoundary& sysBoundaries, SysBoundaryDevice& hos
             cudaMalloc(&dev_templateB, sizeof(Real[6][3]));
             cudaMemcpy(dev_templateB, host_maxwellian->templateB, sizeof(Real[6][3]), cudaMemcpyHostToDevice);
             cudaMalloc(&dev_condition, sizeof(SBC::MaxwellianDevice));
-            constructMaxwellian<<<1,1>>>(dev_condition, dev_templateB);
+            constructMaxwellian<<<1,1>>>(dev_condition, dev_periodic, dev_templateB);
             cudaDeviceSynchronize();
             cudaFree(dev_templateB);
             break;
@@ -271,24 +274,25 @@ void uploadIndexToSysBoundary(SysBoundary& sysBoundaries, SysBoundaryDevice& hos
          case sysboundarytype::IONOSPHERE: {
             std::cerr << "IONOSPHERE not implemented" << std::endl;
             cudaMalloc(&dev_condition, sizeof(SBC::OutflowDevice));
-            constructOutflow<<<1,1>>>(dev_condition);
+            constructOutflow<<<1,1>>>(dev_condition, dev_periodic);  
             cudaDeviceSynchronize();
             break;
          }
          case sysboundarytype::DO_NOT_COMPUTE: {
             cudaMalloc(&dev_condition, sizeof(SBC::DoNotComputeDevice));
-            constructDoNotCompute<<<1,1>>>(dev_condition);
+            constructDoNotCompute<<<1,1>>>(dev_condition, dev_periodic);
             cudaDeviceSynchronize();
             break;
          }
          case sysboundarytype::COPYSPHERE: {
             std::cerr << "COPYSPHERE not implemented" << std::endl;
             cudaMalloc(&dev_condition, sizeof(SBC::OutflowDevice));
-            constructOutflow<<<1,1>>>(dev_condition);
+            constructOutflow<<<1,1>>>(dev_condition, dev_periodic);
             cudaDeviceSynchronize();
             break;
          }
       }
+      cudaFree(dev_periodic);
       host_sysBoundaries.setSysBoundary(type, dev_condition);
    }
 }
@@ -316,7 +320,7 @@ void propagateMagneticFieldSimple(fsgrids::perbspan perb,
                                   fsgrids::efieldspan e,
                                   fsgrids::efieldspan edt2,
                                   fsgrids::technicalspan technical, FieldSolverGrid &fsgrid,
-                                  SysBoundaryDevice *sysBoundaries, creal& dt, cint& RKCase) {
+                                  SysBoundaryDevice *sysBoundaries, creal& dt, cint& RKCase, const DeviceParameters& parameters) {
    phiprof::Timer propagateBTimer{"Propagate magnetic field"};
    const auto* localSize = &fsgrid.getLocalSize()[0];
    const auto& gridSpacing = fsgrid.getGridSpacing();
@@ -373,13 +377,13 @@ void propagateMagneticFieldSimple(fsgrids::perbspan perb,
          cuint bitfield = technical[stencil.ooo()].SOLVE;
          const auto globalCoordinates = coordinates.localToGlobal(stencil.i, stencil.j, stencil.k);
          if ((bitfield & compute::BX) != compute::BX) {
-            propagateSysBoundaryMagneticFieldDevice(perb, perbdt2, bgb, technical, gridSpacing, globalCoordinates, stencil, sysBoundaries, RKCase, 0);
+            propagateSysBoundaryMagneticFieldDevice(perb, perbdt2, bgb, technical, gridSpacing, globalCoordinates, stencil, sysBoundaries, RKCase, 0, parameters);
          }
          if ((bitfield & compute::BY) != compute::BY) {
-            propagateSysBoundaryMagneticFieldDevice(perb, perbdt2, bgb, technical, gridSpacing, globalCoordinates, stencil, sysBoundaries, RKCase, 1);
+            propagateSysBoundaryMagneticFieldDevice(perb, perbdt2, bgb, technical, gridSpacing, globalCoordinates, stencil, sysBoundaries, RKCase, 1, parameters);
          }
          if ((bitfield & compute::BZ) != compute::BZ) {
-            propagateSysBoundaryMagneticFieldDevice(perb, perbdt2, bgb, technical, gridSpacing, globalCoordinates, stencil, sysBoundaries, RKCase, 2);
+            propagateSysBoundaryMagneticFieldDevice(perb, perbdt2, bgb, technical, gridSpacing, globalCoordinates, stencil, sysBoundaries, RKCase, 2, parameters);
          }
       }
    });
@@ -416,13 +420,13 @@ void propagateMagneticFieldSimple(fsgrids::perbspan perb,
          cuint bitfield = technical[stencil.ooo()].SOLVE;
          const auto globalCoordinates = coordinates.localToGlobal(stencil.i, stencil.j, stencil.k);
          if ((bitfield & compute::BX) != compute::BX) {
-            propagateSysBoundaryMagneticFieldDevice(perb, perbdt2, bgb, technical, gridSpacing, globalCoordinates, stencil, sysBoundaries, RKCase, 0);
+            propagateSysBoundaryMagneticFieldDevice(perb, perbdt2, bgb, technical, gridSpacing, globalCoordinates, stencil, sysBoundaries, RKCase, 0, parameters);
          }
          if ((bitfield & compute::BY) != compute::BY) {
-            propagateSysBoundaryMagneticFieldDevice(perb, perbdt2, bgb, technical, gridSpacing, globalCoordinates, stencil, sysBoundaries, RKCase, 1);
+            propagateSysBoundaryMagneticFieldDevice(perb, perbdt2, bgb, technical, gridSpacing, globalCoordinates, stencil, sysBoundaries, RKCase, 1, parameters);
          }
          if ((bitfield & compute::BZ) != compute::BZ) {
-            propagateSysBoundaryMagneticFieldDevice(perb, perbdt2, bgb, technical, gridSpacing, globalCoordinates, stencil, sysBoundaries, RKCase, 2);
+            propagateSysBoundaryMagneticFieldDevice(perb, perbdt2, bgb, technical, gridSpacing, globalCoordinates, stencil, sysBoundaries, RKCase, 2, parameters);
          }
       }
    });

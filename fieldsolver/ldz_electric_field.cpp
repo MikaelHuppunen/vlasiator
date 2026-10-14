@@ -107,14 +107,14 @@ private:
    // http://iopscience.iop.org/article/10.1088/0253-6102/43/2/026/meta (Alfven waves)
    // for details.
 public:
-   __device__ WavespeedsDevice(Real bmag2, Real rhom, Real p11, Real p22, Real p33, const std::array<Real, 3>& gridSpacing)
+   __device__ WavespeedsDevice(Real bmag2, Real rhom, Real p11, Real p22, Real p33, const std::array<Real, 3>& gridSpacing, const DeviceParameters& parameters)
        : alfvenSq(divideIfNonZeroDevice(bmag2, pc::MU_0 * rhom)), soundSq(divideIfNonZeroDevice(p11 + p22 + p33, 2.0 * rhom)),
-         whistler(dev_ohmHallTerm > 0 ?
+         whistler(parameters.ohmHallTerm > 0 ?
                      sqrt(alfvenSq) * (1 + divideIfNonZeroDevice(2*M_PI*M_PI*pc::MASS_PROTON*pc::MASS_PROTON, gridSpacing[0]*gridSpacing[0]*rhom*pc::CHARGE*pc::CHARGE*pc::MU_0)
                                 / sqrt(1 + divideIfNonZeroDevice(  M_PI*M_PI*pc::MASS_PROTON*pc::MASS_PROTON, gridSpacing[0]*gridSpacing[0]*rhom*pc::CHARGE*pc::CHARGE*pc::MU_0)))
                   : 0.0) {}
 
-   __device__ Real minVelocity() const { return min(dev_maxWaveVelocity, sqrt(alfvenSq + soundSq) + whistler); }
+   __device__ Real minVelocity(const DeviceParameters& parameters) const { return min(parameters.maxWaveVelocity, sqrt(alfvenSq + soundSq) + whistler); }
 
    /*! \brief Low-level helper function.
     *
@@ -376,7 +376,7 @@ __device__ WavespeedsDevice calculateWaveSpeedYZDevice(fsgrids::perbspan perB,
                                 fsgrids::constbgbspan BgB,
                                 const std::array<Real, 3>& gridSpacing, const Limits& rhomLimits, size_t self,
                                 size_t nbr, Real By, Real Bz, Real dBydx, Real dBydz, Real dBzdx, Real dBzdy, Real ydir,
-                                Real zdir) {
+                                Real zdir, const DeviceParameters& parameters) {
    const ReconstructionsDevice rec(perB, dPerB, BgB, moments, dMoments, self, nbr, rhomLimits);
 
    const Real rhom =
@@ -393,7 +393,7 @@ __device__ WavespeedsDevice calculateWaveSpeedYZDevice(fsgrids::perbspan perB,
    const Real by2 = ReconstructionsDevice::squared(By + zdir * HALF * dBydz, dBydx);
    const Real bz2 = ReconstructionsDevice::squared(Bz + ydir * HALF * dBzdy, dBzdx);
 
-   return WavespeedsDevice(bx2 + by2 + bz2, rhom, p11, p22, p33, gridSpacing);
+   return WavespeedsDevice(bx2 + by2 + bz2, rhom, p11, p22, p33, gridSpacing, parameters);
 }
 
 /*! \brief Low-level helper function.
@@ -484,7 +484,7 @@ __device__ WavespeedsDevice calculateWaveSpeedXZDevice(fsgrids::perbspan perB,
                                 fsgrids::constbgbspan BgB,
                                 const std::array<Real, 3>& gridSpacing, const Limits& rhomLimits, size_t self,
                                 size_t nbr, Real Bx, Real Bz, Real dBxdy, Real dBxdz, Real dBzdx, Real dBzdy, Real xdir,
-                                Real zdir) {
+                                Real zdir, const DeviceParameters& parameters) {
    const ReconstructionsDevice rec(perB, dPerB, BgB, moments, dMoments, self, nbr, rhomLimits);
 
    const Real rhom =
@@ -501,7 +501,7 @@ __device__ WavespeedsDevice calculateWaveSpeedXZDevice(fsgrids::perbspan perB,
    const Real bx2 = ReconstructionsDevice::squared(Bx + zdir * HALF * dBxdz, dBxdy);
    const Real bz2 = ReconstructionsDevice::squared(Bz + xdir * HALF * dBzdx, dBzdy);
 
-   return WavespeedsDevice(bx2 + by2 + bz2, rhom, p11, p22, p33, gridSpacing);
+   return WavespeedsDevice(bx2 + by2 + bz2, rhom, p11, p22, p33, gridSpacing, parameters);
 }
 
 /*! \brief Low-level helper function.
@@ -592,7 +592,7 @@ __device__ WavespeedsDevice calculateWaveSpeedXYDevice(fsgrids::perbspan perB,
                                 fsgrids::constbgbspan BgB,
                                 const std::array<Real, 3>& gridSpacing, const Limits& rhomLimits, size_t self,
                                 size_t nbr, Real Bx, Real By, Real dBxdy, Real dBxdz, Real dBydx, Real dBydz, Real xdir,
-                                Real ydir) {
+                                Real ydir, const DeviceParameters& parameters) {
    const ReconstructionsDevice rec(perB, dPerB, BgB, moments, dMoments, self, nbr, rhomLimits);
 
    const Real rhom =
@@ -609,7 +609,7 @@ __device__ WavespeedsDevice calculateWaveSpeedXYDevice(fsgrids::perbspan perB,
    const Real bx2 = ReconstructionsDevice::squared(Bx + ydir * HALF * dBxdy, dBxdz);
    const Real by2 = ReconstructionsDevice::squared(By + xdir * HALF * dBydx, dBydz);
 
-   return WavespeedsDevice(bx2 + by2 + bz2, rhom, p11, p22, p33, gridSpacing);
+   return WavespeedsDevice(bx2 + by2 + bz2, rhom, p11, p22, p33, gridSpacing, parameters);
 }
 
 void fsdebugCheck([[maybe_unused]] const fsgrid::FsStencil& stencil, [[maybe_unused]] size_t len,
@@ -671,12 +671,12 @@ Real resistiveTerm(const auto& bgb, const auto& perb, const auto& dperb, Real rh
 }
 
 __device__ Real resistiveTermDevice(const auto& bgb, const auto& perb, const auto& dperb, Real rhoq, std::array<size_t, 2> indices,
-                   std::array<Real, 2> spacing) {
+                   std::array<Real, 2> spacing, const DeviceParameters& parameters) {
    const auto x = bgb[fsgrids::bgbfield::BGBX] + perb[fsgrids::bfield::PERBX];
    const auto y = bgb[fsgrids::bgbfield::BGBY] + perb[fsgrids::bfield::PERBY];
    const auto z = bgb[fsgrids::bgbfield::BGBZ] + perb[fsgrids::bfield::PERBZ];
 
-   return dev_resistivity * sqrt(x * x + y * y + z * z) / rhoq / physicalconstants::MU_0 *
+   return parameters.resistivity * sqrt(x * x + y * y + z * z) / rhoq / physicalconstants::MU_0 *
           (dperb[indices[0]] / spacing[0] - dperb[indices[1]] / spacing[1]);
 }
 
@@ -734,11 +734,12 @@ struct UpwindFieldDevice {
    Real dperB_N = 0.0;
    Real dperB_W = 0.0;
    Real dperB_E = 0.0;
+   DeviceParameters parameters;
 
    __device__ Real operator()() const {
       Real efield = apos * bpos * E_NE + apos * bneg * E_SE + aneg * bpos * E_NW + aneg * bneg * E_SW;
       efield /= ((apos + aneg) * (bpos + bneg) + EPS);
-      if (dev_fieldSolverDiffusiveEterms) {
+      if (parameters.fieldSolverDiffusiveEterms) {
 #ifdef FS_1ST_ORDER_SPACE
          // 1st order diffusive terms:
          efield -= bpos * bneg / (bpos + bneg + EPS) * (perB_S - perB_N);
@@ -1046,7 +1047,7 @@ __device__ void calculateEdgeElectricFieldXDevice(fsgrids::perbspan perb,
                                  fsgrids::constdmomentsspan dmoments,
                                  fsgrids::constbgbspan bgb,
                                  fsgrids::technicalspan technical, const fsgrid::FsStencil& stencil,
-                                 int32_t RKCase, const std::array<Real, 3>& gridSpacing) {
+                                 int32_t RKCase, const std::array<Real, 3>& gridSpacing, const DeviceParameters& parameters) {
    fsdebugCheckDevice(stencil, perb.size(), __FILE__, __LINE__);
 
    // An edge has four neighbouring spatial cells. Calculate
@@ -1105,8 +1106,8 @@ __device__ void calculateEdgeElectricFieldXDevice(fsgrids::perbspan perb,
    size_t self = stencil.ooo();
    size_t nbr = stencil.poo();
    auto wavespeeds = calculateWaveSpeedYZDevice(perb, moments, dperb, dmoments, bgb, gridSpacing, rhomLimits, self, nbr, By_S,
-                                          Bz_W, dBydx_S, dBydz_S, dBzdx_W, dBzdy_W, MINUS, MINUS);
-   c_y = wavespeeds.minVelocity();
+                                          Bz_W, dBydx_S, dBydz_S, dBzdx_W, dBzdy_W, MINUS, MINUS, parameters);
+   c_y = wavespeeds.minVelocity(parameters);
    c_z = c_y;
    ay_neg = max(ZERO, -Vy0 + c_y);
    ay_pos = max(ZERO, +Vy0 + c_y);
@@ -1130,8 +1131,8 @@ __device__ void calculateEdgeElectricFieldXDevice(fsgrids::perbspan perb,
    self = stencil.omo();
    nbr = stencil.pmo();
    wavespeeds = calculateWaveSpeedYZDevice(perb, moments, dperb, dmoments, bgb, gridSpacing, rhomLimits, self, nbr, By_S,
-                                     Bz_E, dBydx_S, dBydz_S, dBzdx_E, dBzdy_E, PLUS, MINUS);
-   c_y = wavespeeds.minVelocity();
+                                     Bz_E, dBydx_S, dBydz_S, dBzdx_E, dBzdy_E, PLUS, MINUS, parameters);
+   c_y = wavespeeds.minVelocity(parameters);
    c_z = c_y;
    ay_neg = max(ay_neg, -Vy0 + c_y);
    ay_pos = max(ay_pos, +Vy0 + c_y);
@@ -1155,8 +1156,8 @@ __device__ void calculateEdgeElectricFieldXDevice(fsgrids::perbspan perb,
    self = stencil.oom();
    nbr = stencil.pom();
    wavespeeds = calculateWaveSpeedYZDevice(perb, moments, dperb, dmoments, bgb, gridSpacing, rhomLimits, self, nbr, By_N,
-                                     Bz_W, dBydx_N, dBydz_N, dBzdx_W, dBzdy_W, MINUS, PLUS);
-   c_y = wavespeeds.minVelocity();
+                                     Bz_W, dBydx_N, dBydz_N, dBzdx_W, dBzdy_W, MINUS, PLUS, parameters);
+   c_y = wavespeeds.minVelocity(parameters);
    c_z = c_y;
    ay_neg = max(ay_neg, -Vy0 + c_y);
    ay_pos = max(ay_pos, +Vy0 + c_y);
@@ -1184,8 +1185,8 @@ __device__ void calculateEdgeElectricFieldXDevice(fsgrids::perbspan perb,
    self = stencil.omm();
    nbr = stencil.pmm();
    wavespeeds = calculateWaveSpeedYZDevice(perb, moments, dperb, dmoments, bgb, gridSpacing, rhomLimits, self, nbr, By_N,
-                                     Bz_E, dBydx_N, dBydz_N, dBzdx_E, dBzdy_E, PLUS, PLUS);
-   c_y = wavespeeds.minVelocity();
+                                     Bz_E, dBydx_N, dBydz_N, dBzdx_E, dBzdy_E, PLUS, PLUS, parameters);
+   c_y = wavespeeds.minVelocity(parameters);
    c_z = c_y;
    ay_neg = max(ay_neg, -Vy0 + c_y);
    ay_pos = max(ay_pos, +Vy0 + c_y);
@@ -1194,19 +1195,19 @@ __device__ void calculateEdgeElectricFieldXDevice(fsgrids::perbspan perb,
    maxV = max(maxV, wavespeeds.cflSpeed(Vy0, Vz0));
 
    // Resistive terms
-   if (dev_resistivity > 0) {
+   if (parameters.resistivity > 0) {
       const std::array indices = {static_cast<size_t>(fsgrids::dperb::dPERBzdy),
                                   static_cast<size_t>(fsgrids::dperb::dPERBydz)};
       const std::array spacing = {gridSpacing[1], gridSpacing[2]};
 
-      Ex_SW += resistiveTermDevice(sw.bgb, sw.perb, sw.dperb, sw.moments[fsgrids::moments::RHOQ], indices, spacing);
-      Ex_SE += resistiveTermDevice(se.bgb, se.perb, se.dperb, se.moments[fsgrids::moments::RHOQ], indices, spacing);
-      Ex_NW += resistiveTermDevice(nw.bgb, nw.perb, nw.dperb, nw.moments[fsgrids::moments::RHOQ], indices, spacing);
-      Ex_NE += resistiveTermDevice(ne.bgb, ne.perb, ne.dperb, ne.moments[fsgrids::moments::RHOQ], indices, spacing);
+      Ex_SW += resistiveTermDevice(sw.bgb, sw.perb, sw.dperb, sw.moments[fsgrids::moments::RHOQ], indices, spacing, parameters);
+      Ex_SE += resistiveTermDevice(se.bgb, se.perb, se.dperb, se.moments[fsgrids::moments::RHOQ], indices, spacing, parameters);
+      Ex_NW += resistiveTermDevice(nw.bgb, nw.perb, nw.dperb, nw.moments[fsgrids::moments::RHOQ], indices, spacing, parameters);
+      Ex_NE += resistiveTermDevice(ne.bgb, ne.perb, ne.dperb, ne.moments[fsgrids::moments::RHOQ], indices, spacing, parameters);
    }
 
    // Hall terms
-   if (dev_ohmHallTerm > 0) {
+   if (parameters.ohmHallTerm > 0) {
       Ex_SW += ehall[ci.sw][fsgrids::ehall::EXHALL_000_100];
       Ex_SE += ehall[ci.se][fsgrids::ehall::EXHALL_010_110];
       Ex_NW += ehall[ci.nw][fsgrids::ehall::EXHALL_001_101];
@@ -1214,7 +1215,7 @@ __device__ void calculateEdgeElectricFieldXDevice(fsgrids::perbspan perb,
    }
 
    // Electron pressure gradient terms
-   if (dev_ohmGradPeTerm > 0) {
+   if (parameters.ohmGradPeTerm > 0) {
       Ex_SW += egradpe[ci.sw][fsgrids::egradpe::EXGRADPE];
       Ex_SE += egradpe[ci.se][fsgrids::egradpe::EXGRADPE];
       Ex_NW += egradpe[ci.nw][fsgrids::egradpe::EXGRADPE];
@@ -1223,7 +1224,7 @@ __device__ void calculateEdgeElectricFieldXDevice(fsgrids::perbspan perb,
 
    // Calculate properly upwinded edge-averaged Ex:
    const UpwindFieldDevice f(Ex_NE, Ex_SE, Ex_NW, Ex_SW, ay_pos, ay_neg, az_pos, az_neg, perBy_S, perBy_N, perBz_W, perBz_E,
-                       dperBydz_S, dperBydz_N, dperBzdy_W, dperBzdy_E);
+                       dperBydz_S, dperBydz_N, dperBzdy_W, dperBzdy_E, parameters);
    e[ci.sw][fsgrids::efield::EX] = f();
 
    if ((RKCase == RK_ORDER1) || (RKCase == RK_ORDER2_STEP2)) {
@@ -1489,7 +1490,7 @@ __device__ void calculateEdgeElectricFieldYDevice(fsgrids::perbspan perb,
                                  fsgrids::constdmomentsspan dmoments,
                                  fsgrids::constbgbspan bgb,
                                  fsgrids::technicalspan technical, const fsgrid::FsStencil& stencil,
-                                 int32_t RKCase, const std::array<Real, 3>& gridSpacing) {
+                                 int32_t RKCase, const std::array<Real, 3>& gridSpacing, const DeviceParameters& parameters) {
    fsdebugCheckDevice(stencil, perb.size(), __FILE__, __LINE__);
 
    // An edge has four neighbouring spatial cells. Calculate
@@ -1549,8 +1550,8 @@ __device__ void calculateEdgeElectricFieldYDevice(fsgrids::perbspan perb,
    size_t self = stencil.ooo();
    size_t nbr = stencil.opo();
    auto wavespeeds = calculateWaveSpeedXZDevice(perb, moments, dperb, dmoments, bgb, gridSpacing, rhomLimits, self, nbr, Bx_W,
-                                          Bz_S, dBxdy_W, dBxdz_W, dBzdx_S, dBzdy_S, MINUS, MINUS);
-   c_z = wavespeeds.minVelocity();
+                                          Bz_S, dBxdy_W, dBxdz_W, dBzdx_S, dBzdy_S, MINUS, MINUS, parameters);
+   c_z = wavespeeds.minVelocity(parameters);
    c_x = c_z;
    az_neg = max(ZERO, -Vz0 + c_z);
    az_pos = max(ZERO, +Vz0 + c_z);
@@ -1574,8 +1575,8 @@ __device__ void calculateEdgeElectricFieldYDevice(fsgrids::perbspan perb,
    self = stencil.oom();
    nbr = stencil.opm();
    wavespeeds = calculateWaveSpeedXZDevice(perb, moments, dperb, dmoments, bgb, gridSpacing, rhomLimits, self, nbr, Bx_E,
-                                     Bz_S, dBxdy_E, dBxdz_E, dBzdx_S, dBzdy_S, MINUS, PLUS);
-   c_z = wavespeeds.minVelocity();
+                                     Bz_S, dBxdy_E, dBxdz_E, dBzdx_S, dBzdy_S, MINUS, PLUS, parameters);
+   c_z = wavespeeds.minVelocity(parameters);
    c_x = c_z;
    az_neg = max(az_neg, -Vz0 + c_z);
    az_pos = max(az_pos, +Vz0 + c_z);
@@ -1599,8 +1600,8 @@ __device__ void calculateEdgeElectricFieldYDevice(fsgrids::perbspan perb,
    self = stencil.moo();
    nbr = stencil.mpo();
    wavespeeds = calculateWaveSpeedXZDevice(perb, moments, dperb, dmoments, bgb, gridSpacing, rhomLimits, self, nbr, Bx_W,
-                                     Bz_N, dBxdy_W, dBxdz_W, dBzdx_N, dBzdy_N, PLUS, MINUS);
-   c_z = wavespeeds.minVelocity();
+                                     Bz_N, dBxdy_W, dBxdz_W, dBzdx_N, dBzdy_N, PLUS, MINUS, parameters);
+   c_z = wavespeeds.minVelocity(parameters);
    c_x = c_z;
    az_neg = max(az_neg, -Vz0 + c_z);
    az_pos = max(az_pos, +Vz0 + c_z);
@@ -1624,8 +1625,8 @@ __device__ void calculateEdgeElectricFieldYDevice(fsgrids::perbspan perb,
    self = stencil.mom();
    nbr = stencil.mpm();
    wavespeeds = calculateWaveSpeedXZDevice(perb, moments, dperb, dmoments, bgb, gridSpacing, rhomLimits, self, nbr, Bx_E,
-                                     Bz_N, dBxdy_E, dBxdz_E, dBzdx_N, dBzdy_N, PLUS, PLUS);
-   c_z = wavespeeds.minVelocity();
+                                     Bz_N, dBxdy_E, dBxdz_E, dBzdx_N, dBzdy_N, PLUS, PLUS, parameters);
+   c_z = wavespeeds.minVelocity(parameters);
    c_x = c_z;
    az_neg = max(az_neg, -Vz0 + c_z);
    az_pos = max(az_pos, +Vz0 + c_z);
@@ -1634,19 +1635,19 @@ __device__ void calculateEdgeElectricFieldYDevice(fsgrids::perbspan perb,
    maxV = max(maxV, wavespeeds.cflSpeed(Vz0, Vx0));
 
    // Resistive terms
-   if (dev_resistivity > 0) {
+   if (parameters.resistivity > 0) {
       const std::array indices = {static_cast<size_t>(fsgrids::dperb::dPERBxdz),
                                   static_cast<size_t>(fsgrids::dperb::dPERBzdx)};
       const std::array spacing = {gridSpacing[2], gridSpacing[0]};
 
-      Ey_SW += resistiveTermDevice(sw.bgb, sw.perb, sw.dperb, sw.moments[fsgrids::moments::RHOQ], indices, spacing);
-      Ey_SE += resistiveTermDevice(se.bgb, se.perb, se.dperb, se.moments[fsgrids::moments::RHOQ], indices, spacing);
-      Ey_NW += resistiveTermDevice(nw.bgb, nw.perb, nw.dperb, nw.moments[fsgrids::moments::RHOQ], indices, spacing);
-      Ey_NE += resistiveTermDevice(ne.bgb, ne.perb, ne.dperb, ne.moments[fsgrids::moments::RHOQ], indices, spacing);
+      Ey_SW += resistiveTermDevice(sw.bgb, sw.perb, sw.dperb, sw.moments[fsgrids::moments::RHOQ], indices, spacing, parameters);
+      Ey_SE += resistiveTermDevice(se.bgb, se.perb, se.dperb, se.moments[fsgrids::moments::RHOQ], indices, spacing, parameters);
+      Ey_NW += resistiveTermDevice(nw.bgb, nw.perb, nw.dperb, nw.moments[fsgrids::moments::RHOQ], indices, spacing, parameters);
+      Ey_NE += resistiveTermDevice(ne.bgb, ne.perb, ne.dperb, ne.moments[fsgrids::moments::RHOQ], indices, spacing, parameters);
    }
 
    // Hall terms
-   if (dev_ohmHallTerm > 0) {
+   if (parameters.ohmHallTerm > 0) {
       Ey_SW += ehall[ci.sw][fsgrids::ehall::EYHALL_000_010];
       Ey_SE += ehall[ci.se][fsgrids::ehall::EYHALL_001_011];
       Ey_NW += ehall[ci.nw][fsgrids::ehall::EYHALL_100_110];
@@ -1654,7 +1655,7 @@ __device__ void calculateEdgeElectricFieldYDevice(fsgrids::perbspan perb,
    }
 
    // Electron pressure gradient terms
-   if (dev_ohmGradPeTerm > 0) {
+   if (parameters.ohmGradPeTerm > 0) {
       Ey_SW += egradpe[ci.sw][fsgrids::egradpe::EYGRADPE];
       Ey_SE += egradpe[ci.se][fsgrids::egradpe::EYGRADPE];
       Ey_NW += egradpe[ci.nw][fsgrids::egradpe::EYGRADPE];
@@ -1663,7 +1664,7 @@ __device__ void calculateEdgeElectricFieldYDevice(fsgrids::perbspan perb,
 
    // Calculate properly upwinded edge-averaged Ey:
    const UpwindFieldDevice f(Ey_NE, Ey_SE, Ey_NW, Ey_SW, az_pos, az_neg, ax_pos, ax_neg, perBz_S, perBz_N, perBx_W, perBx_E,
-                       dperBzdx_S, dperBzdx_N, dperBxdz_W, dperBxdz_E);
+                       dperBzdx_S, dperBzdx_N, dperBxdz_W, dperBxdz_E, parameters);
    e[ci.sw][fsgrids::efield::EY] = f();
 
    if ((RKCase == RK_ORDER1) || (RKCase == RK_ORDER2_STEP2)) {
@@ -1930,7 +1931,7 @@ __device__ void calculateEdgeElectricFieldZDevice(fsgrids::perbspan perb,
                                  fsgrids::constdmomentsspan dmoments,
                                  fsgrids::constbgbspan bgb,
                                  fsgrids::technicalspan technical, const fsgrid::FsStencil& stencil,
-                                 int32_t RKCase, const std::array<Real, 3>& gridSpacing) {
+                                 int32_t RKCase, const std::array<Real, 3>& gridSpacing, const DeviceParameters& parameters) {
    fsdebugCheckDevice(stencil, perb.size(), __FILE__, __LINE__);
 
    // An edge has four neighbouring spatial cells. Calculate
@@ -1991,8 +1992,8 @@ __device__ void calculateEdgeElectricFieldZDevice(fsgrids::perbspan perb,
    size_t self = stencil.ooo();
    size_t nbr = stencil.oop();
    auto wavespeeds = calculateWaveSpeedXYDevice(perb, moments, dperb, dmoments, bgb, gridSpacing, rhomLimits, self, nbr, Bx_S,
-                                          By_W, dBxdy_S, dBxdz_S, dBydx_W, dBydz_W, MINUS, MINUS);
-   c_x = wavespeeds.minVelocity();
+                                          By_W, dBxdy_S, dBxdz_S, dBydx_W, dBydz_W, MINUS, MINUS, parameters);
+   c_x = wavespeeds.minVelocity(parameters);
    c_y = c_x;
    ax_neg = max(ZERO, -Vx0 + c_x);
    ax_pos = max(ZERO, +Vx0 + c_x);
@@ -2016,8 +2017,8 @@ __device__ void calculateEdgeElectricFieldZDevice(fsgrids::perbspan perb,
    self = stencil.moo();
    nbr = stencil.mop();
    wavespeeds = calculateWaveSpeedXYDevice(perb, moments, dperb, dmoments, bgb, gridSpacing, rhomLimits, self, nbr, Bx_S,
-                                     By_E, dBxdy_S, dBxdz_S, dBydx_E, dBydz_E, PLUS, MINUS);
-   c_x = wavespeeds.minVelocity();
+                                     By_E, dBxdy_S, dBxdz_S, dBydx_E, dBydz_E, PLUS, MINUS, parameters);
+   c_x = wavespeeds.minVelocity(parameters);
    c_y = c_x;
    ax_neg = max(ax_neg, -Vx0 + c_x);
    ax_pos = max(ax_pos, +Vx0 + c_x);
@@ -2041,8 +2042,8 @@ __device__ void calculateEdgeElectricFieldZDevice(fsgrids::perbspan perb,
    self = stencil.omo();
    nbr = stencil.omp();
    wavespeeds = calculateWaveSpeedXYDevice(perb, moments, dperb, dmoments, bgb, gridSpacing, rhomLimits, self, nbr, Bx_N,
-                                     By_W, dBxdy_N, dBxdz_N, dBydx_W, dBydz_W, MINUS, PLUS);
-   c_x = wavespeeds.minVelocity();
+                                     By_W, dBxdy_N, dBxdz_N, dBydx_W, dBydz_W, MINUS, PLUS, parameters);
+   c_x = wavespeeds.minVelocity(parameters);
    c_y = c_x;
    ax_neg = max(ax_neg, -Vx0 + c_x);
    ax_pos = max(ax_pos, +Vx0 + c_x);
@@ -2066,8 +2067,8 @@ __device__ void calculateEdgeElectricFieldZDevice(fsgrids::perbspan perb,
    self = stencil.mmo();
    nbr = stencil.mmp();
    wavespeeds = calculateWaveSpeedXYDevice(perb, moments, dperb, dmoments, bgb, gridSpacing, rhomLimits, self, nbr, Bx_N,
-                                     By_E, dBxdy_N, dBxdz_N, dBydx_E, dBydz_E, PLUS, PLUS);
-   c_x = wavespeeds.minVelocity();
+                                     By_E, dBxdy_N, dBxdz_N, dBydx_E, dBydz_E, PLUS, PLUS, parameters);
+   c_x = wavespeeds.minVelocity(parameters);
    c_y = c_x;
    ax_neg = max(ax_neg, -Vx0 + c_x);
    ax_pos = max(ax_pos, +Vx0 + c_x);
@@ -2076,19 +2077,19 @@ __device__ void calculateEdgeElectricFieldZDevice(fsgrids::perbspan perb,
    maxV = max(maxV, wavespeeds.cflSpeed(Vx0, Vy0));
 
    // Resistive terms
-   if (dev_resistivity > 0) {
+   if (parameters.resistivity > 0) {
       const std::array indices = {static_cast<size_t>(fsgrids::dperb::dPERBydx),
                                   static_cast<size_t>(fsgrids::dperb::dPERBxdy)};
       const std::array spacing = {gridSpacing[0], gridSpacing[1]};
 
-      Ez_SW += resistiveTermDevice(sw.bgb, sw.perb, sw.dperb, sw.moments[fsgrids::moments::RHOQ], indices, spacing);
-      Ez_SE += resistiveTermDevice(se.bgb, se.perb, se.dperb, se.moments[fsgrids::moments::RHOQ], indices, spacing);
-      Ez_NW += resistiveTermDevice(nw.bgb, nw.perb, nw.dperb, nw.moments[fsgrids::moments::RHOQ], indices, spacing);
-      Ez_NE += resistiveTermDevice(ne.bgb, ne.perb, ne.dperb, ne.moments[fsgrids::moments::RHOQ], indices, spacing);
+      Ez_SW += resistiveTermDevice(sw.bgb, sw.perb, sw.dperb, sw.moments[fsgrids::moments::RHOQ], indices, spacing, parameters);
+      Ez_SE += resistiveTermDevice(se.bgb, se.perb, se.dperb, se.moments[fsgrids::moments::RHOQ], indices, spacing, parameters);
+      Ez_NW += resistiveTermDevice(nw.bgb, nw.perb, nw.dperb, nw.moments[fsgrids::moments::RHOQ], indices, spacing, parameters);
+      Ez_NE += resistiveTermDevice(ne.bgb, ne.perb, ne.dperb, ne.moments[fsgrids::moments::RHOQ], indices, spacing, parameters);
    }
 
    // Hall terms
-   if (dev_ohmHallTerm > 0) {
+   if (parameters.ohmHallTerm > 0) {
       Ez_SW += ehall[ci.sw][fsgrids::ehall::EZHALL_000_001];
       Ez_SE += ehall[ci.se][fsgrids::ehall::EZHALL_100_101];
       Ez_NW += ehall[ci.nw][fsgrids::ehall::EZHALL_010_011];
@@ -2096,7 +2097,7 @@ __device__ void calculateEdgeElectricFieldZDevice(fsgrids::perbspan perb,
    }
 
    // Electron pressure gradient terms
-   if (dev_ohmGradPeTerm > 0) {
+   if (parameters.ohmGradPeTerm > 0) {
       Ez_SW += egradpe[ci.sw][fsgrids::egradpe::EZGRADPE];
       Ez_SE += egradpe[ci.se][fsgrids::egradpe::EZGRADPE];
       Ez_NW += egradpe[ci.nw][fsgrids::egradpe::EZGRADPE];
@@ -2105,7 +2106,7 @@ __device__ void calculateEdgeElectricFieldZDevice(fsgrids::perbspan perb,
 
    // Calculate properly upwinded edge-averaged Ez:
    const UpwindFieldDevice f(Ez_NE, Ez_SE, Ez_NW, Ez_SW, ax_pos, ax_neg, ay_pos, ay_neg, perBx_S, perBx_N, perBy_W, perBy_E,
-                       dperBxdy_S, dperBxdy_N, dperBydx_W, dperBydx_E);
+                       dperBxdy_S, dperBxdy_N, dperBydx_W, dperBydx_E, parameters);
    e[ci.sw][fsgrids::efield::EZ] = f();
 
    if ((RKCase == RK_ORDER1) || (RKCase == RK_ORDER2_STEP2)) {
@@ -2235,7 +2236,7 @@ __device__ void calculateElectricFieldDevice(fsgrids::perbspan perb,
                             fsgrids::constdmomentsspan dmoments,
                             fsgrids::constbgbspan bgb,
                             fsgrids::technicalspan technical, const fsgrid::FsStencil& stencil,
-                            const std::array<Real, 3>& gridSpacing, SysBoundaryDevice *sysBoundaries, int32_t RKCase) {
+                            const std::array<Real, 3>& gridSpacing, SysBoundaryDevice *sysBoundaries, int32_t RKCase, const DeviceParameters& parameters) {
    cuint cellSysBoundaryFlag = technical[stencil.ooo()].sysBoundaryFlag;
    cuint bitfield = technical[stencil.ooo()].SOLVE;
 
@@ -2246,21 +2247,21 @@ __device__ void calculateElectricFieldDevice(fsgrids::perbspan perb,
 
    if ((bitfield & compute::EX) == compute::EX) {
       calculateEdgeElectricFieldXDevice(perb, dperb, e, ehall, egradpe, moments, dmoments, bgb, technical, stencil, RKCase,
-                                  gridSpacing);
+                                  gridSpacing, parameters);
    } else {
       fieldSolverBoundaryCondElectricFieldDevice(cellSysBoundaryFlag, sysBoundaries, e, stencil, 0);
    }
 
    if ((bitfield & compute::EY) == compute::EY) {
       calculateEdgeElectricFieldYDevice(perb, dperb, e, ehall, egradpe, moments, dmoments, bgb, technical, stencil, RKCase,
-                                  gridSpacing);
+                                  gridSpacing, parameters);
    } else {
       fieldSolverBoundaryCondElectricFieldDevice(cellSysBoundaryFlag, sysBoundaries, e, stencil, 1);
    }
 
    if ((bitfield & compute::EZ) == compute::EZ) {
       calculateEdgeElectricFieldZDevice(perb, dperb, e, ehall, egradpe, moments, dmoments, bgb, technical, stencil, RKCase,
-                                  gridSpacing);
+                                  gridSpacing, parameters);
    } else {
       fieldSolverBoundaryCondElectricFieldDevice(cellSysBoundaryFlag, sysBoundaries, e, stencil, 2);
    }
@@ -2395,7 +2396,8 @@ void calculateUpwindedElectricFieldSimpleDevice(fsgrids::perbspan perb,
                                           fsgrids::bgbspan bgb,
                                           fsgrids::technicalspan technical, FieldSolverGrid &fsgrid,
                                           SysBoundaryDevice *sysBoundaries, int32_t RKCase,
-                                          const bool communicateEGradPeOrMomentsDerivatives) {
+                                          const bool communicateEGradPeOrMomentsDerivatives,
+                                          const DeviceParameters& parameters) {
    const size_t numCells = fsgrid.getNumCells();
 
    if (not(RKCase == RK_ORDER1 || RKCase == RK_ORDER2_STEP2)) {
@@ -2447,7 +2449,7 @@ void calculateUpwindedElectricFieldSimpleDevice(fsgrids::perbspan perb,
                        phiprof::initializeTimer("Electric field compute cells"), technical,
                        [=] __device__(const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
                           calculateElectricFieldDevice(perb, dperb, e, ehall, egradpe, moments, dmoments, bgb, technical, stencil,
-                                                 coordinates.physicalGridSpacing, sysBoundaries, RKCase);
+                                                 coordinates.physicalGridSpacing, sysBoundaries, RKCase, parameters);
                        });
 
    cudaDeviceSynchronize();
@@ -2460,6 +2462,7 @@ void calculateUpwindedElectricFieldSimpleDevice(fsgrids::perbspan perb,
       fsgrid.updateGhostCells(std::span(hostStagingBuffer));
       cudaMemcpy(e.data(), hostStagingBuffer.data(), e.size_bytes(), cudaMemcpyHostToDevice);
    }
+
    mpiTimer.stop();
 
    cudaDeviceSynchronize();

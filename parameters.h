@@ -305,55 +305,40 @@ struct Parameters {
    static void getParameters();
 };
 
-__device__ Real dev_xmin;    /*!< X-coordinate of the lower left corner of the spatial grid. */
-__device__ Real dev_xmax;    /*!< X-coordinate of the upper right corner of the spatial grid. */
-__device__ Real dev_ymin;    /*!< Y-coordinate of the lower left corner of the spatial grid. */
-__device__ Real dev_ymax;    /*!< Y-coordinate of the upper right corner of the spatial grid. */
-__device__ Real dev_zmin;    /*!< Z-coordinate of the lower left corner of the spatial grid. */
-__device__ Real dev_zmax;    /*!< Z-coordinate of the upper right corner of the spatial grid. */
-__device__ Real dev_dx_ini;  /*!< Initial size of spatial cell in x-direction. */
-__device__ Real dev_dy_ini;  /*!< Initial size of spatial cell in y-direction. */
-__device__ Real dev_dz_ini;  /*!< Initial size of spatial cell in z-direction. */
-__device__ uint dev_xcells_ini; /*!< Initial number of spatial cells in x-direction. */
-__device__ uint dev_ycells_ini; /*!< Initial number of spatial cells in y-direction. */
-__device__ uint dev_zcells_ini; /*!< Initial number of spatial cells in z-direction. */
-__device__ uint dev_ohmHallTerm; /*!< Enable/choose spatial order of Hall term in Ohm's law JXB term. 0: off, 1: 1st spatial
-                              order, 2: 2nd spatial order. */
-__device__ Real dev_electronTemperature; /*!< Upstream electron temperature to be used for the electron pressure gradient
-                                    term (K). */
-__device__ Real
-      dev_electronDensity; /*!< Upstream electron density to be used for the electron pressure gradient term (m^-3). */
-__device__ Real dev_electronPTindex; /*!> Polytropic index for electron pressure gradient term. 0 is isobaric, 1 is
-                                 isothermal, 1.667 is adiabatic electrons */
-__device__ bool dev_fieldSolverFiniteDifferencingAtBoundaries; /*!< Enable finite differencing at sysboundaries*/
-__device__ Real dev_maxWaveVelocity;         /*!< Maximum wave velocity allowed in LDZ. */
-__device__ Real dev_resistivity;             /*!< Resistivity in Ohm's law eta*J term. */
-__device__ uint dev_ohmGradPeTerm; /*!< Enable/choose spatial order of the electron pressure gradient term in Ohm's law. 0:
-                                 off, 1: 1st spatial order. */
-__device__ bool dev_fieldSolverDiffusiveEterms; /*!< Enable resistive terms in the computation of E*/
+struct DeviceParameters {
+   Real xmin, xmax, ymin, ymax, zmin, zmax;
+   Real dx_ini, dy_ini, dz_ini;
+   uint xcells_ini, ycells_ini, zcells_ini;
+   uint ohmHallTerm;
+   Real electronTemperature, electronDensity, electronPTindex;
+   bool fieldSolverFiniteDifferencingAtBoundaries;
+   Real maxWaveVelocity;
+   Real resistivity;
+   uint ohmGradPeTerm;
+   bool fieldSolverDiffusiveEterms;
+};
 
-inline void uploadParametersToDevice() {
-   cudaMemcpyToSymbol(dev_xmin, &Parameters::xmin, sizeof(Real));
-   cudaMemcpyToSymbol(dev_xmax, &Parameters::xmax, sizeof(Real));
-   cudaMemcpyToSymbol(dev_ymin, &Parameters::ymin, sizeof(Real));
-   cudaMemcpyToSymbol(dev_ymax, &Parameters::ymax, sizeof(Real));
-   cudaMemcpyToSymbol(dev_zmin, &Parameters::zmin, sizeof(Real));
-   cudaMemcpyToSymbol(dev_zmax, &Parameters::zmax, sizeof(Real));
-   cudaMemcpyToSymbol(dev_dx_ini, &Parameters::dx_ini, sizeof(Real));
-   cudaMemcpyToSymbol(dev_dy_ini, &Parameters::dy_ini, sizeof(Real));
-   cudaMemcpyToSymbol(dev_dz_ini, &Parameters::dz_ini, sizeof(Real));
-   cudaMemcpyToSymbol(dev_xcells_ini, &Parameters::xcells_ini, sizeof(uint));
-   cudaMemcpyToSymbol(dev_ycells_ini, &Parameters::ycells_ini, sizeof(uint));
-   cudaMemcpyToSymbol(dev_zcells_ini, &Parameters::zcells_ini, sizeof(uint));
-   cudaMemcpyToSymbol(dev_ohmHallTerm, &Parameters::ohmHallTerm, sizeof(uint));
-   cudaMemcpyToSymbol(dev_electronTemperature, &Parameters::electronTemperature, sizeof(Real));
-   cudaMemcpyToSymbol(dev_electronDensity, &Parameters::electronDensity, sizeof(Real));
-   cudaMemcpyToSymbol(dev_electronPTindex, &Parameters::electronPTindex, sizeof(Real));
-   cudaMemcpyToSymbol(dev_fieldSolverFiniteDifferencingAtBoundaries, &Parameters::fieldSolverFiniteDifferencingAtBoundaries, sizeof(bool));
-   cudaMemcpyToSymbol(dev_maxWaveVelocity, &Parameters::maxWaveVelocity, sizeof(Real));
-   cudaMemcpyToSymbol(dev_resistivity, &Parameters::resistivity, sizeof(Real));
-   cudaMemcpyToSymbol(dev_ohmGradPeTerm, &Parameters::ohmGradPeTerm, sizeof(uint));
-   cudaMemcpyToSymbol(dev_fieldSolverDiffusiveEterms, &Parameters::fieldSolverDiffusiveEterms, sizeof(bool));
+inline DeviceParameters uploadParametersToDevice() {
+   DeviceParameters deviceParameters;
+   deviceParameters.xmin = Parameters::xmin;   deviceParameters.xmax = Parameters::xmax;
+   deviceParameters.ymin = Parameters::ymin;   deviceParameters.ymax = Parameters::ymax;
+   deviceParameters.zmin = Parameters::zmin;   deviceParameters.zmax = Parameters::zmax;
+   deviceParameters.dx_ini = Parameters::dx_ini;
+   deviceParameters.dy_ini = Parameters::dy_ini;
+   deviceParameters.dz_ini = Parameters::dz_ini;
+   deviceParameters.xcells_ini = Parameters::xcells_ini;
+   deviceParameters.ycells_ini = Parameters::ycells_ini;
+   deviceParameters.zcells_ini = Parameters::zcells_ini;
+   deviceParameters.ohmHallTerm = Parameters::ohmHallTerm;
+   deviceParameters.electronTemperature = Parameters::electronTemperature;
+   deviceParameters.electronDensity = Parameters::electronDensity;
+   deviceParameters.electronPTindex = Parameters::electronPTindex;
+   deviceParameters.fieldSolverFiniteDifferencingAtBoundaries = Parameters::fieldSolverFiniteDifferencingAtBoundaries;
+   deviceParameters.maxWaveVelocity = Parameters::maxWaveVelocity;
+   deviceParameters.resistivity = Parameters::resistivity;
+   deviceParameters.ohmGradPeTerm = Parameters::ohmGradPeTerm;
+   deviceParameters.fieldSolverDiffusiveEterms = Parameters::fieldSolverDiffusiveEterms;
+   return deviceParameters;
 }
 
 #endif

@@ -656,6 +656,7 @@ int simulate(int argn,char* args[]) {
    // If not a restart, perBGrid and dPerBGrid are up to date after propagateFields just above. Otherwise, we should compute them.
    if(P::isRestart) {
       uploadParametersToDevice();
+      DeviceParameters parameters = uploadParametersToDevice();
       ALLOCATE_GPU(gpuMemoryManager, d_perb, perb.size() * sizeof(fsgrids::perbElement));
       ALLOCATE_GPU(gpuMemoryManager, d_dmoments, dmoments.size() * sizeof(fsgrids::dmomentsElement));
       ALLOCATE_GPU(gpuMemoryManager, d_technical, technical.size() * sizeof(fsgrids::technical));
@@ -683,7 +684,8 @@ int simulate(int argn,char* args[]) {
          dev_dmoments,
          dev_technical,
          fsgrid,
-         false // Don't communicate moments, they are not needed here.
+         false, // Don't communicate moments, they are not needed here.
+         parameters
       );
       cudaMemcpy(dperb.data(), d_dperb, dperb.size() * sizeof(fsgrids::dperbElement), cudaMemcpyDeviceToHost);
       cudaMemcpy(dmoments.data(), d_dmoments, dmoments.size() * sizeof(fsgrids::dmomentsElement), cudaMemcpyDeviceToHost);

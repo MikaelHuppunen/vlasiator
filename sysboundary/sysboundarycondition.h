@@ -160,6 +160,8 @@ namespace SBC {
          void setPeriodicity(
             std::array<bool, 3> isFacePeriodic
          );
+         /*! Array of bool telling whether the system is periodic in any direction. */
+         std::array<bool, 3> periodic;
       protected:
          void determineFace(
             bool* isThisCellOnAFace,
@@ -265,8 +267,6 @@ namespace SBC {
          uint precedence;
          /*! Is the boundary condition dynamic in time or not. */
          bool dynamic;
-         /*! Array of bool telling whether the system is periodic in any direction. */
-         std::array<bool, 3> periodic;
          /*! Map of closest nonsysboundarycells. Used in getAllClosestNonsysboundaryCells. */
          std::unordered_map<CellID, std::vector<CellID>> allClosestNonsysboundaryCells;
          /*! Map of close nonsysboundarycells. Used in getAllCloseNonsysboundaryCells. */
@@ -298,14 +298,18 @@ namespace SBC {
     */
    class SysBoundaryConditionDevice {
       public:
-         SysBoundaryConditionDevice() = default;
+         __device__ explicit SysBoundaryConditionDevice(const bool* periodic_input) {
+            for (int i = 0; i < 3; i++) {
+               periodic[i] = periodic_input[i];
+            }
+         }
          virtual ~SysBoundaryConditionDevice() = default;
          virtual Real __device__ fieldSolverBoundaryCondMagneticField(fsgrids::perbspan b,
                                               fsgrids::constbgbspan bgb,
                                               fsgrids::consttechnicalspan technical,
                                               const std::array<Real, 3>& gridSpacing,
                                               const std::array<fsgrid::FsSize_t, 3>& globalCoordinates,
-                                              const fsgrid::FsStencil& stencil, cuint component) = 0;
+                                              const fsgrid::FsStencil& stencil, cuint component, const DeviceParameters& parameters) = 0;
          
          virtual void __device__ fieldSolverBoundaryCondElectricField(fsgrids::efieldspan e,
                                                      const fsgrid::FsStencil& stencil, cuint component) = 0;
@@ -345,40 +349,40 @@ namespace SBC {
          __device__ inline void determineFace(
             bool* isThisCellOnAFace,
             const creal x,const  creal y,const creal z,
-            const creal dx,const creal dy,const creal dz,
+            const creal dx,const creal dy,const creal dz, const DeviceParameters& parameters,
             const bool excludeSlicesAndPeriodicDimensions = false
          ){
             for(uint i=0; i<6; i++) {
                isThisCellOnAFace[i] = false;
             }
-            if(x > dev_xmax - dx * 2) {
+            if(x > parameters.xmax - dx * 2) {
                isThisCellOnAFace[0] = true;
             }
-            if(x < dev_xmin + dx * 2) {
+            if(x < parameters.xmin + dx * 2) {
                isThisCellOnAFace[1] = true;
             }
-            if(y > dev_ymax - dy * 2) {
+            if(y > parameters.ymax - dy * 2) {
                isThisCellOnAFace[2] = true;
             }
-            if(y < dev_ymin + dy * 2) {
+            if(y < parameters.ymin + dy * 2) {
                isThisCellOnAFace[3] = true;
             }
-            if(z > dev_zmax - dz * 2) {
+            if(z > parameters.zmax - dz * 2) {
                isThisCellOnAFace[4] = true;
             }
-            if(z < dev_zmin + dz * 2) {
+            if(z < parameters.zmin + dz * 2) {
                isThisCellOnAFace[5] = true;
             }
             if(excludeSlicesAndPeriodicDimensions == true) {
-               if (dev_xcells_ini == 1 || this->periodic[0]) {
+               if (parameters.xcells_ini == 1 || this->periodic[0]) {
                   isThisCellOnAFace[0] = false;
                   isThisCellOnAFace[1] = false;
                }
-               if (dev_ycells_ini == 1 || this->periodic[1]) {
+               if (parameters.ycells_ini == 1 || this->periodic[1]) {
                   isThisCellOnAFace[2] = false;
                   isThisCellOnAFace[3] = false;
                }
-               if (dev_zcells_ini == 1 || this->periodic[2]) {
+               if (parameters.zcells_ini == 1 || this->periodic[2]) {
                   isThisCellOnAFace[4] = false;
                   isThisCellOnAFace[5] = false;
                }
@@ -466,6 +470,7 @@ namespace SBC {
 
    class OuterBoundaryConditionDevice: public SysBoundaryConditionDevice {
       public:
+         __device__ explicit OuterBoundaryConditionDevice(const bool* periodic_input) : SysBoundaryConditionDevice(periodic_input) {}
       protected:
    };
 

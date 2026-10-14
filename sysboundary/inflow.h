@@ -144,8 +144,8 @@ protected:
  */
 class InflowDevice : public OuterBoundaryConditionDevice {
 public:
-   InflowDevice() = default;
-   __device__ InflowDevice(const Real (*templateB_in)[3]) {
+   __device__ InflowDevice(const bool* periodic_input, const Real (*templateB_in)[3])
+      : OuterBoundaryConditionDevice(periodic_input) {
       for (int i = 0; i < 6; i++) {
          for (int j = 0; j < 3; j++) {
             templateB[i][j] = templateB_in[i][j];
@@ -158,17 +158,17 @@ public:
                                                      fsgrids::consttechnicalspan technical,
                                                      const std::array<Real, 3>& gridSpacing,
                                                      const std::array<fsgrid::FsSize_t, 3>& globalCoordinates,
-                                                     const fsgrid::FsStencil& stencil, cuint component){
+                                                     const fsgrid::FsStencil& stencil, cuint component, const DeviceParameters& parameters){
       Real result = 0.0;
-      creal dx = dev_dx_ini;
-      creal dy = dev_dy_ini;
-      creal dz = dev_dz_ini;
-      creal x = (static_cast<Real>(globalCoordinates[0]) + 0.5) * gridSpacing[0] + dev_xmin;
-      creal y = (static_cast<Real>(globalCoordinates[1]) + 0.5) * gridSpacing[1] + dev_ymin;
-      creal z = (static_cast<Real>(globalCoordinates[2]) + 0.5) * gridSpacing[2] + dev_zmin;
+      creal dx = parameters.dx_ini;
+      creal dy = parameters.dy_ini;
+      creal dz = parameters.dz_ini;
+      creal x = (static_cast<Real>(globalCoordinates[0]) + 0.5) * gridSpacing[0] + parameters.xmin;
+      creal y = (static_cast<Real>(globalCoordinates[1]) + 0.5) * gridSpacing[1] + parameters.ymin;
+      creal z = (static_cast<Real>(globalCoordinates[2]) + 0.5) * gridSpacing[2] + parameters.zmin;
 
       bool isThisCellOnAFace[6];
-      determineFace(&isThisCellOnAFace[0], x, y, z, dx, dy, dz, true);
+      determineFace(&isThisCellOnAFace[0], x, y, z, dx, dy, dz, parameters, true);
 
       for (uint i = 0; i < 6; i++) {
          if (isThisCellOnAFace[i]) {

@@ -97,14 +97,14 @@ namespace SBC {
 
    class DoNotComputeDevice: public SysBoundaryConditionDevice {
    public:
-      DoNotComputeDevice() = default;
+      __device__ explicit DoNotComputeDevice(const bool* periodic_input) : SysBoundaryConditionDevice(periodic_input) {}
       virtual ~DoNotComputeDevice() = default;
 
       inline __device__ Real fieldSolverBoundaryCondMagneticField(fsgrids::perbspan,
                                                 fsgrids::constbgbspan,
                                                 fsgrids::consttechnicalspan, const std::array<Real, 3>&,
                                                 const std::array<fsgrid::FsSize_t, 3>&, const fsgrid::FsStencil&,
-                                                cuint) override {;
+                                                cuint, const DeviceParameters& parameters) override {;
          return 0.;
       }
       inline __device__ void fieldSolverBoundaryCondElectricField(fsgrids::efieldspan,

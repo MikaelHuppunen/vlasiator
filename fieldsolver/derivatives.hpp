@@ -40,7 +40,7 @@ void calculateDerivativesSimpleDevice(fsgrids::perbspan perb,
                                 fsgrids::dperbspan dperb,
                                 fsgrids::dmomentsspan dmoments,
                                 fsgrids::technicalspan technical, FieldSolverGrid &fsgrid,
-                                const bool doMoments);
+                                const bool doMoments, const DeviceParameters& parameters);
 
 void calculateBVOLDerivativesSimple(fsgrids::volspan vol,
                                     fsgrids::technicalspan technical, FieldSolverGrid &fsgrid);

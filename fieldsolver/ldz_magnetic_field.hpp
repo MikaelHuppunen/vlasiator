@@ -37,7 +37,7 @@ void propagateMagneticFieldSimple(fsgrids::perbspan perb,
                                   fsgrids::efieldspan e,
                                   fsgrids::efieldspan edt2,
                                   fsgrids::technicalspan technical, FieldSolverGrid &fsgrid,
-                                  SysBoundaryDevice *sysBoundaries, creal& dt, cint& RKCase);
+                                  SysBoundaryDevice *sysBoundaries, creal& dt, cint& RKCase, const DeviceParameters& parameters);
 
 __global__ void constructDoNotCompute(SBC::SysBoundaryConditionDevice* mem);
 __global__ void constructMaxwellian(SBC::SysBoundaryConditionDevice* mem, const Real (*templateB)[3]);

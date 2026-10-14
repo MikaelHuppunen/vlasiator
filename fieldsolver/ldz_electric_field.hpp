@@ -57,6 +57,7 @@ void calculateUpwindedElectricFieldSimpleDevice(fsgrids::perbspan perb,
                                           fsgrids::bgbspan bgb,
                                           fsgrids::technicalspan technical, FieldSolverGrid &fsgrid,
                                           SysBoundaryDevice *sysBoundaries, int32_t RKCase,
-                                          const bool communicateEGradPeOrMomentsDerivatives);
+                                          const bool communicateEGradPeOrMomentsDerivatives,
+                                          const DeviceParameters& parameters);
 
 #endif

@@ -137,14 +137,14 @@ namespace SBC {
     */
    class OutflowDevice: public OuterBoundaryConditionDevice {
    public:
-      OutflowDevice() = default;
+      __device__ explicit OutflowDevice(const bool* periodic_input) : OuterBoundaryConditionDevice(periodic_input) {}
       virtual ~OutflowDevice() = default;
       __device__ inline Real fieldSolverBoundaryCondMagneticField(fsgrids::perbspan b,
                                                         fsgrids::constbgbspan bgb,
                                                         fsgrids::consttechnicalspan technical,
                                                         const std::array<Real, 3>& gridSpacing,
                                                         const std::array<fsgrid::FsSize_t, 3>& globalCoordinates,
-                                                        const fsgrid::FsStencil& stencil, cuint component) {
+                                                        const fsgrid::FsStencil& stencil, cuint component, const DeviceParameters& parameters) {
          return fieldBoundaryCopyFromSolvingNbrMagneticField(b, technical, stencil, component, 1 << component);
       }
       __device__ inline void fieldSolverBoundaryCondElectricField(fsgrids::efieldspan e,

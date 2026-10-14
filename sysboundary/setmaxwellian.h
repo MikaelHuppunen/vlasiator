@@ -65,8 +65,7 @@ namespace SBC {
     */
    class MaxwellianDevice : public InflowDevice {
    public:
-      MaxwellianDevice() = default;
-      __device__ MaxwellianDevice(const Real (*templateB)[3]) : InflowDevice(templateB) {}
+      __device__ MaxwellianDevice(const bool* periodic_input, const Real (*templateB_in)[3]) : InflowDevice(periodic_input, templateB_in) {}
       virtual ~MaxwellianDevice() = default;
    };
 }
