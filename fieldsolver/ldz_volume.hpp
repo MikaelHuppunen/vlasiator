@@ -35,4 +35,10 @@ void calculateVolumeAveragedFieldsSimple(fsgrids::perbspan perb,
                                          fsgrids::volspan vol,
                                          fsgrids::technicalspan technical, FieldSolverGrid &fsgrid);
 
+void calculateVolumeAveragedFieldsSimpleDevice(fsgrids::perbspan perb,
+                                         fsgrids::efieldspan e,
+                                         fsgrids::dperbspan dperb,
+                                         fsgrids::volspan vol,
+                                         fsgrids::technicalspan technical, FieldSolverGrid &fsgrid);
+
 #endif
