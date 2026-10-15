@@ -600,6 +600,76 @@ void calculateBVOLDerivatives(fsgrids::volspan vol,
    }
 }
 
+/*! \brief Low-level spatial derivatives calculation.
+ *
+ * Calculate the spatial derivatives of BVOL or set them to zero.
+ *
+ * For sysBoundaryLayer 1 or 2, we are near a boundary, and we wish to use regular centered differences instead of slope
+ * limiter-adjusted values. This is to minimize oscillations as a smooth behaviour is required near artificial
+ * boundaries, unlike at boundaries and shocks inside the simulation domain.
+ *
+ * \param vol fsGrid holding the volume averaged fields
+ * \param technical fsGrid holding technical information (such as boundary types)
+ * \param stencil fsgrid stencil of current cell
+ *
+ * \sa calculateDerivatives calculateBVOLDerivativesSimple calculateDerivativesSimple
+ */
+
+__device__ void calculateBVOLDerivativesDevice(fsgrids::volspan vol,
+                              fsgrids::consttechnicalspan technical, const fsgrid::FsStencil& stencil, const DeviceParameters& parameters) {
+   const auto& tech = technical[stencil.ooo()];
+
+   cuint sysBoundaryFlag = tech.sysBoundaryFlag;
+   cuint sysBoundaryLayer = tech.sysBoundaryLayer;
+   const bool atSysBoundary =
+       sysBoundaryLayer == 1 || (sysBoundaryLayer == 2 && sysBoundaryFlag == sysboundarytype::NOT_SYSBOUNDARY);
+
+   using vf = fsgrids::volfields;
+
+   auto computeDiff = [](const auto& i, const auto& right, const auto& left) { return 0.5 * (right[i] - left[i]); };
+
+   auto computeLimiter = [](const auto& i, const auto& right, const auto& left, const auto& center) {
+      return deviceLimiter(left[i], center[i], right[i]);
+   };
+
+   auto& volCenter = vol[stencil.ooo()];
+   const auto poo = stencil.poo();
+   const auto moo = stencil.moo();
+   if (parameters.fieldSolverFiniteDifferencingAtBoundaries && atSysBoundary) {
+      volCenter[vf::dPERBXVOLdx] = computeDiff(vf::PERBXVOL, vol[poo], vol[moo]);
+      volCenter[vf::dPERBYVOLdx] = computeDiff(vf::PERBYVOL, vol[poo], vol[moo]);
+      volCenter[vf::dPERBZVOLdx] = computeDiff(vf::PERBZVOL, vol[poo], vol[moo]);
+   } else {
+      volCenter[vf::dPERBXVOLdx] = computeLimiter(vf::PERBXVOL, vol[poo], vol[moo], volCenter);
+      volCenter[vf::dPERBYVOLdx] = computeLimiter(vf::PERBYVOL, vol[poo], vol[moo], volCenter);
+      volCenter[vf::dPERBZVOLdx] = computeLimiter(vf::PERBZVOL, vol[poo], vol[moo], volCenter);
+   }
+
+   const auto opo = stencil.opo();
+   const auto omo = stencil.omo();
+   if (parameters.fieldSolverFiniteDifferencingAtBoundaries && atSysBoundary) {
+      volCenter[vf::dPERBXVOLdy] = computeDiff(vf::PERBXVOL, vol[opo], vol[omo]);
+      volCenter[vf::dPERBYVOLdy] = computeDiff(vf::PERBYVOL, vol[opo], vol[omo]);
+      volCenter[vf::dPERBZVOLdy] = computeDiff(vf::PERBZVOL, vol[opo], vol[omo]);
+   } else {
+      volCenter[vf::dPERBXVOLdy] = computeLimiter(vf::PERBXVOL, vol[opo], vol[omo], volCenter);
+      volCenter[vf::dPERBYVOLdy] = computeLimiter(vf::PERBYVOL, vol[opo], vol[omo], volCenter);
+      volCenter[vf::dPERBZVOLdy] = computeLimiter(vf::PERBZVOL, vol[opo], vol[omo], volCenter);
+   }
+
+   const auto oop = stencil.oop();
+   const auto oom = stencil.oom();
+   if (parameters.fieldSolverFiniteDifferencingAtBoundaries && atSysBoundary) {
+      volCenter[vf::dPERBXVOLdz] = computeDiff(vf::PERBXVOL, vol[oop], vol[oom]);
+      volCenter[vf::dPERBYVOLdz] = computeDiff(vf::PERBYVOL, vol[oop], vol[oom]);
+      volCenter[vf::dPERBZVOLdz] = computeDiff(vf::PERBZVOL, vol[oop], vol[oom]);
+   } else {
+      volCenter[vf::dPERBXVOLdz] = computeLimiter(vf::PERBXVOL, vol[oop], vol[oom], volCenter);
+      volCenter[vf::dPERBYVOLdz] = computeLimiter(vf::PERBYVOL, vol[oop], vol[oom], volCenter);
+      volCenter[vf::dPERBZVOLdz] = computeLimiter(vf::PERBZVOL, vol[oop], vol[oom], volCenter);
+   }
+}
+
 /*! \brief High-level derivative calculation wrapper function.
  *
  * BVOL has been calculated locally by calculateVolumeAveragedFields but not communicated.
@@ -626,6 +696,43 @@ void calculateBVOLDerivativesSimple(fsgrids::volspan vol,
                        [=](const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
                           calculateBVOLDerivatives(vol, technical, stencil);
                       });
+
+   derivsTimer.stop(numCells, "Spatial Cells");
+}
+
+/*! \brief High-level derivative calculation wrapper function.
+ *
+ * BVOL has been calculated locally by calculateVolumeAveragedFields but not communicated.
+ * For the acceleration step one needs the cross-derivatives of BVOL
+ *
+ * \param vol fsGrid holding the volume averaged fields
+ * \param technical fsGrid holding technical information (such as boundary types)
+ * \param fsgrid fsgrid container
+ *
+ * \sa calculateDerivatives calculateBVOLDerivatives calculateDerivativesSimple
+ */
+void calculateBVOLDerivativesSimpleDevice(fsgrids::volspan vol,
+                                    fsgrids::technicalspan technical, FieldSolverGrid &fsgrid, const DeviceParameters& parameters) {
+   phiprof::Timer derivsTimer{"Calculate volume derivatives"};
+   const size_t numCells = fsgrid.getNumCells();
+
+   phiprof::Timer commTimer{"BVOL derivatives ghost updates MPI", {"MPI"}};
+   {
+      std::vector<fsgrids::volElement> hostStagingBuffer(vol.size());
+      cudaMemcpy(hostStagingBuffer.data(), vol.data(), vol.size_bytes(), cudaMemcpyDeviceToHost);
+      fsgrid.updateGhostCells(std::span(hostStagingBuffer));
+      cudaMemcpy(vol.data(), hostStagingBuffer.data(), vol.size_bytes(), cudaMemcpyHostToDevice);
+   }
+   commTimer.stop(numCells, "Spatial Cells");
+   cudaDeviceSynchronize();
+
+   // Calculate derivatives
+   fsgrid.parallel_for_GPU([](int timerId) ->  phiprof::Timer { return phiprof::Timer{timerId}; },
+                       phiprof::initializeTimer("FS derivatives BVOL compute cells"), technical,
+                       [=] __device__(const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
+                          calculateBVOLDerivativesDevice(vol, technical, stencil, parameters);
+                      });
+   cudaDeviceSynchronize();
 
    derivsTimer.stop(numCells, "Spatial Cells");
 }

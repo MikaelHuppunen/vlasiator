@@ -45,6 +45,9 @@ void calculateDerivativesSimpleDevice(fsgrids::perbspan perb,
 void calculateBVOLDerivativesSimple(fsgrids::volspan vol,
                                     fsgrids::technicalspan technical, FieldSolverGrid &fsgrid);
 
+void calculateBVOLDerivativesSimpleDevice(fsgrids::volspan vol,
+                                    fsgrids::technicalspan technical, FieldSolverGrid &fsgrid, const DeviceParameters& parameters);
+
 void calculateCurvatureSimple(fsgrids::volspan vol,
                               fsgrids::constbgbspan bgb,
                               fsgrids::technicalspan technical, FieldSolverGrid &fsgrid);

@@ -76,8 +76,8 @@ bool propagateFields(fsgrids::perbspan perb,
                      fsgrids::dmomentsspan dmomentsdt2,
                      fsgrids::bgbspan bgb,
                      fsgrids::volspan vol,
-                     fsgrids::technicalspan technical, FieldSolverGrid &fsgrid, SysBoundary& sysBoundaries,
-                     creal& dt, cuint subcycles);
+                     fsgrids::technicalspan technical, FieldSolverGrid &fsgrid, SysBoundaryDevice *sysBoundaries,
+                     creal& dt, cuint subcycles, const DeviceParameters& parameters);
 
 Real divideIfNonZero(creal rhoV, creal rho);
 
