@@ -162,6 +162,112 @@ void filterMoments(fsgrid::FsData<std::array<Real, fsgrids::moments::N_MOMENTS>>
    }
 }
 
+/*
+Filter moments after feeding them to FsGrid to alleviate the staircase effect caused in AMR runs.
+This is using a 3D, 5-point stencil triangle kernel.
+*/
+void filterMomentsDevice(fsgrid::FsData<std::array<Real, fsgrids::moments::N_MOMENTS>>& moments,
+                   fsgrids::technicalspan technical, FieldSolverGrid &fsgrid, DeviceParameters& parameters) {
+
+   // Kernel Characteristics
+   constexpr int kernelOffset = 2;                // offset of 5 pointstencil 3D kernel => (floor(stencilWidth/2);)
+   constexpr Real inverseKernelSum = 1.0 / 729.0; // the inverse of the total kernel's sum
+   constexpr Real kernel[5][5][5] = {
+       {{1 * inverseKernelSum, 2 * inverseKernelSum, 3 * inverseKernelSum, 2 * inverseKernelSum, 1 * inverseKernelSum},
+        {2 * inverseKernelSum, 4 * inverseKernelSum, 6 * inverseKernelSum, 4 * inverseKernelSum, 2 * inverseKernelSum},
+        {3 * inverseKernelSum, 6 * inverseKernelSum, 9 * inverseKernelSum, 6 * inverseKernelSum, 3 * inverseKernelSum},
+        {2 * inverseKernelSum, 4 * inverseKernelSum, 6 * inverseKernelSum, 4 * inverseKernelSum, 2 * inverseKernelSum},
+        {1 * inverseKernelSum, 2 * inverseKernelSum, 3 * inverseKernelSum, 2 * inverseKernelSum, 1 * inverseKernelSum}},
+
+       {{2 * inverseKernelSum, 4 * inverseKernelSum, 6 * inverseKernelSum, 4 * inverseKernelSum, 2 * inverseKernelSum},
+        {4 * inverseKernelSum, 8 * inverseKernelSum, 12 * inverseKernelSum, 8 * inverseKernelSum, 4 * inverseKernelSum},
+        {6 * inverseKernelSum, 12 * inverseKernelSum, 18 * inverseKernelSum, 12 * inverseKernelSum, 6 * inverseKernelSum},
+        {4 * inverseKernelSum, 8 * inverseKernelSum, 12 * inverseKernelSum, 8 * inverseKernelSum, 4 * inverseKernelSum},
+        {2 * inverseKernelSum, 4 * inverseKernelSum, 6 * inverseKernelSum, 4 * inverseKernelSum, 2 * inverseKernelSum}},
+
+       {{3 * inverseKernelSum, 6 * inverseKernelSum, 9 * inverseKernelSum, 6 * inverseKernelSum, 3 * inverseKernelSum},
+        {6 * inverseKernelSum, 12 * inverseKernelSum, 18 * inverseKernelSum, 12 * inverseKernelSum, 6 * inverseKernelSum},
+        {9 * inverseKernelSum, 18 * inverseKernelSum, 27 * inverseKernelSum, 18 * inverseKernelSum, 9 * inverseKernelSum},
+        {6 * inverseKernelSum, 12 * inverseKernelSum, 18 * inverseKernelSum, 12 * inverseKernelSum, 6 * inverseKernelSum},
+        {3 * inverseKernelSum, 6 * inverseKernelSum, 9 * inverseKernelSum, 6 * inverseKernelSum, 3 * inverseKernelSum}},
+
+       {{2 * inverseKernelSum, 4 * inverseKernelSum, 6 * inverseKernelSum, 4 * inverseKernelSum, 2 * inverseKernelSum},
+        {4 * inverseKernelSum, 8 * inverseKernelSum, 12 * inverseKernelSum, 8 * inverseKernelSum, 4 * inverseKernelSum},
+        {6 * inverseKernelSum, 12 * inverseKernelSum, 18 * inverseKernelSum, 12 * inverseKernelSum, 6 * inverseKernelSum},
+        {4 * inverseKernelSum, 8 * inverseKernelSum, 12 * inverseKernelSum, 8 * inverseKernelSum, 4 * inverseKernelSum},
+        {2 * inverseKernelSum, 4 * inverseKernelSum, 6 * inverseKernelSum, 4 * inverseKernelSum, 2 * inverseKernelSum}},
+
+       {{1 * inverseKernelSum, 2 * inverseKernelSum, 3 * inverseKernelSum, 2 * inverseKernelSum, 1 * inverseKernelSum},
+        {2 * inverseKernelSum, 4 * inverseKernelSum, 6 * inverseKernelSum, 4 * inverseKernelSum, 2 * inverseKernelSum},
+        {3 * inverseKernelSum, 6 * inverseKernelSum, 9 * inverseKernelSum, 6 * inverseKernelSum, 3 * inverseKernelSum},
+        {2 * inverseKernelSum, 4 * inverseKernelSum, 6 * inverseKernelSum, 4 * inverseKernelSum, 2 * inverseKernelSum},
+        {1 * inverseKernelSum, 2 * inverseKernelSum, 3 * inverseKernelSum, 2 * inverseKernelSum, 1 * inverseKernelSum}}};
+
+   // Create a copy of moments data for filtering
+   fsgrid::FsData<std::array<Real, fsgrids::moments::N_MOMENTS>> blurred(moments.size());
+
+   // Update momentsGrid Ghost Cells
+   fsgrid.updateGhostCells(moments.view());
+
+   CREATE_UNIQUE_POINTER(gpuMemoryManager, d_blurred);
+   ALLOCATE_GPU(gpuMemoryManager, d_moments, moments.size() * sizeof(fsgrids::momentsElement));
+   ALLOCATE_GPU(gpuMemoryManager, d_blurred, moments.size() * sizeof(fsgrids::momentsElement));
+   ALLOCATE_GPU(gpuMemoryManager, d_technical, technical.size() * sizeof(fsgrids::technical));
+   fsgrids::momentsElement *d_moments = GET_POINTER(gpuMemoryManager, fsgrids::momentsElement, d_moments);
+   fsgrids::momentsElement *d_blurred = GET_POINTER(gpuMemoryManager, fsgrids::momentsElement, d_blurred);
+   fsgrids::technical *d_technical = GET_POINTER(gpuMemoryManager, fsgrids::technical, d_technical);
+   std::span<fsgrids::momentsElement> dev_moments(d_moments, moments.size());
+   std::span<fsgrids::momentsElement> dev_blurred(d_blurred, moments.size());
+   std::span<fsgrids::technical> dev_technical(d_technical, technical.size());
+   cudaMemcpy(d_technical, technical.data(), technical.size() * sizeof(fsgrids::technical), cudaMemcpyHostToDevice);
+
+   // Filtering Loop
+   for (auto blurPass = 0; blurPass < Parameters::maxFilteringPasses; blurPass++) {
+      // Blurring Pass
+      cudaMemcpy(d_moments, moments.data(),  moments.size() * sizeof(fsgrids::momentsElement), cudaMemcpyHostToDevice);
+      fsgrid.parallel_for_GPU([](int timerId) -> phiprof::Timer { return phiprof::Timer{timerId}; },
+                          phiprof::initializeTimer("Filtering loop"), dev_technical,
+                          [=] __device__(const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
+                             const auto refLevel = dev_technical[stencil.ooo()].refLevel;
+                             auto& blurCell = dev_blurred[stencil.ooo()];
+
+                             // Skip pass, set blurCell value equal to original
+                             if (blurPass >= parameters.numPasses.at(refLevel) || sysBoundaryFlag != sysboundarytype::NOT_SYSBOUNDARY) {
+                                blurCell = dev_moments[stencil.ooo()];
+                                // this was a continue before moving to parallel_for, now the rest of the body of the loop is in the else below.
+                             } else {
+                                // Set Cell to zero before passing filter
+                                blurCell.fill(0.0);
+
+                                // Perform the blur
+                                for (int c = -kernelOffset; c <= kernelOffset; c++) {
+                                   for (int b = -kernelOffset; b <= kernelOffset; b++) {
+                                      for (int a = -kernelOffset; a <= kernelOffset; a++) {
+                                         const auto& cell = dev_moments[stencil.indexFromOffset(a,b,c)];
+                                         for (int e = 0; e < fsgrids::moments::N_MOMENTS; ++e) {
+                                            blurCell[e] += cell[e] * kernel[kernelOffset + a][kernelOffset + b][kernelOffset + c];
+                                         }
+                                      }
+                                   }
+                                } // inner filtering loop
+                             } // else
+               });
+
+      cudaDeviceSynchronize();
+
+      cudaMemcpy(moments.data(), d_moments, moments.size() * sizeof(fsgrids::momentsElement), cudaMemcpyDeviceToHost);
+      cudaMemcpy(blurred.data(), d_blurred, blurred.size() * sizeof(fsgrids::momentsElement), cudaMemcpyDeviceToHost);
+
+      using std::swap;
+      swap(moments, blurred);
+      fsgrid.updateGhostCells(moments.view());
+
+      // If outflow boundaries exist, filtered moments must be recopied there
+      copyMomentsToOutflow(moments, technical, fsgrid);
+      fsgrid.updateGhostCells(moments.view());
+   }
+}
+
 void feedMomentsIntoFsGrid(dccrg::Dccrg<SpatialCell, dccrg::Cartesian_Geometry>& mpiGrid,
                            const std::vector<CellID>& cells,
                            fsgrid::FsData<std::array<Real, fsgrids::moments::N_MOMENTS>>& moments,
@@ -251,6 +357,98 @@ void feedMomentsIntoFsGrid(dccrg::Dccrg<SpatialCell, dccrg::Cartesian_Geometry>&
    if (P::amrMaxSpatialRefLevel > 0) {
       phiprof::Timer filteringTimer{"AMR Filtering-Triangle-3D"};
       filterMoments(moments, technical, fsgrid);
+   }
+}
+
+void feedMomentsIntoFsGridDevice(dccrg::Dccrg<SpatialCell, dccrg::Cartesian_Geometry>& mpiGrid,
+                           const std::vector<CellID>& cells,
+                           fsgrid::FsData<std::array<Real, fsgrids::moments::N_MOMENTS>>& moments,
+                           fsgrids::technicalspan technical, FieldSolverGrid &fsgrid, DeviceParameters& parameters, bool dt2 /*=false*/) {
+
+   int ii;
+   // sorted list of dccrg cells. cells is typicall already sorted, but just to make sure....
+   std::vector<CellID> dccrgCells = cells;
+   std::sort(dccrgCells.begin(), dccrgCells.end());
+
+   // map receive process => receive buffers
+   std::map<int, std::vector<Real>> receivedData;
+
+   // send buffers  to each process
+   std::map<int, std::vector<Real>> sendData;
+
+   // list of requests
+   std::vector<MPI_Request> sendRequests;
+   std::vector<MPI_Request> receiveRequests;
+
+   // Post receives
+   receiveRequests.resize(onFsgridMapRemoteProcessGlobal.size());
+   ii = 0;
+   for (auto const& receives : onFsgridMapRemoteProcessGlobal) {
+      int process = receives.first;
+      int count = receives.second.size();
+      receivedData[process].resize(count * fsgrids::moments::N_MOMENTS);
+      MPI_Irecv(receivedData[process].data(), count * fsgrids::moments::N_MOMENTS * sizeof(Real),
+                MPI_BYTE, process, 1, MPI_COMM_WORLD, &(receiveRequests[ii++]));
+   }
+
+   // Launch sends
+   ii = 0;
+   sendRequests.resize(onDccrgMapRemoteProcessGlobal.size());
+   for (auto const& snd : onDccrgMapRemoteProcessGlobal) {
+      int targetProc = snd.first;
+      auto& sendBuffer = sendData[targetProc];
+      for (CellID sendCell : snd.second) {
+         // Collect data to send for this dccrg cell
+         auto cellParams = mpiGrid[sendCell]->get_cell_parameters();
+         if (!dt2) {
+            sendBuffer.push_back(cellParams[CellParams::RHOM]);
+            sendBuffer.push_back(cellParams[CellParams::RHOQ]);
+            sendBuffer.push_back(cellParams[CellParams::VX]);
+            sendBuffer.push_back(cellParams[CellParams::VY]);
+            sendBuffer.push_back(cellParams[CellParams::VZ]);
+            sendBuffer.push_back(cellParams[CellParams::P_11]);
+            sendBuffer.push_back(cellParams[CellParams::P_22]);
+            sendBuffer.push_back(cellParams[CellParams::P_33]);
+         } else {
+            sendBuffer.push_back(cellParams[CellParams::RHOM_DT2]);
+            sendBuffer.push_back(cellParams[CellParams::RHOQ_DT2]);
+            sendBuffer.push_back(cellParams[CellParams::VX_DT2]);
+            sendBuffer.push_back(cellParams[CellParams::VY_DT2]);
+            sendBuffer.push_back(cellParams[CellParams::VZ_DT2]);
+            sendBuffer.push_back(cellParams[CellParams::P_11_DT2]);
+            sendBuffer.push_back(cellParams[CellParams::P_22_DT2]);
+            sendBuffer.push_back(cellParams[CellParams::P_33_DT2]);
+         }
+      }
+      MPI_Isend(sendBuffer.data(), sendBuffer.size() * sizeof(Real),
+                MPI_BYTE, targetProc, 1, MPI_COMM_WORLD, &(sendRequests[ii]));
+      ii++;
+   }
+
+   MPI_Waitall(receiveRequests.size(), receiveRequests.data(), MPI_STATUSES_IGNORE);
+
+   for (auto const& receives : onFsgridMapRemoteProcessGlobal) {
+      int process = receives.first;                       // data received from this process
+      Real* receiveBuffer = receivedData[process].data(); // data received from process
+      for (auto const& cell : receives.second) {          // loop over cellids (dccrg) for receive
+         // this part heavily relies on both sender and receiver having cellids sorted!
+         for (auto lid : onFsgridMapCellsGlobal[cell]) {
+            auto& moment = moments[static_cast<size_t>(lid)];
+            for (int l = 0; l < fsgrids::moments::N_MOMENTS; l++) {
+               moment[l] = receiveBuffer[l];
+            }
+         }
+
+         receiveBuffer += fsgrids::moments::N_MOMENTS;
+      }
+   }
+
+   MPI_Waitall(sendRequests.size(), sendRequests.data(), MPI_STATUSES_IGNORE);
+
+   // Filter Moments if this is a 3D AMR run.
+   if (P::amrMaxSpatialRefLevel > 0) {
+      phiprof::Timer filteringTimer{"AMR Filtering-Triangle-3D"};
+      filterMomentsDevice(moments, technical, fsgrid, parameters);
    }
 }
 

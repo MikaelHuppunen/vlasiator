@@ -316,6 +316,7 @@ struct DeviceParameters {
    Real resistivity;
    uint ohmGradPeTerm;
    bool fieldSolverDiffusiveEterms;
+   std::array<int, 16> numPasses;
 };
 
 inline DeviceParameters uploadParametersToDevice() {
@@ -338,6 +339,9 @@ inline DeviceParameters uploadParametersToDevice() {
    deviceParameters.resistivity = Parameters::resistivity;
    deviceParameters.ohmGradPeTerm = Parameters::ohmGradPeTerm;
    deviceParameters.fieldSolverDiffusiveEterms = Parameters::fieldSolverDiffusiveEterms;
+   for(int i = 0; i < 16; i++){
+      deviceParameters.numPasses[i] = Parameters::numPasses[i];
+   }
    return deviceParameters;
 }
 

@@ -67,6 +67,21 @@ void feedMomentsIntoFsGrid(dccrg::Dccrg<SpatialCell, dccrg::Cartesian_Geometry>&
                            fsgrid::FsData<std::array<Real, fsgrids::moments::N_MOMENTS>>& moments,
                            fsgrids::technicalspan technical, FieldSolverGrid &fsgrid, bool dt2 = false);
 
+/*! Take input moments from DCCRG grid and put them into the Fieldsolver grid
+ * \param mpiGrid The DCCRG grid carrying rho, rhoV and P
+ * \param cells List of local cells
+ * \param moments fsgrid for moments quantities
+ * \param technical fsgrid with technical parameters
+ * \param fsgrid fsgrid container
+ * \param dt2 Whether to copy base moments, or _DT2 moments
+ *
+ * This function assumes that proper grid coupling has been set up.
+ */
+void feedMomentsIntoFsGridDevice(dccrg::Dccrg<SpatialCell, dccrg::Cartesian_Geometry>& mpiGrid,
+                           const std::vector<CellID>& cells,
+                           fsgrid::FsData<std::array<Real, fsgrids::moments::N_MOMENTS>>& moments,
+                           fsgrids::technicalspan technical, FieldSolverGrid &fsgrid, DeviceParameters& parameters, bool dt2 = false);
+
 /*! Copy field solver result (VOLB, VOLE, VOLPERB derivatives, gradpe) and store them back into DCCRG
  * \param volumefields fsgrid for volume-averaged fields
  * \param bgb fsgrid for background magnetic field
