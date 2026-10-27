@@ -2414,31 +2414,35 @@ void calculateUpwindedElectricFieldSimpleDevice(fsgrids::perbspan perb,
 
    // Update ghosts if necessary, unless previous terms have already updated them
    if (P::ohmHallTerm > 0) {
-      std::vector<fsgrids::ehallElement> hostStagingBuffer(ehall.size());
-      cudaMemcpy(hostStagingBuffer.data(), ehall.data(), ehall.size_bytes(), cudaMemcpyDeviceToHost);
-      fsgrid.updateGhostCells(std::span(hostStagingBuffer));
-      cudaMemcpy(ehall.data(), hostStagingBuffer.data(), ehall.size_bytes(), cudaMemcpyHostToDevice);
+      fsgrids::ehallElement *h_ehall = GET_POINTER(gpuMemoryManager, fsgrids::ehallElement, h_ehall);
+      std::span<fsgrids::ehallElement> host_ehall(h_ehall, ehall.size());
+      cudaMemcpy(host_ehall.data(), ehall.data(), ehall.size_bytes(), cudaMemcpyDeviceToHost);
+      fsgrid.updateGhostCells(host_ehall);
+      cudaMemcpy(ehall.data(), host_ehall.data(), ehall.size_bytes(), cudaMemcpyHostToDevice);
    }
 
    if (P::ohmGradPeTerm > 0 && communicateEGradPeOrMomentsDerivatives) {
-      std::vector<fsgrids::egradpeElement> hostStagingBuffer(egradpe.size());
-      cudaMemcpy(hostStagingBuffer.data(), egradpe.data(), egradpe.size_bytes(), cudaMemcpyDeviceToHost);
-      fsgrid.updateGhostCells(std::span(hostStagingBuffer));
-      cudaMemcpy(egradpe.data(), hostStagingBuffer.data(), egradpe.size_bytes(), cudaMemcpyHostToDevice);
+      fsgrids::egradpeElement *h_egradpe = GET_POINTER(gpuMemoryManager, fsgrids::egradpeElement, h_egradpe);
+      std::span<fsgrids::egradpeElement> host_egradpe(h_egradpe, egradpe.size());
+      cudaMemcpy(host_egradpe.data(), egradpe.data(), egradpe.size_bytes(), cudaMemcpyDeviceToHost);
+      fsgrid.updateGhostCells(host_egradpe);
+      cudaMemcpy(egradpe.data(), host_egradpe.data(), egradpe.size_bytes(), cudaMemcpyHostToDevice);
    }
 
    if (P::ohmHallTerm == 0) {
-      std::vector<fsgrids::dperbElement> hostStagingBuffer(dperb.size());
-      cudaMemcpy(hostStagingBuffer.data(), dperb.data(), dperb.size_bytes(), cudaMemcpyDeviceToHost);
-      fsgrid.updateGhostCells(std::span(hostStagingBuffer));
-      cudaMemcpy(dperb.data(), hostStagingBuffer.data(), dperb.size_bytes(), cudaMemcpyHostToDevice);
+      fsgrids::dperbElement *h_dperb = GET_POINTER(gpuMemoryManager, fsgrids::dperbElement, h_dperb);
+      std::span<fsgrids::dperbElement> host_dperb(h_dperb, dperb.size());
+      cudaMemcpy(host_dperb.data(), dperb.data(), dperb.size_bytes(), cudaMemcpyDeviceToHost);
+      fsgrid.updateGhostCells(host_dperb);
+      cudaMemcpy(dperb.data(), host_dperb.data(), dperb.size_bytes(), cudaMemcpyHostToDevice);
    }
 
    if (P::ohmHallTerm == 0 && P::ohmGradPeTerm == 0 && communicateEGradPeOrMomentsDerivatives) {
-      std::vector<fsgrids::dmomentsElement> hostStagingBuffer(dmoments.size());
-      cudaMemcpy(hostStagingBuffer.data(), dmoments.data(), dmoments.size_bytes(), cudaMemcpyDeviceToHost);
-      fsgrid.updateGhostCells(std::span(hostStagingBuffer));
-      cudaMemcpy(dmoments.data(), hostStagingBuffer.data(), dmoments.size_bytes(), cudaMemcpyHostToDevice);
+      fsgrids::dmomentsElement *h_dmoments = GET_POINTER(gpuMemoryManager, fsgrids::dmomentsElement, h_dmoments);
+      std::span<fsgrids::dmomentsElement> host_dmoments(h_dmoments, dmoments.size());
+      cudaMemcpy(host_dmoments.data(), dmoments.data(), dmoments.size_bytes(), cudaMemcpyDeviceToHost);
+      fsgrid.updateGhostCells(host_dmoments);
+      cudaMemcpy(dmoments.data(), host_dmoments.data(), dmoments.size_bytes(), cudaMemcpyHostToDevice);
    }
 
    cudaDeviceSynchronize();
@@ -2457,10 +2461,11 @@ void calculateUpwindedElectricFieldSimpleDevice(fsgrids::perbspan perb,
    mpiTimer.start();
    // Exchange electric field with neighbouring processes
    {
-      std::vector<fsgrids::efieldElement> hostStagingBuffer(e.size());
-      cudaMemcpy(hostStagingBuffer.data(), e.data(), e.size_bytes(), cudaMemcpyDeviceToHost);
-      fsgrid.updateGhostCells(std::span(hostStagingBuffer));
-      cudaMemcpy(e.data(), hostStagingBuffer.data(), e.size_bytes(), cudaMemcpyHostToDevice);
+      fsgrids::efieldElement *h_e = GET_POINTER(gpuMemoryManager, fsgrids::efieldElement, h_e);
+      std::span<fsgrids::efieldElement> host_e(h_e, e.size());
+      cudaMemcpy(host_e.data(), e.data(), e.size_bytes(), cudaMemcpyDeviceToHost);
+      fsgrid.updateGhostCells(host_e);
+      cudaMemcpy(e.data(), host_e.data(), e.size_bytes(), cudaMemcpyHostToDevice);
    }
 
    mpiTimer.stop();

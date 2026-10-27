@@ -74,6 +74,50 @@ void copyMomentsToOutflow(fsgrid::FsData<std::array<Real, fsgrids::moments::N_MO
 }
 
 /*
+Copy moments from simulation domain to outflow boundaries on fsgrid
+*/
+void copyMomentsToOutflowDevice(std::span<fsgrids::momentsElement>& moments,
+                          fsgrids::technicalspan technical,
+                          FieldSolverGrid &fsgrid) {
+
+   fsgrid.parallel_for([](int timerId) -> phiprof::Timer { return phiprof::Timer{timerId}; },
+                       phiprof::initializeTimer("copyMomentsToOutflow loop"), technical,
+                       [&](const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
+      // Copying only needs to be done for L1/L2 outflow cells
+      if (technical[stencil.ooo()].sysBoundaryFlag != sysboundarytype::OUTFLOW || technical[stencil.ooo()].sysBoundaryLayer > 2) {
+         return;
+      }
+
+      int distance = numeric_limits<int>::max();
+      array<int,3> closestCellOffset = {numeric_limits<int>::max(), numeric_limits<int>::max(), numeric_limits<int>::max()};
+
+      for (int kk=-2; kk<3; kk++) {
+         for (int jj=-2; jj<3; jj++) {
+            for (int ii=-2; ii<3 ; ii++) {
+               if( stencil.cellExists(ii,jj,kk) // skip invalid cells returning NULL
+                  && technical[stencil.indexFromOffset(ii,jj,kk)].sysBoundaryFlag == sysboundarytype::NOT_SYSBOUNDARY // Copy only from sim domain
+               ) {
+                  if(distance > ii*ii + jj*jj + kk*kk) {
+                     distance = ii*ii + jj*jj + kk*kk;
+                     closestCellOffset = {ii, jj, kk};
+                  }
+               }
+            }
+         }
+      }
+
+      if (closestCellOffset[0] == numeric_limits<int>::max()) {
+         abort_mpi("No closest cell found!", 1);
+      }
+
+      // Set outflow cell to closest in-domain cell values
+      for (int e = 0; e < fsgrids::moments::N_MOMENTS; ++e) {
+         moments[stencil.ooo()][e] = moments[stencil.indexFromOffset(closestCellOffset[0], closestCellOffset[1], closestCellOffset[2])][fsgrids::moments::RHOM+e];
+      }
+   });
+}
+
+/*
 Filter moments after feeding them to FsGrid to alleviate the staircase effect caused in AMR runs.
 This is using a 3D, 5-point stencil triangle kernel.
 */
@@ -166,7 +210,7 @@ void filterMoments(fsgrid::FsData<std::array<Real, fsgrids::moments::N_MOMENTS>>
 Filter moments after feeding them to FsGrid to alleviate the staircase effect caused in AMR runs.
 This is using a 3D, 5-point stencil triangle kernel.
 */
-void filterMomentsDevice(fsgrid::FsData<std::array<Real, fsgrids::moments::N_MOMENTS>>& moments,
+void filterMomentsDevice(std::span<fsgrids::momentsElement>& moments,
                    fsgrids::technicalspan technical, FieldSolverGrid &fsgrid, DeviceParameters& parameters) {
 
    // Kernel Characteristics
@@ -203,20 +247,20 @@ void filterMomentsDevice(fsgrid::FsData<std::array<Real, fsgrids::moments::N_MOM
         {2 * inverseKernelSum, 4 * inverseKernelSum, 6 * inverseKernelSum, 4 * inverseKernelSum, 2 * inverseKernelSum},
         {1 * inverseKernelSum, 2 * inverseKernelSum, 3 * inverseKernelSum, 2 * inverseKernelSum, 1 * inverseKernelSum}}};
 
-   // Create a copy of moments data for filtering
-   fsgrid::FsData<std::array<Real, fsgrids::moments::N_MOMENTS>> blurred(moments.size());
-
    // Update momentsGrid Ghost Cells
-   fsgrid.updateGhostCells(moments.view());
+   fsgrid.updateGhostCells(moments);
 
+   CREATE_UNIQUE_POINTER(gpuMemoryManager, h_blurred); // Create a copy of moments data for filtering
    CREATE_UNIQUE_POINTER(gpuMemoryManager, d_blurred);
-   ALLOCATE_GPU(gpuMemoryManager, d_moments, moments.size() * sizeof(fsgrids::momentsElement));
+   HOST_ALLOCATE_GPU(gpuMemoryManager, h_blurred, moments.size() * sizeof(fsgrids::momentsElement));
    ALLOCATE_GPU(gpuMemoryManager, d_blurred, moments.size() * sizeof(fsgrids::momentsElement));
    ALLOCATE_GPU(gpuMemoryManager, d_technical, technical.size() * sizeof(fsgrids::technical));
    fsgrids::momentsElement *d_moments = GET_POINTER(gpuMemoryManager, fsgrids::momentsElement, d_moments);
+   fsgrids::momentsElement *h_blurred = GET_POINTER(gpuMemoryManager, fsgrids::momentsElement, h_blurred);
    fsgrids::momentsElement *d_blurred = GET_POINTER(gpuMemoryManager, fsgrids::momentsElement, d_blurred);
    fsgrids::technical *d_technical = GET_POINTER(gpuMemoryManager, fsgrids::technical, d_technical);
    std::span<fsgrids::momentsElement> dev_moments(d_moments, moments.size());
+   std::span<fsgrids::momentsElement> blurred(h_blurred, moments.size());
    std::span<fsgrids::momentsElement> dev_blurred(d_blurred, moments.size());
    std::span<fsgrids::technical> dev_technical(d_technical, technical.size());
    cudaMemcpy(d_technical, technical.data(), technical.size() * sizeof(fsgrids::technical), cudaMemcpyHostToDevice);
@@ -255,16 +299,15 @@ void filterMomentsDevice(fsgrid::FsData<std::array<Real, fsgrids::moments::N_MOM
 
       cudaDeviceSynchronize();
 
-      cudaMemcpy(moments.data(), d_moments, moments.size() * sizeof(fsgrids::momentsElement), cudaMemcpyDeviceToHost);
       cudaMemcpy(blurred.data(), d_blurred, blurred.size() * sizeof(fsgrids::momentsElement), cudaMemcpyDeviceToHost);
 
       using std::swap;
       swap(moments, blurred);
-      fsgrid.updateGhostCells(moments.view());
+      fsgrid.updateGhostCells(moments);
 
       // If outflow boundaries exist, filtered moments must be recopied there
-      copyMomentsToOutflow(moments, technical, fsgrid);
-      fsgrid.updateGhostCells(moments.view());
+      copyMomentsToOutflowDevice(moments, technical, fsgrid);
+      fsgrid.updateGhostCells(moments);
    }
 }
 
@@ -362,7 +405,7 @@ void feedMomentsIntoFsGrid(dccrg::Dccrg<SpatialCell, dccrg::Cartesian_Geometry>&
 
 void feedMomentsIntoFsGridDevice(dccrg::Dccrg<SpatialCell, dccrg::Cartesian_Geometry>& mpiGrid,
                            const std::vector<CellID>& cells,
-                           fsgrid::FsData<std::array<Real, fsgrids::moments::N_MOMENTS>>& moments,
+                           std::span<fsgrids::momentsElement>& moments,
                            fsgrids::technicalspan technical, FieldSolverGrid &fsgrid, DeviceParameters& parameters, bool dt2 /*=false*/) {
 
    int ii;

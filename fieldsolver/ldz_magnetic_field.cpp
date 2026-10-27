@@ -345,16 +345,18 @@ void propagateMagneticFieldSimple(fsgrids::perbspan perb,
    phiprof::Timer mpiTimer{"MPI", {"MPI"}};
    if (RKCase == RK_ORDER1 || RKCase == RK_ORDER2_STEP2) {
       // Exchange PERBX,PERBY,PERBZ with neighbours
-      std::vector<fsgrids::perbElement> hostStagingBuffer(perb.size());
-      cudaMemcpy(hostStagingBuffer.data(), perb.data(), perb.size_bytes(), cudaMemcpyDeviceToHost);
-      fsgrid.updateGhostCells(std::span(hostStagingBuffer));
-      cudaMemcpy(perb.data(), hostStagingBuffer.data(), perb.size_bytes(), cudaMemcpyHostToDevice);
+      fsgrids::perbElement *h_perb = GET_POINTER(gpuMemoryManager, fsgrids::perbElement, h_perb);
+      std::span<fsgrids::perbElement> host_perb(h_perb, perb.size());
+      cudaMemcpy(host_perb.data(), perb.data(), perb.size_bytes(), cudaMemcpyDeviceToHost);
+      fsgrid.updateGhostCells(host_perb);
+      cudaMemcpy(perb.data(), host_perb.data(), perb.size_bytes(), cudaMemcpyHostToDevice);
    } else { // RKCase == RK_ORDER2_STEP1
       // Exchange PERBX_DT2,PERBY_DT2,PERBZ_DT2 with neighbours
-      std::vector<fsgrids::perbElement> hostStagingBuffer(perbdt2.size());
-      cudaMemcpy(hostStagingBuffer.data(), perbdt2.data(), perbdt2.size_bytes(), cudaMemcpyDeviceToHost);
-      fsgrid.updateGhostCells(std::span(hostStagingBuffer));
-      cudaMemcpy(perbdt2.data(), hostStagingBuffer.data(), perbdt2.size_bytes(), cudaMemcpyHostToDevice);
+      fsgrids::perbElement *h_perbdt2 = GET_POINTER(gpuMemoryManager, fsgrids::perbElement, h_perbdt2);
+      std::span<fsgrids::perbElement> host_perbdt2(h_perbdt2, perbdt2.size());
+      cudaMemcpy(host_perbdt2.data(), perbdt2.data(), perbdt2.size_bytes(), cudaMemcpyDeviceToHost);
+      fsgrid.updateGhostCells(host_perbdt2);
+      cudaMemcpy(perbdt2.data(), host_perbdt2.data(), perbdt2.size_bytes(), cudaMemcpyHostToDevice);
    }
    mpiTimer.stop();
 
@@ -394,16 +396,18 @@ void propagateMagneticFieldSimple(fsgrids::perbspan perb,
    mpiTimer.start();
    if (RKCase == RK_ORDER1 || RKCase == RK_ORDER2_STEP2) {
       // Exchange PERBX,PERBY,PERBZ with neighbours
-      std::vector<fsgrids::perbElement> hostStagingBuffer(perb.size());
-      cudaMemcpy(hostStagingBuffer.data(), perb.data(), perb.size_bytes(), cudaMemcpyDeviceToHost);
-      fsgrid.updateGhostCells(std::span(hostStagingBuffer));
-      cudaMemcpy(perb.data(), hostStagingBuffer.data(), perb.size_bytes(), cudaMemcpyHostToDevice);
+      fsgrids::perbElement *h_perb = GET_POINTER(gpuMemoryManager, fsgrids::perbElement, h_perb);
+      std::span<fsgrids::perbElement> host_perb(h_perb, perb.size());
+      cudaMemcpy(host_perb.data(), perb.data(), perb.size_bytes(), cudaMemcpyDeviceToHost);
+      fsgrid.updateGhostCells(host_perb);
+      cudaMemcpy(perb.data(), host_perb.data(), perb.size_bytes(), cudaMemcpyHostToDevice);
    } else { // RKCase == RK_ORDER2_STEP1
       // Exchange PERBX_DT2,PERBY_DT2,PERBZ_DT2 with neighbours
-      std::vector<fsgrids::perbElement> hostStagingBuffer(perbdt2.size());
-      cudaMemcpy(hostStagingBuffer.data(), perbdt2.data(), perbdt2.size_bytes(), cudaMemcpyDeviceToHost);
-      fsgrid.updateGhostCells(std::span(hostStagingBuffer));
-      cudaMemcpy(perbdt2.data(), hostStagingBuffer.data(), perbdt2.size_bytes(), cudaMemcpyHostToDevice);
+      fsgrids::perbElement *h_perbdt2 = GET_POINTER(gpuMemoryManager, fsgrids::perbElement, h_perbdt2);
+      std::span<fsgrids::perbElement> host_perbdt2(h_perbdt2, perbdt2.size());
+      cudaMemcpy(host_perbdt2.data(), perbdt2.data(), perbdt2.size_bytes(), cudaMemcpyDeviceToHost);
+      fsgrid.updateGhostCells(host_perbdt2);
+      cudaMemcpy(perbdt2.data(), host_perbdt2.data(), perbdt2.size_bytes(), cudaMemcpyHostToDevice);
    }
    mpiTimer.stop();
 

@@ -505,16 +505,18 @@ void calculateDerivativesSimpleDevice(fsgrids::perbspan perb,
    cudaDeviceSynchronize();
 
    {
-      std::vector<fsgrids::perbElement> hostStagingBuffer(perb.size());
-      cudaMemcpy(hostStagingBuffer.data(), perb.data(), perb.size_bytes(), cudaMemcpyDeviceToHost);
-      fsgrid.updateGhostCells(std::span(hostStagingBuffer));
-      cudaMemcpy(perb.data(), hostStagingBuffer.data(), perb.size_bytes(), cudaMemcpyHostToDevice);
+      fsgrids::perbElement *h_perb = GET_POINTER(gpuMemoryManager, fsgrids::perbElement, h_perb);
+      std::span<fsgrids::perbElement> host_perb(h_perb, perb.size());
+      cudaMemcpy(host_perb.data(), perb.data(), perb.size_bytes(), cudaMemcpyDeviceToHost);
+      fsgrid.updateGhostCells(host_perb);
+      cudaMemcpy(perb.data(), host_perb.data(), perb.size_bytes(), cudaMemcpyHostToDevice);
    }
    if (doMoments) {
-      std::vector<fsgrids::momentsElement> hostStagingBuffer(moments.size());
-      cudaMemcpy(hostStagingBuffer.data(), moments.data(), moments.size_bytes(), cudaMemcpyDeviceToHost);
-      fsgrid.updateGhostCells(std::span(hostStagingBuffer));
-      cudaMemcpy(moments.data(), hostStagingBuffer.data(), moments.size_bytes(), cudaMemcpyHostToDevice);
+      fsgrids::momentsElement *h_moments = GET_POINTER(gpuMemoryManager, fsgrids::momentsElement, h_moments);
+      std::span<fsgrids::momentsElement> host_moments(h_moments, moments.size());
+      cudaMemcpy(host_moments.data(), moments.data(), moments.size_bytes(), cudaMemcpyDeviceToHost);
+      fsgrid.updateGhostCells(host_moments);
+      cudaMemcpy(moments.data(), host_moments.data(), moments.size_bytes(), cudaMemcpyHostToDevice);
    }
    mpiTimer.stop();
    cudaDeviceSynchronize();
@@ -718,10 +720,11 @@ void calculateBVOLDerivativesSimpleDevice(fsgrids::volspan vol,
 
    phiprof::Timer commTimer{"BVOL derivatives ghost updates MPI", {"MPI"}};
    {
-      std::vector<fsgrids::volElement> hostStagingBuffer(vol.size());
-      cudaMemcpy(hostStagingBuffer.data(), vol.data(), vol.size_bytes(), cudaMemcpyDeviceToHost);
-      fsgrid.updateGhostCells(std::span(hostStagingBuffer));
-      cudaMemcpy(vol.data(), hostStagingBuffer.data(), vol.size_bytes(), cudaMemcpyHostToDevice);
+      fsgrids::volElement *h_vol = GET_POINTER(gpuMemoryManager, fsgrids::volElement, h_vol);
+      std::span<fsgrids::volElement> host_vol(h_vol, vol.size());
+      cudaMemcpy(host_vol.data(), vol.data(), vol.size_bytes(), cudaMemcpyDeviceToHost);
+      fsgrid.updateGhostCells(host_vol);
+      cudaMemcpy(vol.data(), host_vol.data(), vol.size_bytes(), cudaMemcpyHostToDevice);
    }
    commTimer.stop(numCells, "Spatial Cells");
    cudaDeviceSynchronize();
