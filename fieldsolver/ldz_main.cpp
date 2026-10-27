@@ -126,11 +126,12 @@ bool propagateFields(fsgrids::perbspan perb,
 #ifdef FS_1ST_ORDER_TIME
       propagateMagneticFieldSimple(perb, perbdt2, bgb, e, edt2, technical, fsgrid, sysBoundaries, dt, RK_ORDER1, parameters);
       calculateDerivativesSimpleDevice(perb, moments, dperb, dmoments, technical, fsgrid, true /*doMoments*/, parameters);
-      /*
       if (P::ohmGradPeTerm > 0) {
+         std::cerr << "TODO: calculateGradPeTermSimple not implemented" << std::endl;
          calculateGradPeTermSimple(egradpe, egradpedt2, moments, momentsdt2, dmoments, dmomentsdt2, technical, fsgrid, sysBoundaries, RK_ORDER1);
       }
       if (P::ohmHallTerm > 0) {
+         std::cerr << "TODO: calculateHallTermSimple not implemented" << std::endl;
          calculateHallTermSimple(
             perb,
             perbdt2,
@@ -148,7 +149,6 @@ bool propagateFields(fsgrids::perbspan perb,
             true // communicateMomentsDerivatives
          );
       }
-      */
       calculateUpwindedElectricFieldSimpleDevice(
          perb,
          perbdt2,
@@ -173,11 +173,12 @@ bool propagateFields(fsgrids::perbspan perb,
 #else
       propagateMagneticFieldSimple(perb, perbdt2, bgb, e, edt2, technical, fsgrid, sysBoundaries, dt, RK_ORDER2_STEP1, parameters);
       calculateDerivativesSimpleDevice(perbdt2, momentsdt2, dperb, dmomentsdt2, technical, fsgrid, true /*doMoments*/, parameters);
-      /*
       if (P::ohmGradPeTerm > 0) {
+         std::cerr << "TODO: calculateGradPeTermSimple not implemented" << std::endl;
          calculateGradPeTermSimple(egradpe, egradpedt2, moments, momentsdt2, dmoments, dmomentsdt2, technical, fsgrid, sysBoundaries, RK_ORDER2_STEP1);
       }
       if (P::ohmHallTerm > 0) {
+         std::cerr << "TODO: calculateHallTermSimple not implemented" << std::endl;
          calculateHallTermSimple(
             perb,
             perbdt2,
@@ -195,7 +196,6 @@ bool propagateFields(fsgrids::perbspan perb,
             true // communicateMomentsDerivatives
          );
       }
-      */
       calculateUpwindedElectricFieldSimpleDevice(
          perb,
          perbdt2,
@@ -219,11 +219,12 @@ bool propagateFields(fsgrids::perbspan perb,
       );
       propagateMagneticFieldSimple(perb, perbdt2, bgb, e, edt2, technical, fsgrid, sysBoundaries, dt, RK_ORDER2_STEP2, parameters);
       calculateDerivativesSimpleDevice(perb, moments, dperb, dmoments, technical, fsgrid, true /*doMoments*/, parameters);
-      /*
       if (P::ohmGradPeTerm > 0) {
+         std::cerr << "TODO: calculateGradPeTermSimple not implemented" << std::endl;
          calculateGradPeTermSimple(egradpe, egradpedt2, moments, momentsdt2, dmoments, dmomentsdt2, technical, fsgrid, sysBoundaries, RK_ORDER2_STEP2);
       }
       if (P::ohmHallTerm > 0) {
+         std::cerr << "TODO: calculateHallTermSimple not implemented" << std::endl;
          calculateHallTermSimple(
             perb,
             perbdt2,
@@ -241,7 +242,6 @@ bool propagateFields(fsgrids::perbspan perb,
             true // communicateMomentsDerivatives
          );
       }
-      */
       calculateUpwindedElectricFieldSimpleDevice(
          perb,
          perbdt2,
@@ -264,7 +264,9 @@ bool propagateFields(fsgrids::perbspan perb,
          parameters
       );
 #endif
-   } /*else {
+   } else {
+      std::cerr << "TODO: subcycles > 1 not implemented" << std::endl;
+      /*
       Real subcycleDt = dt / convert<Real>(subcycles);
       Real subcycleT = P::t;
       creal targetT = P::t + dt;
@@ -433,15 +435,15 @@ bool propagateFields(fsgrids::perbspan perb,
       if (subcycles != subcycleCount && myRank == MASTER_RANK) {
          logFile << "Effective field solver subcycles were " << subcycleCount << " instead of " << P::fieldSolverSubcycles << " on step " << P::tstep << std::endl;
       }
-   }*/
+      */
+   }
 
    calculateVolumeAveragedFieldsSimpleDevice(perb, e, dperb, vol, technical, fsgrid);
    calculateBVOLDerivativesSimpleDevice(vol, technical, fsgrid, parameters);
-   /*
    if (FieldTracing::fieldTracingParameters.doTraceFullBox || Parameters::computeCurvature) {
+      std::cerr << "TODO: calculateCurvatureSimple not implemented" << std::endl;
       fsgrid.updateGhostCells(vol);
       calculateCurvatureSimple(vol, bgb, technical, fsgrid);
    }
-   */
    return true;
 }
