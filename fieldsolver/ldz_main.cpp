@@ -446,7 +446,7 @@ bool propagateFields(fsgrids::perbspan perb,
    calculateBVOLDerivativesSimpleDevice(vol, technical, fsgrid, parameters);
    if (FieldTracing::fieldTracingParameters.doTraceFullBox || Parameters::computeCurvature) {
       std::cerr << "TODO: calculateCurvatureSimple not implemented" << std::endl;
-      fsgrid.updateGhostCells(vol);
+      //fsgrid.updateGhostCells(vol);
       //calculateCurvatureSimple(vol, bgb, technical, fsgrid);
    }
    return true;

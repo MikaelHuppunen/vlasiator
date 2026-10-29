@@ -626,6 +626,25 @@ int simulate(int argn,char* args[]) {
    // Fieldsolver dt limits, and also calculate volumetric B-fields.
    // At restart, all we need at this stage has been read from the restart, the rest will be recomputed in due time.
 
+   fsgrid_detail::GhostCellBuffers buf;
+   auto provider = [&](size_t bytes) {
+      CREATE_UNIQUE_POINTER(gpuMemoryManager, dev_send);
+      CREATE_UNIQUE_POINTER(gpuMemoryManager, dev_receive);
+      CREATE_UNIQUE_POINTER(gpuMemoryManager, host_send);
+      CREATE_UNIQUE_POINTER(gpuMemoryManager, host_receive);
+      ALLOCATE_GPU(gpuMemoryManager, dev_send, bytes);
+      ALLOCATE_GPU(gpuMemoryManager, dev_receive, bytes);
+      HOST_ALLOCATE_GPU(gpuMemoryManager, host_send, bytes);
+      HOST_ALLOCATE_GPU(gpuMemoryManager, host_receive, bytes);
+      buf.dev_send = GET_POINTER(gpuMemoryManager, char, dev_send);
+      buf.dev_receive = GET_POINTER(gpuMemoryManager, char, dev_receive);
+      buf.host_send = GET_POINTER(gpuMemoryManager, char, host_send);
+      buf.host_receive = GET_POINTER(gpuMemoryManager, char, host_receive);
+      buf.capacity = GET_SIZE(gpuMemoryManager, dev_send);
+      return buf;
+   };
+   fsgrid.setGhostBufferAllocator(provider);
+
    DeviceParameters parameters = uploadParametersToDevice();
    SysBoundaryDevice host_sysBoundaries;
    uploadIndexToSysBoundary(sysBoundaryContainer,  host_sysBoundaries);
@@ -829,9 +848,9 @@ int simulate(int argn,char* args[]) {
          false, // Don't communicate moments, they are not needed here.
          parameters
       );
+      fsgrid.updateGhostCellsDevice(dev_dperb);
       cudaMemcpy(host_dperb.data(), d_dperb, host_dperb.size() * sizeof(fsgrids::dperbElement), cudaMemcpyDeviceToHost);
       cudaMemcpy(host_dmoments.data(), d_dmoments, host_dmoments.size() * sizeof(fsgrids::dmomentsElement), cudaMemcpyDeviceToHost);
-      fsgrid.updateGhostCells(host_dperb);
    }
    FieldTracing::calculateIonosphereFsgridCoupling(technical.view(), fsgrid, host_perb, host_dperb, SBC::ionosphereGrid.nodes, SBC::Ionosphere::radius);
    SBC::ionosphereGrid.initSolver(!P::isRestart); // If it is a restart we do not want to zero out everything
@@ -1515,6 +1534,11 @@ int simulate(int argn,char* args[]) {
             parameters
          );
 
+         phiprof::Timer getFieldsTimer {"getFieldsFromFsGrid"};
+         // Copy results back from fsgrid.
+         fsgrid.updateGhostCellsDevice(dev_vol);
+         fsgrid.updateGhostCellsDevice(dev_technical);
+
          cudaMemcpy(host_perb.data(), d_perb, host_perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
          cudaMemcpy(host_dperb.data(), d_dperb, host_dperb.size() * sizeof(fsgrids::dperbElement), cudaMemcpyDeviceToHost);
          cudaMemcpy(host_dmoments.data(), d_dmoments, host_dmoments.size() * sizeof(fsgrids::dmomentsElement), cudaMemcpyDeviceToHost);
@@ -1524,10 +1548,6 @@ int simulate(int argn,char* args[]) {
          cudaMemcpy(host_egradpe.data(), d_egradpe, host_egradpe.size() * sizeof(fsgrids::egradpeElement), cudaMemcpyDeviceToHost);
          cudaMemcpy(host_vol.data(), d_vol, host_vol.size() * sizeof(fsgrids::volElement), cudaMemcpyDeviceToHost);
 
-         phiprof::Timer getFieldsTimer {"getFieldsFromFsGrid"};
-         // Copy results back from fsgrid.
-         fsgrid.updateGhostCells(host_vol);
-         fsgrid.updateGhostCells(technical.view());
          getFieldsFromFsGrid(host_vol, host_bgb, host_egradpe, host_dmoments, technical.view(), fsgrid, mpiGrid, cells);
          getFieldsTimer.stop();
          propagateTimer.stop(cells.size(),"SpatialCells");

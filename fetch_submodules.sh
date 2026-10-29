@@ -16,7 +16,7 @@ set -e   # Abort on error
 # this into fetch_libraries.sh would force those jobs to pay for those
 # redundant fetches on every run.
 
-FSGRID_COMMIT="06f5d8f8f17107cc792059b905633b4be7d95085"
+FSGRID_COMMIT="10da4ed2082d09a7a8cc4ca564e8660b3f3066c1"
 DCCRG_COMMIT="ee1c17691ba03d4ccddc3d61cc5f9af2bee4b1d7"
 EIGEN_COMMIT="3147391d946bb4b6c68edd901f2add6ac1f31f8c"
 VECTORCLASS_COMMIT="f4617df57e17efcd754f5bbe0ec87883e0ed9ce6"
