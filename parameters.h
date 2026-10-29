@@ -340,7 +340,11 @@ inline DeviceParameters uploadParametersToDevice() {
    deviceParameters.ohmGradPeTerm = Parameters::ohmGradPeTerm;
    deviceParameters.fieldSolverDiffusiveEterms = Parameters::fieldSolverDiffusiveEterms;
    for(int i = 0; i < 16; i++){
-      deviceParameters.numPasses[i] = Parameters::numPasses[i];
+      if (i >= Parameters::numPasses.size()) {
+         deviceParameters.numPasses[i] = 0;
+      } else {
+         deviceParameters.numPasses[i] = Parameters::numPasses[i];
+      }
    }
    return deviceParameters;
 }
