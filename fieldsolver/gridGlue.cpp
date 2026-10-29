@@ -80,9 +80,9 @@ void copyMomentsToOutflowDevice(std::span<fsgrids::momentsElement>& moments,
                           fsgrids::technicalspan technical,
                           FieldSolverGrid &fsgrid) {
 
-   fsgrid.parallel_for([](int timerId) -> phiprof::Timer { return phiprof::Timer{timerId}; },
+   fsgrid.parallel_for_GPU([](int timerId) -> phiprof::Timer { return phiprof::Timer{timerId}; },
                        phiprof::initializeTimer("copyMomentsToOutflow loop"), technical,
-                       [&](const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
+                       [=] __device__(const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
       // Copying only needs to be done for L1/L2 outflow cells
       if (technical[stencil.ooo()].sysBoundaryFlag != sysboundarytype::OUTFLOW || technical[stencil.ooo()].sysBoundaryLayer > 2) {
          return;
@@ -107,7 +107,8 @@ void copyMomentsToOutflowDevice(std::span<fsgrids::momentsElement>& moments,
       }
 
       if (closestCellOffset[0] == numeric_limits<int>::max()) {
-         abort_mpi("No closest cell found!", 1);
+         printf("No closest cell found!\n");
+         assert(false);
       }
 
       // Set outflow cell to closest in-domain cell values
@@ -115,6 +116,7 @@ void copyMomentsToOutflowDevice(std::span<fsgrids::momentsElement>& moments,
          moments[stencil.ooo()][e] = moments[stencil.indexFromOffset(closestCellOffset[0], closestCellOffset[1], closestCellOffset[2])][fsgrids::moments::RHOM+e];
       }
    });
+   cudaDeviceSynchronize();
 }
 
 /*
@@ -248,36 +250,25 @@ void filterMomentsDevice(std::span<fsgrids::momentsElement>& moments,
         {1 * inverseKernelSum, 2 * inverseKernelSum, 3 * inverseKernelSum, 2 * inverseKernelSum, 1 * inverseKernelSum}}};
 
    // Update momentsGrid Ghost Cells
-   fsgrid.updateGhostCells(moments);
+   fsgrid.updateGhostCellsDevice(moments);
 
-   CREATE_UNIQUE_POINTER(gpuMemoryManager, h_blurred); // Create a copy of moments data for filtering
-   CREATE_UNIQUE_POINTER(gpuMemoryManager, d_blurred);
-   HOST_ALLOCATE_GPU(gpuMemoryManager, h_blurred, moments.size() * sizeof(fsgrids::momentsElement));
-   ALLOCATE_GPU(gpuMemoryManager, d_blurred, moments.size() * sizeof(fsgrids::momentsElement));
-   ALLOCATE_GPU(gpuMemoryManager, d_technical, technical.size() * sizeof(fsgrids::technical));
-   fsgrids::momentsElement *d_moments = GET_POINTER(gpuMemoryManager, fsgrids::momentsElement, d_moments);
-   fsgrids::momentsElement *h_blurred = GET_POINTER(gpuMemoryManager, fsgrids::momentsElement, h_blurred);
-   fsgrids::momentsElement *d_blurred = GET_POINTER(gpuMemoryManager, fsgrids::momentsElement, d_blurred);
-   fsgrids::technical *d_technical = GET_POINTER(gpuMemoryManager, fsgrids::technical, d_technical);
-   std::span<fsgrids::momentsElement> dev_moments(d_moments, moments.size());
-   std::span<fsgrids::momentsElement> blurred(h_blurred, moments.size());
-   std::span<fsgrids::momentsElement> dev_blurred(d_blurred, moments.size());
-   std::span<fsgrids::technical> dev_technical(d_technical, technical.size());
-   cudaMemcpy(d_technical, technical.data(), technical.size() * sizeof(fsgrids::technical), cudaMemcpyHostToDevice);
+   CREATE_UNIQUE_POINTER(gpuMemoryManager, dev_blurred); // Create a copy of moments data for filtering
+   ALLOCATE_GPU(gpuMemoryManager, dev_blurred, moments.size() * sizeof(fsgrids::momentsElement));
+   fsgrids::momentsElement *dev_blurred = GET_POINTER(gpuMemoryManager, fsgrids::momentsElement, dev_blurred);
+   std::span<fsgrids::momentsElement> blurred(dev_blurred, moments.size());
 
    // Filtering Loop
    for (auto blurPass = 0; blurPass < Parameters::maxFilteringPasses; blurPass++) {
       // Blurring Pass
-      cudaMemcpy(d_moments, moments.data(),  moments.size() * sizeof(fsgrids::momentsElement), cudaMemcpyHostToDevice);
       fsgrid.parallel_for_GPU([](int timerId) -> phiprof::Timer { return phiprof::Timer{timerId}; },
-                          phiprof::initializeTimer("Filtering loop"), dev_technical,
+                          phiprof::initializeTimer("Filtering loop"), technical,
                           [=] __device__(const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
-                             const auto refLevel = dev_technical[stencil.ooo()].refLevel;
-                             auto& blurCell = dev_blurred[stencil.ooo()];
+                             const auto refLevel = technical[stencil.ooo()].refLevel;
+                             auto& blurCell = blurred[stencil.ooo()];
 
                              // Skip pass, set blurCell value equal to original
                              if (blurPass >= parameters.numPasses.at(refLevel) || sysBoundaryFlag != sysboundarytype::NOT_SYSBOUNDARY) {
-                                blurCell = dev_moments[stencil.ooo()];
+                                blurCell = moments[stencil.ooo()];
                                 // this was a continue before moving to parallel_for, now the rest of the body of the loop is in the else below.
                              } else {
                                 // Set Cell to zero before passing filter
@@ -287,7 +278,7 @@ void filterMomentsDevice(std::span<fsgrids::momentsElement>& moments,
                                 for (int c = -kernelOffset; c <= kernelOffset; c++) {
                                    for (int b = -kernelOffset; b <= kernelOffset; b++) {
                                       for (int a = -kernelOffset; a <= kernelOffset; a++) {
-                                         const auto& cell = dev_moments[stencil.indexFromOffset(a,b,c)];
+                                         const auto& cell = moments[stencil.indexFromOffset(a,b,c)];
                                          for (int e = 0; e < fsgrids::moments::N_MOMENTS; ++e) {
                                             blurCell[e] += cell[e] * kernel[kernelOffset + a][kernelOffset + b][kernelOffset + c];
                                          }
@@ -299,15 +290,13 @@ void filterMomentsDevice(std::span<fsgrids::momentsElement>& moments,
 
       cudaDeviceSynchronize();
 
-      cudaMemcpy(blurred.data(), d_blurred, blurred.size() * sizeof(fsgrids::momentsElement), cudaMemcpyDeviceToHost);
-
       using std::swap;
       swap(moments, blurred);
-      fsgrid.updateGhostCells(moments);
+      fsgrid.updateGhostCellsDevice(moments);
 
       // If outflow boundaries exist, filtered moments must be recopied there
       copyMomentsToOutflowDevice(moments, technical, fsgrid);
-      fsgrid.updateGhostCells(moments);
+      fsgrid.updateGhostCellsDevice(moments);
    }
 }
 
@@ -470,13 +459,16 @@ void feedMomentsIntoFsGridDevice(dccrg::Dccrg<SpatialCell, dccrg::Cartesian_Geom
 
    MPI_Waitall(receiveRequests.size(), receiveRequests.data(), MPI_STATUSES_IGNORE);
 
+   fsgrids::momentsElement *h_moments = GET_POINTER(gpuMemoryManager, fsgrids::momentsElement, h_moments);
+   std::span<fsgrids::momentsElement> host_moments(h_moments, moments.size());
+
    for (auto const& receives : onFsgridMapRemoteProcessGlobal) {
       int process = receives.first;                       // data received from this process
       Real* receiveBuffer = receivedData[process].data(); // data received from process
       for (auto const& cell : receives.second) {          // loop over cellids (dccrg) for receive
          // this part heavily relies on both sender and receiver having cellids sorted!
          for (auto lid : onFsgridMapCellsGlobal[cell]) {
-            auto& moment = moments[static_cast<size_t>(lid)];
+            auto& moment = host_moments[static_cast<size_t>(lid)];
             for (int l = 0; l < fsgrids::moments::N_MOMENTS; l++) {
                moment[l] = receiveBuffer[l];
             }
@@ -485,6 +477,8 @@ void feedMomentsIntoFsGridDevice(dccrg::Dccrg<SpatialCell, dccrg::Cartesian_Geom
          receiveBuffer += fsgrids::moments::N_MOMENTS;
       }
    }
+
+   cudaMemcpy(moments.data(), host_moments.data(), moments.size() * sizeof(fsgrids::momentsElement), cudaMemcpyHostToDevice);
 
    MPI_Waitall(sendRequests.size(), sendRequests.data(), MPI_STATUSES_IGNORE);
 

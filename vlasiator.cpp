@@ -1147,6 +1147,12 @@ int simulate(int argn,char* args[]) {
             cudaMemcpy(dmomentsdt2.data(), d_dmomentsdt2, dmomentsdt2.size() * sizeof(fsgrids::dmomentsElement), cudaMemcpyDeviceToHost);
             cudaMemcpy(ehall.data(), d_ehall, ehall.size() * sizeof(fsgrids::ehallElement), cudaMemcpyDeviceToHost);
             cudaMemcpy(egradpedt2.data(), d_egradpedt2, egradpedt2.size() * sizeof(fsgrids::egradpeElement), cudaMemcpyDeviceToHost);
+            if (P::amrMaxSpatialRefLevel > 0) {
+               cudaMemcpy(host_moments.data(), fieldSolverData.moments.data(), host_moments.size() * sizeof(fsgrids::momentsElement), cudaMemcpyDeviceToHost);
+               cudaMemcpy(host_momentsdt2.data(), fieldSolverData.momentsDt2.data(), host_momentsdt2.size() * sizeof(fsgrids::momentsElement), cudaMemcpyDeviceToHost);
+               fieldSolverData.moments = host_moments;
+               fieldSolverData.momentsDt2 = host_momentsdt2;
+            }
             if (writeGrid(
                    mpiGrid,
                    fieldSolverData,
@@ -1240,6 +1246,12 @@ int simulate(int argn,char* args[]) {
          cudaMemcpy(dmomentsdt2.data(), d_dmomentsdt2, dmomentsdt2.size() * sizeof(fsgrids::dmomentsElement), cudaMemcpyDeviceToHost);
          cudaMemcpy(ehall.data(), d_ehall, ehall.size() * sizeof(fsgrids::ehallElement), cudaMemcpyDeviceToHost);
          cudaMemcpy(egradpedt2.data(), d_egradpedt2, egradpedt2.size() * sizeof(fsgrids::egradpeElement), cudaMemcpyDeviceToHost);
+         if (P::amrMaxSpatialRefLevel > 0) {
+            cudaMemcpy(host_moments.data(), fieldSolverData.moments.data(), host_moments.size() * sizeof(fsgrids::momentsElement), cudaMemcpyDeviceToHost);
+            cudaMemcpy(host_momentsdt2.data(), fieldSolverData.momentsDt2.data(), host_momentsdt2.size() * sizeof(fsgrids::momentsElement), cudaMemcpyDeviceToHost);
+            fieldSolverData.moments = host_moments;
+            fieldSolverData.momentsDt2 = host_momentsdt2;
+         }
          if (writeRestart(
                 mpiGrid,
                 fieldSolverData,
@@ -1277,6 +1289,12 @@ int simulate(int argn,char* args[]) {
          cudaMemcpy(dmomentsdt2.data(), d_dmomentsdt2, dmomentsdt2.size() * sizeof(fsgrids::dmomentsElement), cudaMemcpyDeviceToHost);
          cudaMemcpy(ehall.data(), d_ehall, ehall.size() * sizeof(fsgrids::ehallElement), cudaMemcpyDeviceToHost);
          cudaMemcpy(egradpedt2.data(), d_egradpedt2, egradpedt2.size() * sizeof(fsgrids::egradpeElement), cudaMemcpyDeviceToHost);
+         if (P::amrMaxSpatialRefLevel > 0) {
+            cudaMemcpy(host_moments.data(), fieldSolverData.moments.data(), host_moments.size() * sizeof(fsgrids::momentsElement), cudaMemcpyDeviceToHost);
+            cudaMemcpy(host_momentsdt2.data(), fieldSolverData.momentsDt2.data(), host_momentsdt2.size() * sizeof(fsgrids::momentsElement), cudaMemcpyDeviceToHost);
+            fieldSolverData.moments = host_moments;
+            fieldSolverData.momentsDt2 = host_momentsdt2;
+         }
          if (writeRestart(
                 mpiGrid,
                 fieldSolverData,
@@ -1489,27 +1507,25 @@ int simulate(int argn,char* args[]) {
       if (P::propagateField) {
          phiprof::Timer propagateTimer {"Propagate Fields"};
 
-         phiprof::Timer couplingInTimer {"fsgrid-coupling-in"};
-         // Copy moments over into the fsgrid.
-         feedMomentsIntoFsGridDevice(mpiGrid, cells, host_moments, technical.view(), fsgrid, parameters, false);
-         feedMomentsIntoFsGridDevice(mpiGrid, cells, host_momentsdt2, technical.view(), fsgrid, parameters, true);
-         // Update the spans of the filtered grids that were swapped in filtering
-         if (P::amrMaxSpatialRefLevel > 0) {
-            fieldSolverData.moments = host_moments;
-            fieldSolverData.momentsDt2 = host_momentsdt2;
-         }
-         couplingInTimer.stop();
-
          ALLOCATE_GPU(gpuMemoryManager, d_technical, technical.size() * sizeof(fsgrids::technical));
          fsgrids::technical *d_technical = GET_POINTER(gpuMemoryManager, fsgrids::technical, d_technical);
          std::span<fsgrids::technical> dev_technical(d_technical, technical.size());
 
          cudaMemcpy(d_technical, technical.data(), technical.size() * sizeof(fsgrids::technical), cudaMemcpyHostToDevice);
+
+         phiprof::Timer couplingInTimer {"fsgrid-coupling-in"};
+         // Copy moments over into the fsgrid.
+         feedMomentsIntoFsGridDevice(mpiGrid, cells, dev_moments, dev_technical, fsgrid, parameters, false);
+         feedMomentsIntoFsGridDevice(mpiGrid, cells, dev_momentsdt2, dev_technical, fsgrid, parameters, true);
+         // Update the spans of the filtered grids that were swapped in filtering
+         if (P::amrMaxSpatialRefLevel > 0) {
+            fieldSolverData.moments = dev_moments;
+            fieldSolverData.momentsDt2 = dev_momentsdt2;
+         }
+         couplingInTimer.stop();
+
          cudaMemcpy(d_perb, host_perb.data(),  host_perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyHostToDevice);
          cudaMemcpy(d_dperb, host_dperb.data(),  host_dperb.size() * sizeof(fsgrids::dperbElement), cudaMemcpyHostToDevice);
-         cudaMemcpy(d_moments, host_moments.data(),  host_moments.size() * sizeof(fsgrids::momentsElement), cudaMemcpyHostToDevice);
-         cudaMemcpy(d_momentsdt2, host_momentsdt2.data(),  host_momentsdt2.size() * sizeof(fsgrids::momentsElement), cudaMemcpyHostToDevice);
-         cudaMemcpy(d_vol, host_vol.data(),  host_vol.size() * sizeof(fsgrids::volElement), cudaMemcpyHostToDevice);
 
          propagateFields(
             dev_perb,
@@ -1534,17 +1550,16 @@ int simulate(int argn,char* args[]) {
             parameters
          );
 
+         cudaMemcpy(technical.data(), d_technical, technical.size() * sizeof(fsgrids::technical), cudaMemcpyDeviceToHost);
+         cudaMemcpy(host_perb.data(), d_perb, host_perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
+         cudaMemcpy(host_dperb.data(), d_dperb, host_dperb.size() * sizeof(fsgrids::dperbElement), cudaMemcpyDeviceToHost);
+
          phiprof::Timer getFieldsTimer {"getFieldsFromFsGrid"};
          // Copy results back from fsgrid.
          fsgrid.updateGhostCellsDevice(dev_vol);
          fsgrid.updateGhostCellsDevice(dev_technical);
 
-         cudaMemcpy(host_perb.data(), d_perb, host_perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
-         cudaMemcpy(host_dperb.data(), d_dperb, host_dperb.size() * sizeof(fsgrids::dperbElement), cudaMemcpyDeviceToHost);
          cudaMemcpy(host_dmoments.data(), d_dmoments, host_dmoments.size() * sizeof(fsgrids::dmomentsElement), cudaMemcpyDeviceToHost);
-         cudaMemcpy(technical.data(), d_technical, technical.size() * sizeof(fsgrids::technical), cudaMemcpyDeviceToHost);
-         cudaMemcpy(host_moments.data(), d_moments, host_moments.size() * sizeof(fsgrids::momentsElement), cudaMemcpyDeviceToHost);
-         cudaMemcpy(host_momentsdt2.data(), d_momentsdt2, host_momentsdt2.size() * sizeof(fsgrids::momentsElement), cudaMemcpyDeviceToHost);
          cudaMemcpy(host_egradpe.data(), d_egradpe, host_egradpe.size() * sizeof(fsgrids::egradpeElement), cudaMemcpyDeviceToHost);
          cudaMemcpy(host_vol.data(), d_vol, host_vol.size() * sizeof(fsgrids::volElement), cudaMemcpyDeviceToHost);
 
@@ -1564,7 +1579,9 @@ int simulate(int argn,char* args[]) {
       // dPerBGrid was updated before the electric fields.
       if(SBC::ionosphereGrid.nodes.size() > 0 && ((P::t > SBC::Ionosphere::solveCount * SBC::Ionosphere::couplingInterval && SBC::Ionosphere::couplingInterval > 0) || SBC::Ionosphere::couplingInterval == 0)) {
          FieldTracing::calculateIonosphereFsgridCoupling(technical.view(), fsgrid, host_perb, host_dperb, SBC::ionosphereGrid.nodes, SBC::Ionosphere::radius);
+         cudaMemcpy(host_moments.data(), dev_moments.data(), host_moments.size() * sizeof(fsgrids::momentsElement), cudaMemcpyDeviceToHost);
          SBC::ionosphereGrid.mapDownBoundaryData(host_perb, host_dperb, host_moments, technical.view(), fsgrid);
+         cudaMemcpy(dev_moments.data(), host_moments.data(),  host_moments.size() * sizeof(fsgrids::momentsElement), cudaMemcpyHostToDevice);
          SBC::ionosphereGrid.calculateConductivityTensor(SBC::Ionosphere::F10_7, SBC::Ionosphere::recombAlpha, SBC::Ionosphere::backgroundIonisation);
 
          // Solve ionosphere
