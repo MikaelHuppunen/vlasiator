@@ -1036,12 +1036,15 @@ int simulate(int argn,char* args[]) {
 
    ALLOCATE_GPU(gpuMemoryManager, d_edt2, edt2.size() * sizeof(fsgrids::efieldElement));
    ALLOCATE_GPU(gpuMemoryManager, d_dmomentsdt2, dmomentsdt2.size() * sizeof(fsgrids::dmomentsElement));
+   ALLOCATE_GPU(gpuMemoryManager, d_technical, technical.size() * sizeof(fsgrids::technical));
    fsgrids::efieldElement *d_edt2 = GET_POINTER(gpuMemoryManager, fsgrids::efieldElement, d_edt2);
    fsgrids::dmomentsElement *d_dmomentsdt2 = GET_POINTER(gpuMemoryManager, fsgrids::dmomentsElement, d_dmomentsdt2);
    fsgrids::egradpeElement *d_egradpedt2 = GET_POINTER(gpuMemoryManager, fsgrids::egradpeElement, d_egradpedt2);
+   fsgrids::technical *d_technical = GET_POINTER(gpuMemoryManager, fsgrids::technical, d_technical);
    std::span<fsgrids::efieldElement> dev_edt2(d_edt2, edt2.size());
    std::span<fsgrids::dmomentsElement> dev_dmomentsdt2(d_dmomentsdt2, dmomentsdt2.size());
    std::span<fsgrids::egradpeElement> dev_egradpedt2(d_egradpedt2, egradpedt2.size());
+   std::span<fsgrids::technical> dev_technical(d_technical, technical.size());
    cudaMemcpy(d_perbdt2, host_perbdt2.data(),  host_perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyHostToDevice);
    cudaMemcpy(d_e, host_e.data(),  host_e.size() * sizeof(fsgrids::efieldElement), cudaMemcpyHostToDevice);
    cudaMemcpy(d_edt2, edt2.data(),  edt2.size() * sizeof(fsgrids::efieldElement), cudaMemcpyHostToDevice);
@@ -1134,13 +1137,7 @@ int simulate(int argn,char* args[]) {
             // Calculate these so refinement parameters can be tuned based on the vlsv
             calculateScaledDeltasSimple(mpiGrid);
 
-            // Call the reductions (e.g. field tracing)
-            FieldTracing::reduceData(technical.view(), fsgrid, host_perb, host_dperb, mpiGrid, SBC::ionosphereGrid.nodes);
-
-            phiprof::Timer writeSysTimer {"write-system"};
-            logFile << "(IO): Writing spatial cell and reduced system data to disk, tstep = " << P::tstep << " t = " << P::t << endl << writeVerbose;
-            const bool writeGhosts = true;
-
+            cudaMemcpy(host_dperb.data(), d_dperb, host_dperb.size() * sizeof(fsgrids::dperbElement), cudaMemcpyDeviceToHost);
             cudaMemcpy(perbdt2.data(), d_perbdt2, perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
             cudaMemcpy(e.data(), d_e, e.size() * sizeof(fsgrids::efieldElement), cudaMemcpyDeviceToHost);
             cudaMemcpy(edt2.data(), d_edt2, edt2.size() * sizeof(fsgrids::efieldElement), cudaMemcpyDeviceToHost);
@@ -1153,6 +1150,14 @@ int simulate(int argn,char* args[]) {
                fieldSolverData.moments = host_moments;
                fieldSolverData.momentsDt2 = host_momentsdt2;
             }
+
+            // Call the reductions (e.g. field tracing)
+            FieldTracing::reduceData(technical.view(), fsgrid, host_perb, host_dperb, mpiGrid, SBC::ionosphereGrid.nodes);
+
+            phiprof::Timer writeSysTimer {"write-system"};
+            logFile << "(IO): Writing spatial cell and reduced system data to disk, tstep = " << P::tstep << " t = " << P::t << endl << writeVerbose;
+            const bool writeGhosts = true;
+
             if (writeGrid(
                    mpiGrid,
                    fieldSolverData,
@@ -1507,10 +1512,6 @@ int simulate(int argn,char* args[]) {
       if (P::propagateField) {
          phiprof::Timer propagateTimer {"Propagate Fields"};
 
-         ALLOCATE_GPU(gpuMemoryManager, d_technical, technical.size() * sizeof(fsgrids::technical));
-         fsgrids::technical *d_technical = GET_POINTER(gpuMemoryManager, fsgrids::technical, d_technical);
-         std::span<fsgrids::technical> dev_technical(d_technical, technical.size());
-
          cudaMemcpy(d_technical, technical.data(), technical.size() * sizeof(fsgrids::technical), cudaMemcpyHostToDevice);
 
          phiprof::Timer couplingInTimer {"fsgrid-coupling-in"};
@@ -1525,7 +1526,6 @@ int simulate(int argn,char* args[]) {
          couplingInTimer.stop();
 
          cudaMemcpy(d_perb, host_perb.data(),  host_perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyHostToDevice);
-         cudaMemcpy(d_dperb, host_dperb.data(),  host_dperb.size() * sizeof(fsgrids::dperbElement), cudaMemcpyHostToDevice);
 
          propagateFields(
             dev_perb,
@@ -1552,7 +1552,6 @@ int simulate(int argn,char* args[]) {
 
          cudaMemcpy(technical.data(), d_technical, technical.size() * sizeof(fsgrids::technical), cudaMemcpyDeviceToHost);
          cudaMemcpy(host_perb.data(), d_perb, host_perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
-         cudaMemcpy(host_dperb.data(), d_dperb, host_dperb.size() * sizeof(fsgrids::dperbElement), cudaMemcpyDeviceToHost);
 
          phiprof::Timer getFieldsTimer {"getFieldsFromFsGrid"};
          // Copy results back from fsgrid.
@@ -1578,11 +1577,15 @@ int simulate(int argn,char* args[]) {
       // perBGrid was ghost-updated before derivatives were computed in the field solver.
       // dPerBGrid was updated before the electric fields.
       if(SBC::ionosphereGrid.nodes.size() > 0 && ((P::t > SBC::Ionosphere::solveCount * SBC::Ionosphere::couplingInterval && SBC::Ionosphere::couplingInterval > 0) || SBC::Ionosphere::couplingInterval == 0)) {
-         FieldTracing::calculateIonosphereFsgridCoupling(technical.view(), fsgrid, host_perb, host_dperb, SBC::ionosphereGrid.nodes, SBC::Ionosphere::radius);
          cudaMemcpy(host_moments.data(), dev_moments.data(), host_moments.size() * sizeof(fsgrids::momentsElement), cudaMemcpyDeviceToHost);
+         cudaMemcpy(host_dperb.data(), d_dperb, host_dperb.size() * sizeof(fsgrids::dperbElement), cudaMemcpyDeviceToHost);
+
+         FieldTracing::calculateIonosphereFsgridCoupling(technical.view(), fsgrid, host_perb, host_dperb, SBC::ionosphereGrid.nodes, SBC::Ionosphere::radius);
          SBC::ionosphereGrid.mapDownBoundaryData(host_perb, host_dperb, host_moments, technical.view(), fsgrid);
-         cudaMemcpy(dev_moments.data(), host_moments.data(),  host_moments.size() * sizeof(fsgrids::momentsElement), cudaMemcpyHostToDevice);
          SBC::ionosphereGrid.calculateConductivityTensor(SBC::Ionosphere::F10_7, SBC::Ionosphere::recombAlpha, SBC::Ionosphere::backgroundIonisation);
+
+         cudaMemcpy(dev_moments.data(), host_moments.data(),  host_moments.size() * sizeof(fsgrids::momentsElement), cudaMemcpyHostToDevice);
+         cudaMemcpy(d_dperb, host_dperb.data(),  host_dperb.size() * sizeof(fsgrids::dperbElement), cudaMemcpyHostToDevice);
 
          // Solve ionosphere
          int nIterations, nRestarts;
