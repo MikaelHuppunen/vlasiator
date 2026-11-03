@@ -154,6 +154,86 @@ void calculateGradPeTerm(fsgrids::egradpespan egradpes,
    }
 }
 
+__device__ inline void fieldSolverBoundaryCondGradPeElectricFieldDevice(cuint cellSysBoundaryFlag, SysBoundaryDevice *sysBoundaries, fsgrids::efieldspan egradpe, const fsgrid::FsStencil& stencil, cuint component) {
+   switch (cellSysBoundaryFlag) {
+      case sysboundarytype::OUTFLOW: {
+         static_cast<SBC::OutflowDevice*>(sysBoundaries[0].getSysBoundary(cellSysBoundaryFlag))->SBC::OutflowDevice::fieldSolverBoundaryCondGradPeElectricField(egradpe, stencil, component);
+         break;
+      }
+      case sysboundarytype::MAXWELLIAN: {
+         static_cast<SBC::MaxwellianDevice*>(sysBoundaries[0].getSysBoundary(cellSysBoundaryFlag))->SBC::MaxwellianDevice::fieldSolverBoundaryCondGradPeElectricField(egradpe, stencil, component);
+         break;
+      }
+      case sysboundarytype::IONOSPHERE: {
+         break;
+      }
+      case sysboundarytype::DO_NOT_COMPUTE: {
+         static_cast<SBC::DoNotComputeDevice*>(sysBoundaries[0].getSysBoundary(cellSysBoundaryFlag))->SBC::DoNotComputeDevice::fieldSolverBoundaryCondGradPeElectricField(egradpe, stencil, component);
+         break;
+      }
+      case sysboundarytype::COPYSPHERE: {
+         break;
+      }
+   }
+}
+
+/** Calculate the electron pressure gradient term on all given cells.
+ * @param egradpes fsgrid of Hall term electric fields
+ * @param moments fsgrid of moments
+ * @param dmoments fsgrid of moments derivatives
+ * @param technical fsgrid with technical parameters
+ * @param stencil fsgrid stencil of current cell
+ * @param gridSpacing fsgrid cell size in x,y,z
+ * @param sysBoundaries System boundary condition functions.
+ */
+__device__ void calculateGradPeTermDevice(fsgrids::egradpespan egradpes,
+                         fsgrids::constmomentsspan moments,
+                         fsgrids::constdmomentsspan dmoments,
+                         fsgrids::consttechnicalspan technical, const fsgrid::FsStencil& stencil,
+                         const auto& gridSpacing, SysBoundaryDevice *sysBoundaries, const DeviceParameters& parameters) {
+#ifdef DEBUG_FSOLVER
+   if (stencil.ooo() >= moments.size()) {
+      cerr << "Out-of-bounds access in " << __FILE__ << ":" << __LINE__ << endl;
+      exit(1);
+   }
+#endif
+   auto& egradpe = egradpes[stencil.ooo()];
+   const auto& moment = moments[stencil.ooo()];
+   const auto& dmoment = dmoments[stencil.ooo()];
+   const auto& tech = technical[stencil.ooo()];
+
+   cuint cellSysBoundaryFlag = tech.sysBoundaryFlag;
+   cuint cellSysBoundaryLayer = tech.sysBoundaryLayer;
+
+   if (cellSysBoundaryFlag == sysboundarytype::DO_NOT_COMPUTE ||
+       cellSysBoundaryFlag == sysboundarytype::OUTER_BOUNDARY_PADDING) {
+      return;
+   }
+
+   if ((cellSysBoundaryFlag != sysboundarytype::NOT_SYSBOUNDARY) && (cellSysBoundaryLayer != 1)) {
+      fieldSolverBoundaryCondGradPeElectricFieldDevice(cellSysBoundaryFlag, sysBoundaries, egradpes, stencil, 0);
+      fieldSolverBoundaryCondGradPeElectricFieldDevice(cellSysBoundaryFlag, sysBoundaries, egradpes, stencil, 1);
+      fieldSolverBoundaryCondGradPeElectricFieldDevice(cellSysBoundaryFlag, sysBoundaries, egradpes, stencil, 2);
+   } else {
+      if (parameters.ohmGradPeTerm == 0) {
+         printf("You shouldn't be in a electron pressure gradient term function if Parameters::ohmGradPeTerm == 0.\n"); 
+      } else if (parameters.ohmGradPeTerm == 1) {
+         auto calculateEdgeGradPeTermComponent = [&egradpe, &moment, &dmoment, &parameters](size_t i, size_t j, Real spacing) {
+            const Real rhoq = moment[fsgrids::moments::RHOQ];
+            const Real min = parameters.hallMinimumRhoq;
+            const Real max = std::numeric_limits<Real>::max();
+            const Real hallRhoq = std::clamp(rhoq, min, max);
+            egradpe[i] = -dmoment[j] / (hallRhoq * spacing);
+         };
+         calculateEdgeGradPeTermComponent(fsgrids::egradpe::EXGRADPE, fsgrids::dmoments::dPedx, gridSpacing[0]);
+         calculateEdgeGradPeTermComponent(fsgrids::egradpe::EYGRADPE, fsgrids::dmoments::dPedy, gridSpacing[1]);
+         calculateEdgeGradPeTermComponent(fsgrids::egradpe::EZGRADPE, fsgrids::dmoments::dPedz, gridSpacing[2]);
+      } else {
+         printf("You are welcome to code higher-order Hall term correction terms.\n");
+      }
+   }
+}
+
 void calculateGradPeTermSimple(fsgrids::egradpespan egradpe,
                                fsgrids::egradpespan egradpedt2,
                                fsgrids::momentsspan moments,
@@ -181,6 +261,38 @@ void calculateGradPeTermSimple(fsgrids::egradpespan egradpe,
                        phiprof::initializeTimer("EgradPe compute cells"), technical,
                        [=, &sysBoundaries](const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
                           calculateGradPeTerm(egradpe, moments, dmoments, technical, stencil, coordinates.physicalGridSpacing, sysBoundaries);
+                       });
+
+   gradPeTimer.stop(numCells, "Spatial Cells");
+}
+
+void calculateGradPeTermSimpleDevice(fsgrids::egradpespan egradpe,
+                               fsgrids::egradpespan egradpedt2,
+                               fsgrids::momentsspan moments,
+                               fsgrids::momentsspan momentsdt2,
+                               fsgrids::dmomentsspan dmoments,
+                               fsgrids::dmomentsspan dmomentsdt2,
+                               fsgrids::technicalspan technical, FieldSolverGrid &fsgrid,
+                               SysBoundaryDevice *sysBoundaries, cint& RKCase, const DeviceParameters& parameters) {
+   phiprof::Timer gradPeTimer{"Calculate GradPe term"};
+
+   const size_t numCells = fsgrid.getNumCells();
+
+   if (not(RKCase == RK_ORDER1 || RKCase == RK_ORDER2_STEP2)) {
+      egradpe = egradpedt2;
+      moments = momentsdt2;
+      dmoments = dmomentsdt2;
+   }
+
+   phiprof::Timer mpiTimer{"EgradPe field update ghosts MPI", {"MPI"}};
+   fsgrid.updateGhostCellsDevice(dmoments);
+   mpiTimer.stop();
+
+   // Calculate GradPe term
+   fsgrid.parallel_for_GPU([](int timerId) -> phiprof::Timer { return phiprof::Timer{timerId}; },
+                       phiprof::initializeTimer("EgradPe compute cells"), technical,
+                       [=] __device__(const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
+                          calculateGradPeTermDevice(egradpe, moments, dmoments, technical, stencil, coordinates.physicalGridSpacing, sysBoundaries, parameters);
                        });
 
    gradPeTimer.stop(numCells, "Spatial Cells");

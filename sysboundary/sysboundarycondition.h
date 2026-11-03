@@ -314,6 +314,9 @@ namespace SBC {
          virtual void __device__ fieldSolverBoundaryCondElectricField(fsgrids::efieldspan e,
                                                      const fsgrid::FsStencil& stencil, cuint component) = 0;
 
+         virtual __device__ void fieldSolverBoundaryCondGradPeElectricField(fsgrids::egradpespan,
+                                                         const fsgrid::FsStencil&, cuint) = 0;
+
          __device__ inline Real fieldBoundaryCopyFromSolvingNbrMagneticField(
             fsgrids::perbspan b, fsgrids::consttechnicalspan technical,
             const fsgrid::FsStencil& stencil, cuint component, cuint mask) {

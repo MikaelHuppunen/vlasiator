@@ -21,6 +21,9 @@
 #define LDZ_GRADPE_HPP
 
 #include "../definitions.h"
+#include "../sysboundary/donotcompute.h"
+#include "../sysboundary/outflow.h"
+#include "../sysboundary/setmaxwellian.h"
 
 void calculateGradPeTermSimple(fsgrids::egradpespan egradpe,
                                fsgrids::egradpespan egradpedt2,
@@ -32,5 +35,16 @@ void calculateGradPeTermSimple(fsgrids::egradpespan egradpe,
                                FieldSolverGrid &fsgrid,
                                SysBoundary& sysBoundaries,
                                cint& RKCase);
+
+void calculateGradPeTermSimpleDevice(fsgrids::egradpespan egradpe,
+                               fsgrids::egradpespan egradpedt2,
+                               fsgrids::momentsspan moments,
+                               fsgrids::momentsspan momentsdt2,
+                               fsgrids::dmomentsspan dmoments,
+                               fsgrids::dmomentsspan dmomentsdt2,
+                               fsgrids::technicalspan technical,
+                               FieldSolverGrid &fsgrid,
+                               SysBoundaryDevice *sysBoundaries,
+                               cint& RKCase, const DeviceParameters& parameters);
 
 #endif

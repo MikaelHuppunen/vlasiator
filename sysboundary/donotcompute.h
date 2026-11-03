@@ -111,6 +111,10 @@ namespace SBC {
                                                 const fsgrid::FsStencil&, cuint) override {
          assert(false); 
       }
+      inline __device__ void fieldSolverBoundaryCondGradPeElectricField(fsgrids::egradpespan,
+                                                      const fsgrid::FsStencil&, cuint) override {
+         assert(false);
+      }
    };
 }
 

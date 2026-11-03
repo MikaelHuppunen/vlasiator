@@ -127,8 +127,7 @@ bool propagateFields(fsgrids::perbspan perb,
       propagateMagneticFieldSimple(perb, perbdt2, bgb, e, edt2, technical, fsgrid, sysBoundaries, dt, RK_ORDER1, parameters);
       calculateDerivativesSimpleDevice(perb, moments, dperb, dmoments, technical, fsgrid, true /*doMoments*/, parameters);
       if (P::ohmGradPeTerm > 0) {
-         std::cerr << "TODO: calculateGradPeTermSimple not implemented" << std::endl;
-         calculateGradPeTermSimple(egradpe, egradpedt2, moments, momentsdt2, dmoments, dmomentsdt2, technical, fsgrid, sysBoundaries, RK_ORDER1);
+         calculateGradPeTermSimpleDevice(egradpe, egradpedt2, moments, momentsdt2, dmoments, dmomentsdt2, technical, fsgrid, sysBoundaries, RK_ORDER1, parameters);
       }
       if (P::ohmHallTerm > 0) {
          std::cerr << "TODO: calculateHallTermSimple not implemented" << std::endl;
@@ -174,8 +173,7 @@ bool propagateFields(fsgrids::perbspan perb,
       propagateMagneticFieldSimple(perb, perbdt2, bgb, e, edt2, technical, fsgrid, sysBoundaries, dt, RK_ORDER2_STEP1, parameters);
       calculateDerivativesSimpleDevice(perbdt2, momentsdt2, dperb, dmomentsdt2, technical, fsgrid, true /*doMoments*/, parameters);
       if (P::ohmGradPeTerm > 0) {
-         std::cerr << "TODO: calculateGradPeTermSimple not implemented" << std::endl;
-         //calculateGradPeTermSimple(egradpe, egradpedt2, moments, momentsdt2, dmoments, dmomentsdt2, technical, fsgrid, sysBoundaries, RK_ORDER2_STEP1);
+         calculateGradPeTermSimpleDevice(egradpe, egradpedt2, moments, momentsdt2, dmoments, dmomentsdt2, technical, fsgrid, sysBoundaries, RK_ORDER2_STEP1, parameters);
       }
       if (P::ohmHallTerm > 0) {
          std::cerr << "TODO: calculateHallTermSimple not implemented" << std::endl;
@@ -222,8 +220,7 @@ bool propagateFields(fsgrids::perbspan perb,
       propagateMagneticFieldSimple(perb, perbdt2, bgb, e, edt2, technical, fsgrid, sysBoundaries, dt, RK_ORDER2_STEP2, parameters);
       calculateDerivativesSimpleDevice(perb, moments, dperb, dmoments, technical, fsgrid, true /*doMoments*/, parameters);
       if (P::ohmGradPeTerm > 0) {
-         std::cerr << "TODO: calculateGradPeTermSimple not implemented" << std::endl;
-         //calculateGradPeTermSimple(egradpe, egradpedt2, moments, momentsdt2, dmoments, dmomentsdt2, technical, fsgrid, sysBoundaries, RK_ORDER2_STEP2);
+         calculateGradPeTermSimpleDevice(egradpe, egradpedt2, moments, momentsdt2, dmoments, dmomentsdt2, technical, fsgrid, sysBoundaries, RK_ORDER2_STEP2, parameters);
       }
       if (P::ohmHallTerm > 0) {
          std::cerr << "TODO: calculateHallTermSimple not implemented" << std::endl;
@@ -290,7 +287,7 @@ bool propagateFields(fsgrids::perbspan perb,
          calculateDerivativesSimpleDevice(perbdt2, momentsdt2, dperb, dmomentsdt2, technical, fsgrid, (subcycleCount == 0) *//*doMoments*//*, parameters);
 
          if (P::ohmGradPeTerm > 0 && subcycleCount == 0) {
-            calculateGradPeTermSimple(egradpe, egradpedt2, moments, momentsdt2, dmoments, dmomentsdt2, technical, fsgrid, sysBoundaries, RK_ORDER2_STEP1);
+            calculateGradPeTermSimpleDevice(egradpe, egradpedt2, moments, momentsdt2, dmoments, dmomentsdt2, technical, fsgrid, sysBoundaries, RK_ORDER2_STEP1, parameters);
          }
          if (P::ohmHallTerm > 0) {
             calculateHallTermSimple(
@@ -338,7 +335,7 @@ bool propagateFields(fsgrids::perbspan perb,
          calculateDerivativesSimpleDevice(perb, moments, dperb, dmoments, technical, fsgrid, (subcycleCount == 0) *//*doMoments*//*, parameters);
 
          if (P::ohmGradPeTerm > 0 && subcycleCount == 0) {
-            calculateGradPeTermSimple(egradpe, egradpedt2, moments, momentsdt2, dmoments, dmomentsdt2, technical, fsgrid, sysBoundaries, RK_ORDER2_STEP2);
+            calculateGradPeTermSimpleDevice(egradpe, egradpedt2, moments, momentsdt2, dmoments, dmomentsdt2, technical, fsgrid, sysBoundaries, RK_ORDER2_STEP2, parameters);
          }
          if (P::ohmHallTerm > 0) {
             calculateHallTermSimple(

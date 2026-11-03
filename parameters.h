@@ -317,6 +317,7 @@ struct DeviceParameters {
    uint ohmGradPeTerm;
    bool fieldSolverDiffusiveEterms;
    std::array<int, 16> numPasses;
+   Real hallMinimumRhoq;
 };
 
 inline DeviceParameters uploadParametersToDevice() {
@@ -346,6 +347,7 @@ inline DeviceParameters uploadParametersToDevice() {
          deviceParameters.numPasses[i] = Parameters::numPasses[i];
       }
    }
+   deviceParameters.hallMinimumRhoq = Parameters::hallMinimumRhoq;
    return deviceParameters;
 }
 
