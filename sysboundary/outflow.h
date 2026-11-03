@@ -158,6 +158,35 @@ namespace SBC {
       {
          EGradPe[stencil.ooo()][fsgrids::egradpe::EXGRADPE + component] = 0.0;
       }
+
+      __device__ inline void fieldSolverBoundaryCondHallElectricField(fsgrids::ehallspan ehall,
+         const fsgrid::FsStencil& stencil, cuint component)
+      {
+         array<Real, fsgrids::ehall::N_EHALL>& cp = ehall[stencil.ooo()];
+         switch (component) {
+         case 0:
+            cp[fsgrids::ehall::EXHALL_000_100] = 0.0;
+            cp[fsgrids::ehall::EXHALL_010_110] = 0.0;
+            cp[fsgrids::ehall::EXHALL_001_101] = 0.0;
+            cp[fsgrids::ehall::EXHALL_011_111] = 0.0;
+            break;
+         case 1:
+            cp[fsgrids::ehall::EYHALL_000_010] = 0.0;
+            cp[fsgrids::ehall::EYHALL_100_110] = 0.0;
+            cp[fsgrids::ehall::EYHALL_001_011] = 0.0;
+            cp[fsgrids::ehall::EYHALL_101_111] = 0.0;
+            break;
+         case 2:
+            cp[fsgrids::ehall::EZHALL_000_001] = 0.0;
+            cp[fsgrids::ehall::EZHALL_100_101] = 0.0;
+            cp[fsgrids::ehall::EZHALL_010_011] = 0.0;
+            cp[fsgrids::ehall::EZHALL_110_111] = 0.0;
+            break;
+         default:
+            printf(" Invalid component\n");
+            assert(false);
+         }
+      }
    protected:
    }; // class Outflow
 } // namespace SBC

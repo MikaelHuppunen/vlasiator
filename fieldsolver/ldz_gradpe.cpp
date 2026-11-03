@@ -154,7 +154,7 @@ void calculateGradPeTerm(fsgrids::egradpespan egradpes,
    }
 }
 
-__device__ inline void fieldSolverBoundaryCondGradPeElectricFieldDevice(cuint cellSysBoundaryFlag, SysBoundaryDevice *sysBoundaries, fsgrids::efieldspan egradpe, const fsgrid::FsStencil& stencil, cuint component) {
+__device__ inline void fieldSolverBoundaryCondGradPeElectricFieldDevice(cuint cellSysBoundaryFlag, SysBoundaryDevice *sysBoundaries, fsgrids::egradpespan egradpe, const fsgrid::FsStencil& stencil, cuint component) {
    switch (cellSysBoundaryFlag) {
       case sysboundarytype::OUTFLOW: {
          static_cast<SBC::OutflowDevice*>(sysBoundaries[0].getSysBoundary(cellSysBoundaryFlag))->SBC::OutflowDevice::fieldSolverBoundaryCondGradPeElectricField(egradpe, stencil, component);

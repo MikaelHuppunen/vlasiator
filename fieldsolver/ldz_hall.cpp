@@ -107,7 +107,135 @@ REAL JXBX_000_100(
  *
  */
 template<typename REAL> inline
+__device__ REAL JXBX_000_100Device(
+   const std::array<REAL, Rec::N_REC_COEFFICIENTS>& pC,
+   creal BGBY,
+   creal BGBZ,
+   const std::array<Real, 3>& gridSpacing
+) {
+   using namespace Rec;
+   const auto dx = gridSpacing[0];
+   const auto dy = gridSpacing[1];
+   const auto dz = gridSpacing[2];
+   return -(pC[a_zz] * BGBZ) / dz + (pC[a_z] * BGBZ) / dz - (pC[a_yz] * BGBZ) / (2 * dz) -
+          (pC[c_xzz] * BGBZ) / (6 * dx) + (pC[c_xz] * BGBZ) / (2 * dx) - (pC[c_xyz] * BGBZ) / (4 * dx) +
+          (pC[c_xy] * BGBZ) / (2 * dx) - (pC[c_x] * BGBZ) / dx - (pC[a_yz] * BGBY) / (2 * dy) - (pC[a_yy] * BGBY) / dy +
+          (pC[a_y] * BGBY) / dy + (pC[b_xz] * BGBY) / (2 * dx) - (pC[b_xyz] * BGBY) / (4 * dx) -
+          (pC[b_xyy] * BGBY) / (6 * dx) + (pC[b_xy] * BGBY) / (2 * dx) - (pC[b_x] * BGBY) / dx -
+          (pC[a_zz] * pC[c_zz]) / (6 * dz) + (pC[a_z] * pC[c_zz]) / (6 * dz) - (pC[a_yz] * pC[c_zz]) / (12 * dz) +
+          (pC[a_zz] * pC[c_z]) / (2 * dz) - (pC[a_z] * pC[c_z]) / (2 * dz) + (pC[a_yz] * pC[c_z]) / (4 * dz) -
+          (pC[a_zz] * pC[c_yz]) / (4 * dz) + (pC[a_z] * pC[c_yz]) / (4 * dz) - (pC[a_yz] * pC[c_yz]) / (8 * dz) +
+          (pC[a_zz] * pC[c_y]) / (2 * dz) - (pC[a_z] * pC[c_y]) / (2 * dz) + (pC[a_yz] * pC[c_y]) / (4 * dz) +
+          (pC[a_xzz] * pC[c_xz]) / (24 * dz) - (pC[a_xz] * pC[c_xz]) / (24 * dz) + (pC[a_xyz] * pC[c_xz]) / (48 * dz) -
+          (pC[a_xzz] * pC[c_x]) / (12 * dz) + (pC[a_xz] * pC[c_x]) / (12 * dz) - (pC[a_xyz] * pC[c_x]) / (24 * dz) -
+          (pC[a_zz] * pC[c_0]) / dz + (pC[a_z] * pC[c_0]) / dz - (pC[a_yz] * pC[c_0]) / (2 * dz) +
+          (pC[a_yz] * pC[b_z]) / (4 * dy) + (pC[a_yy] * pC[b_z]) / (2 * dy) - (pC[a_y] * pC[b_z]) / (2 * dy) -
+          (pC[a_yz] * pC[b_yz]) / (8 * dy) - (pC[a_yy] * pC[b_yz]) / (4 * dy) + (pC[a_y] * pC[b_yz]) / (4 * dy) -
+          (pC[a_yz] * pC[b_yy]) / (12 * dy) - (pC[a_yy] * pC[b_yy]) / (6 * dy) + (pC[a_y] * pC[b_yy]) / (6 * dy) +
+          (pC[a_yz] * pC[b_y]) / (4 * dy) + (pC[a_yy] * pC[b_y]) / (2 * dy) - (pC[a_y] * pC[b_y]) / (2 * dy) +
+          (pC[a_xyz] * pC[b_xy]) / (48 * dy) + (pC[a_xyy] * pC[b_xy]) / (24 * dy) - (pC[a_xy] * pC[b_xy]) / (24 * dy) -
+          (pC[a_xyz] * pC[b_x]) / (24 * dy) - (pC[a_xyy] * pC[b_x]) / (12 * dy) + (pC[a_xy] * pC[b_x]) / (12 * dy) -
+          (pC[a_yz] * pC[b_0]) / (2 * dy) - (pC[a_yy] * pC[b_0]) / dy + (pC[a_y] * pC[b_0]) / dy -
+          (pC[c_xzz] * pC[c_zz]) / (36 * dx) + (pC[c_xz] * pC[c_zz]) / (12 * dx) - (pC[c_xyz] * pC[c_zz]) / (24 * dx) +
+          (pC[c_xy] * pC[c_zz]) / (12 * dx) - (pC[c_x] * pC[c_zz]) / (6 * dx) + (pC[c_xzz] * pC[c_z]) / (12 * dx) -
+          (pC[c_xz] * pC[c_z]) / (4 * dx) + (pC[c_xyz] * pC[c_z]) / (8 * dx) - (pC[c_xy] * pC[c_z]) / (4 * dx) +
+          (pC[c_x] * pC[c_z]) / (2 * dx) - (pC[c_xzz] * pC[c_yz]) / (24 * dx) + (pC[c_xz] * pC[c_yz]) / (8 * dx) -
+          (pC[c_xyz] * pC[c_yz]) / (16 * dx) + (pC[c_xy] * pC[c_yz]) / (8 * dx) - (pC[c_x] * pC[c_yz]) / (4 * dx) +
+          (pC[c_xzz] * pC[c_y]) / (12 * dx) - (pC[c_xz] * pC[c_y]) / (4 * dx) + (pC[c_xyz] * pC[c_y]) / (8 * dx) -
+          (pC[c_xy] * pC[c_y]) / (4 * dx) + (pC[c_x] * pC[c_y]) / (2 * dx) - (pC[c_0] * pC[c_xzz]) / (6 * dx) -
+          (pC[c_xxz] * pC[c_xz]) / (24 * dx) + (pC[c_xx] * pC[c_xz]) / (12 * dx) + (pC[c_0] * pC[c_xz]) / (2 * dx) -
+          (pC[c_0] * pC[c_xyz]) / (4 * dx) + (pC[c_0] * pC[c_xy]) / (2 * dx) + (pC[c_x] * pC[c_xxz]) / (12 * dx) -
+          (pC[c_x] * pC[c_xx]) / (6 * dx) - (pC[c_0] * pC[c_x]) / dx - (pC[b_xz] * pC[b_z]) / (4 * dx) +
+          (pC[b_xyz] * pC[b_z]) / (8 * dx) + (pC[b_xyy] * pC[b_z]) / (12 * dx) - (pC[b_xy] * pC[b_z]) / (4 * dx) +
+          (pC[b_x] * pC[b_z]) / (2 * dx) + (pC[b_xz] * pC[b_yz]) / (8 * dx) - (pC[b_xyz] * pC[b_yz]) / (16 * dx) -
+          (pC[b_xyy] * pC[b_yz]) / (24 * dx) + (pC[b_xy] * pC[b_yz]) / (8 * dx) - (pC[b_x] * pC[b_yz]) / (4 * dx) +
+          (pC[b_xz] * pC[b_yy]) / (12 * dx) - (pC[b_xyz] * pC[b_yy]) / (24 * dx) - (pC[b_xyy] * pC[b_yy]) / (36 * dx) +
+          (pC[b_xy] * pC[b_yy]) / (12 * dx) - (pC[b_x] * pC[b_yy]) / (6 * dx) - (pC[b_xz] * pC[b_y]) / (4 * dx) +
+          (pC[b_xyz] * pC[b_y]) / (8 * dx) + (pC[b_xyy] * pC[b_y]) / (12 * dx) - (pC[b_xy] * pC[b_y]) / (4 * dx) +
+          (pC[b_x] * pC[b_y]) / (2 * dx) + (pC[b_0] * pC[b_xz]) / (2 * dx) - (pC[b_0] * pC[b_xyz]) / (4 * dx) -
+          (pC[b_0] * pC[b_xyy]) / (6 * dx) - (pC[b_xxy] * pC[b_xy]) / (24 * dx) + (pC[b_xx] * pC[b_xy]) / (12 * dx) +
+          (pC[b_0] * pC[b_xy]) / (2 * dx) + (pC[b_x] * pC[b_xxy]) / (12 * dx) - (pC[b_x] * pC[b_xx]) / (6 * dx) -
+          (pC[b_0] * pC[b_x]) / dx;
+}
+
+/*! \brief Low-level Hall component computation
+ *
+ * Hall term computation following Balsara reconstruction, edge-averaged.
+ *
+ * \param pC Reconstruction coefficients
+ * \param BGBY Background By
+ * \param BGBZ Background Bz
+ * \param gridSpacing fsgrid cell size in x,y,z
+ *
+ * \sa calculateEdgeHallTermComponents
+ *
+ */
+template<typename REAL> inline
 REAL JXBX_010_110(
+   const std::array<REAL, Rec::N_REC_COEFFICIENTS>& pC,
+   creal BGBY,
+   creal BGBZ,
+   const std::array<Real, 3>& gridSpacing
+) {
+   using namespace Rec;
+   const auto dx = gridSpacing[0];
+   const auto dy = gridSpacing[1];
+   const auto dz = gridSpacing[2];
+   return -(pC[a_zz] * BGBZ) / dz + (pC[a_z] * BGBZ) / dz + (pC[a_yz] * BGBZ) / (2 * dz) -
+          (pC[c_xzz] * BGBZ) / (6 * dx) + (pC[c_xz] * BGBZ) / (2 * dx) + (pC[c_xyz] * BGBZ) / (4 * dx) -
+          (pC[c_xy] * BGBZ) / (2 * dx) - (pC[c_x] * BGBZ) / dx - (pC[a_yz] * BGBY) / (2 * dy) + (pC[a_yy] * BGBY) / dy +
+          (pC[a_y] * BGBY) / dy + (pC[b_xz] * BGBY) / (2 * dx) + (pC[b_xyz] * BGBY) / (4 * dx) -
+          (pC[b_xyy] * BGBY) / (6 * dx) - (pC[b_xy] * BGBY) / (2 * dx) - (pC[b_x] * BGBY) / dx -
+          (pC[a_zz] * pC[c_zz]) / (6 * dz) + (pC[a_z] * pC[c_zz]) / (6 * dz) + (pC[a_yz] * pC[c_zz]) / (12 * dz) +
+          (pC[a_zz] * pC[c_z]) / (2 * dz) - (pC[a_z] * pC[c_z]) / (2 * dz) - (pC[a_yz] * pC[c_z]) / (4 * dz) +
+          (pC[a_zz] * pC[c_yz]) / (4 * dz) - (pC[a_z] * pC[c_yz]) / (4 * dz) - (pC[a_yz] * pC[c_yz]) / (8 * dz) -
+          (pC[a_zz] * pC[c_y]) / (2 * dz) + (pC[a_z] * pC[c_y]) / (2 * dz) + (pC[a_yz] * pC[c_y]) / (4 * dz) +
+          (pC[a_xzz] * pC[c_xz]) / (24 * dz) - (pC[a_xz] * pC[c_xz]) / (24 * dz) - (pC[a_xyz] * pC[c_xz]) / (48 * dz) -
+          (pC[a_xzz] * pC[c_x]) / (12 * dz) + (pC[a_xz] * pC[c_x]) / (12 * dz) + (pC[a_xyz] * pC[c_x]) / (24 * dz) -
+          (pC[a_zz] * pC[c_0]) / dz + (pC[a_z] * pC[c_0]) / dz + (pC[a_yz] * pC[c_0]) / (2 * dz) +
+          (pC[a_yz] * pC[b_z]) / (4 * dy) - (pC[a_yy] * pC[b_z]) / (2 * dy) - (pC[a_y] * pC[b_z]) / (2 * dy) +
+          (pC[a_yz] * pC[b_yz]) / (8 * dy) - (pC[a_yy] * pC[b_yz]) / (4 * dy) - (pC[a_y] * pC[b_yz]) / (4 * dy) -
+          (pC[a_yz] * pC[b_yy]) / (12 * dy) + (pC[a_yy] * pC[b_yy]) / (6 * dy) + (pC[a_y] * pC[b_yy]) / (6 * dy) -
+          (pC[a_yz] * pC[b_y]) / (4 * dy) + (pC[a_yy] * pC[b_y]) / (2 * dy) + (pC[a_y] * pC[b_y]) / (2 * dy) -
+          (pC[a_xyz] * pC[b_xy]) / (48 * dy) + (pC[a_xyy] * pC[b_xy]) / (24 * dy) + (pC[a_xy] * pC[b_xy]) / (24 * dy) -
+          (pC[a_xyz] * pC[b_x]) / (24 * dy) + (pC[a_xyy] * pC[b_x]) / (12 * dy) + (pC[a_xy] * pC[b_x]) / (12 * dy) -
+          (pC[a_yz] * pC[b_0]) / (2 * dy) + (pC[a_yy] * pC[b_0]) / dy + (pC[a_y] * pC[b_0]) / dy -
+          (pC[c_xzz] * pC[c_zz]) / (36 * dx) + (pC[c_xz] * pC[c_zz]) / (12 * dx) + (pC[c_xyz] * pC[c_zz]) / (24 * dx) -
+          (pC[c_xy] * pC[c_zz]) / (12 * dx) - (pC[c_x] * pC[c_zz]) / (6 * dx) + (pC[c_xzz] * pC[c_z]) / (12 * dx) -
+          (pC[c_xz] * pC[c_z]) / (4 * dx) - (pC[c_xyz] * pC[c_z]) / (8 * dx) + (pC[c_xy] * pC[c_z]) / (4 * dx) +
+          (pC[c_x] * pC[c_z]) / (2 * dx) + (pC[c_xzz] * pC[c_yz]) / (24 * dx) - (pC[c_xz] * pC[c_yz]) / (8 * dx) -
+          (pC[c_xyz] * pC[c_yz]) / (16 * dx) + (pC[c_xy] * pC[c_yz]) / (8 * dx) + (pC[c_x] * pC[c_yz]) / (4 * dx) -
+          (pC[c_xzz] * pC[c_y]) / (12 * dx) + (pC[c_xz] * pC[c_y]) / (4 * dx) + (pC[c_xyz] * pC[c_y]) / (8 * dx) -
+          (pC[c_xy] * pC[c_y]) / (4 * dx) - (pC[c_x] * pC[c_y]) / (2 * dx) - (pC[c_0] * pC[c_xzz]) / (6 * dx) -
+          (pC[c_xxz] * pC[c_xz]) / (24 * dx) + (pC[c_xx] * pC[c_xz]) / (12 * dx) + (pC[c_0] * pC[c_xz]) / (2 * dx) +
+          (pC[c_0] * pC[c_xyz]) / (4 * dx) - (pC[c_0] * pC[c_xy]) / (2 * dx) + (pC[c_x] * pC[c_xxz]) / (12 * dx) -
+          (pC[c_x] * pC[c_xx]) / (6 * dx) - (pC[c_0] * pC[c_x]) / dx - (pC[b_xz] * pC[b_z]) / (4 * dx) -
+          (pC[b_xyz] * pC[b_z]) / (8 * dx) + (pC[b_xyy] * pC[b_z]) / (12 * dx) + (pC[b_xy] * pC[b_z]) / (4 * dx) +
+          (pC[b_x] * pC[b_z]) / (2 * dx) - (pC[b_xz] * pC[b_yz]) / (8 * dx) - (pC[b_xyz] * pC[b_yz]) / (16 * dx) +
+          (pC[b_xyy] * pC[b_yz]) / (24 * dx) + (pC[b_xy] * pC[b_yz]) / (8 * dx) + (pC[b_x] * pC[b_yz]) / (4 * dx) +
+          (pC[b_xz] * pC[b_yy]) / (12 * dx) + (pC[b_xyz] * pC[b_yy]) / (24 * dx) - (pC[b_xyy] * pC[b_yy]) / (36 * dx) -
+          (pC[b_xy] * pC[b_yy]) / (12 * dx) - (pC[b_x] * pC[b_yy]) / (6 * dx) + (pC[b_xz] * pC[b_y]) / (4 * dx) +
+          (pC[b_xyz] * pC[b_y]) / (8 * dx) - (pC[b_xyy] * pC[b_y]) / (12 * dx) - (pC[b_xy] * pC[b_y]) / (4 * dx) -
+          (pC[b_x] * pC[b_y]) / (2 * dx) + (pC[b_0] * pC[b_xz]) / (2 * dx) + (pC[b_0] * pC[b_xyz]) / (4 * dx) -
+          (pC[b_0] * pC[b_xyy]) / (6 * dx) - (pC[b_xxy] * pC[b_xy]) / (24 * dx) - (pC[b_xx] * pC[b_xy]) / (12 * dx) -
+          (pC[b_0] * pC[b_xy]) / (2 * dx) - (pC[b_x] * pC[b_xxy]) / (12 * dx) - (pC[b_x] * pC[b_xx]) / (6 * dx) -
+          (pC[b_0] * pC[b_x]) / dx;
+}
+
+/*! \brief Low-level Hall component computation
+ *
+ * Hall term computation following Balsara reconstruction, edge-averaged.
+ *
+ * \param pC Reconstruction coefficients
+ * \param BGBY Background By
+ * \param BGBZ Background Bz
+ * \param gridSpacing fsgrid cell size in x,y,z
+ *
+ * \sa calculateEdgeHallTermComponents
+ *
+ */
+template<typename REAL> inline
+__device__ REAL JXBX_010_110Device(
    const std::array<REAL, Rec::N_REC_COEFFICIENTS>& pC,
    creal BGBY,
    creal BGBZ,
@@ -235,7 +363,135 @@ REAL JXBX_001_101(
  *
  */
 template<typename REAL> inline
+__device__ REAL JXBX_001_101Device(
+   const std::array<REAL, Rec::N_REC_COEFFICIENTS>& pC,
+   creal BGBY,
+   creal BGBZ,
+   const std::array<Real, 3>& gridSpacing
+) {
+   using namespace Rec;
+   const auto dx = gridSpacing[0];
+   const auto dy = gridSpacing[1];
+   const auto dz = gridSpacing[2];
+   return (pC[a_zz] * BGBZ) / dz + (pC[a_z] * BGBZ) / dz - (pC[a_yz] * BGBZ) / (2 * dz) -
+          (pC[c_xzz] * BGBZ) / (6 * dx) - (pC[c_xz] * BGBZ) / (2 * dx) + (pC[c_xyz] * BGBZ) / (4 * dx) +
+          (pC[c_xy] * BGBZ) / (2 * dx) - (pC[c_x] * BGBZ) / dx + (pC[a_yz] * BGBY) / (2 * dy) - (pC[a_yy] * BGBY) / dy +
+          (pC[a_y] * BGBY) / dy - (pC[b_xz] * BGBY) / (2 * dx) + (pC[b_xyz] * BGBY) / (4 * dx) -
+          (pC[b_xyy] * BGBY) / (6 * dx) + (pC[b_xy] * BGBY) / (2 * dx) - (pC[b_x] * BGBY) / dx +
+          (pC[a_zz] * pC[c_zz]) / (6 * dz) + (pC[a_z] * pC[c_zz]) / (6 * dz) - (pC[a_yz] * pC[c_zz]) / (12 * dz) +
+          (pC[a_zz] * pC[c_z]) / (2 * dz) + (pC[a_z] * pC[c_z]) / (2 * dz) - (pC[a_yz] * pC[c_z]) / (4 * dz) -
+          (pC[a_zz] * pC[c_yz]) / (4 * dz) - (pC[a_z] * pC[c_yz]) / (4 * dz) + (pC[a_yz] * pC[c_yz]) / (8 * dz) -
+          (pC[a_zz] * pC[c_y]) / (2 * dz) - (pC[a_z] * pC[c_y]) / (2 * dz) + (pC[a_yz] * pC[c_y]) / (4 * dz) +
+          (pC[a_xzz] * pC[c_xz]) / (24 * dz) + (pC[a_xz] * pC[c_xz]) / (24 * dz) - (pC[a_xyz] * pC[c_xz]) / (48 * dz) +
+          (pC[a_xzz] * pC[c_x]) / (12 * dz) + (pC[a_xz] * pC[c_x]) / (12 * dz) - (pC[a_xyz] * pC[c_x]) / (24 * dz) +
+          (pC[a_zz] * pC[c_0]) / dz + (pC[a_z] * pC[c_0]) / dz - (pC[a_yz] * pC[c_0]) / (2 * dz) +
+          (pC[a_yz] * pC[b_z]) / (4 * dy) - (pC[a_yy] * pC[b_z]) / (2 * dy) + (pC[a_y] * pC[b_z]) / (2 * dy) -
+          (pC[a_yz] * pC[b_yz]) / (8 * dy) + (pC[a_yy] * pC[b_yz]) / (4 * dy) - (pC[a_y] * pC[b_yz]) / (4 * dy) +
+          (pC[a_yz] * pC[b_yy]) / (12 * dy) - (pC[a_yy] * pC[b_yy]) / (6 * dy) + (pC[a_y] * pC[b_yy]) / (6 * dy) -
+          (pC[a_yz] * pC[b_y]) / (4 * dy) + (pC[a_yy] * pC[b_y]) / (2 * dy) - (pC[a_y] * pC[b_y]) / (2 * dy) -
+          (pC[a_xyz] * pC[b_xy]) / (48 * dy) + (pC[a_xyy] * pC[b_xy]) / (24 * dy) - (pC[a_xy] * pC[b_xy]) / (24 * dy) +
+          (pC[a_xyz] * pC[b_x]) / (24 * dy) - (pC[a_xyy] * pC[b_x]) / (12 * dy) + (pC[a_xy] * pC[b_x]) / (12 * dy) +
+          (pC[a_yz] * pC[b_0]) / (2 * dy) - (pC[a_yy] * pC[b_0]) / dy + (pC[a_y] * pC[b_0]) / dy -
+          (pC[c_xzz] * pC[c_zz]) / (36 * dx) - (pC[c_xz] * pC[c_zz]) / (12 * dx) + (pC[c_xyz] * pC[c_zz]) / (24 * dx) +
+          (pC[c_xy] * pC[c_zz]) / (12 * dx) - (pC[c_x] * pC[c_zz]) / (6 * dx) - (pC[c_xzz] * pC[c_z]) / (12 * dx) -
+          (pC[c_xz] * pC[c_z]) / (4 * dx) + (pC[c_xyz] * pC[c_z]) / (8 * dx) + (pC[c_xy] * pC[c_z]) / (4 * dx) -
+          (pC[c_x] * pC[c_z]) / (2 * dx) + (pC[c_xzz] * pC[c_yz]) / (24 * dx) + (pC[c_xz] * pC[c_yz]) / (8 * dx) -
+          (pC[c_xyz] * pC[c_yz]) / (16 * dx) - (pC[c_xy] * pC[c_yz]) / (8 * dx) + (pC[c_x] * pC[c_yz]) / (4 * dx) +
+          (pC[c_xzz] * pC[c_y]) / (12 * dx) + (pC[c_xz] * pC[c_y]) / (4 * dx) - (pC[c_xyz] * pC[c_y]) / (8 * dx) -
+          (pC[c_xy] * pC[c_y]) / (4 * dx) + (pC[c_x] * pC[c_y]) / (2 * dx) - (pC[c_0] * pC[c_xzz]) / (6 * dx) -
+          (pC[c_xxz] * pC[c_xz]) / (24 * dx) - (pC[c_xx] * pC[c_xz]) / (12 * dx) - (pC[c_0] * pC[c_xz]) / (2 * dx) +
+          (pC[c_0] * pC[c_xyz]) / (4 * dx) + (pC[c_0] * pC[c_xy]) / (2 * dx) - (pC[c_x] * pC[c_xxz]) / (12 * dx) -
+          (pC[c_x] * pC[c_xx]) / (6 * dx) - (pC[c_0] * pC[c_x]) / dx - (pC[b_xz] * pC[b_z]) / (4 * dx) +
+          (pC[b_xyz] * pC[b_z]) / (8 * dx) - (pC[b_xyy] * pC[b_z]) / (12 * dx) + (pC[b_xy] * pC[b_z]) / (4 * dx) -
+          (pC[b_x] * pC[b_z]) / (2 * dx) + (pC[b_xz] * pC[b_yz]) / (8 * dx) - (pC[b_xyz] * pC[b_yz]) / (16 * dx) +
+          (pC[b_xyy] * pC[b_yz]) / (24 * dx) - (pC[b_xy] * pC[b_yz]) / (8 * dx) + (pC[b_x] * pC[b_yz]) / (4 * dx) -
+          (pC[b_xz] * pC[b_yy]) / (12 * dx) + (pC[b_xyz] * pC[b_yy]) / (24 * dx) - (pC[b_xyy] * pC[b_yy]) / (36 * dx) +
+          (pC[b_xy] * pC[b_yy]) / (12 * dx) - (pC[b_x] * pC[b_yy]) / (6 * dx) + (pC[b_xz] * pC[b_y]) / (4 * dx) -
+          (pC[b_xyz] * pC[b_y]) / (8 * dx) + (pC[b_xyy] * pC[b_y]) / (12 * dx) - (pC[b_xy] * pC[b_y]) / (4 * dx) +
+          (pC[b_x] * pC[b_y]) / (2 * dx) - (pC[b_0] * pC[b_xz]) / (2 * dx) + (pC[b_0] * pC[b_xyz]) / (4 * dx) -
+          (pC[b_0] * pC[b_xyy]) / (6 * dx) - (pC[b_xxy] * pC[b_xy]) / (24 * dx) + (pC[b_xx] * pC[b_xy]) / (12 * dx) +
+          (pC[b_0] * pC[b_xy]) / (2 * dx) + (pC[b_x] * pC[b_xxy]) / (12 * dx) - (pC[b_x] * pC[b_xx]) / (6 * dx) -
+          (pC[b_0] * pC[b_x]) / dx;
+}
+
+/*! \brief Low-level Hall component computation
+ *
+ * Hall term computation following Balsara reconstruction, edge-averaged.
+ *
+ * \param pC Reconstruction coefficients
+ * \param BGBY Background By
+ * \param BGBZ Background Bz
+ * \param gridSpacing fsgrid cell size in x,y,z
+ *
+ * \sa calculateEdgeHallTermComponents
+ *
+ */
+template<typename REAL> inline
 REAL JXBX_011_111(
+   const std::array<REAL, Rec::N_REC_COEFFICIENTS>& pC,
+   creal BGBY,
+   creal BGBZ,
+   const std::array<Real, 3>& gridSpacing
+) {
+   using namespace Rec;
+   const auto dx = gridSpacing[0];
+   const auto dy = gridSpacing[1];
+   const auto dz = gridSpacing[2];
+   return (pC[a_zz] * BGBZ) / dz + (pC[a_z] * BGBZ) / dz + (pC[a_yz] * BGBZ) / (2 * dz) -
+          (pC[c_xzz] * BGBZ) / (6 * dx) - (pC[c_xz] * BGBZ) / (2 * dx) - (pC[c_xyz] * BGBZ) / (4 * dx) -
+          (pC[c_xy] * BGBZ) / (2 * dx) - (pC[c_x] * BGBZ) / dx + (pC[a_yz] * BGBY) / (2 * dy) + (pC[a_yy] * BGBY) / dy +
+          (pC[a_y] * BGBY) / dy - (pC[b_xz] * BGBY) / (2 * dx) - (pC[b_xyz] * BGBY) / (4 * dx) -
+          (pC[b_xyy] * BGBY) / (6 * dx) - (pC[b_xy] * BGBY) / (2 * dx) - (pC[b_x] * BGBY) / dx +
+          (pC[a_zz] * pC[c_zz]) / (6 * dz) + (pC[a_z] * pC[c_zz]) / (6 * dz) + (pC[a_yz] * pC[c_zz]) / (12 * dz) +
+          (pC[a_zz] * pC[c_z]) / (2 * dz) + (pC[a_z] * pC[c_z]) / (2 * dz) + (pC[a_yz] * pC[c_z]) / (4 * dz) +
+          (pC[a_zz] * pC[c_yz]) / (4 * dz) + (pC[a_z] * pC[c_yz]) / (4 * dz) + (pC[a_yz] * pC[c_yz]) / (8 * dz) +
+          (pC[a_zz] * pC[c_y]) / (2 * dz) + (pC[a_z] * pC[c_y]) / (2 * dz) + (pC[a_yz] * pC[c_y]) / (4 * dz) +
+          (pC[a_xzz] * pC[c_xz]) / (24 * dz) + (pC[a_xz] * pC[c_xz]) / (24 * dz) + (pC[a_xyz] * pC[c_xz]) / (48 * dz) +
+          (pC[a_xzz] * pC[c_x]) / (12 * dz) + (pC[a_xz] * pC[c_x]) / (12 * dz) + (pC[a_xyz] * pC[c_x]) / (24 * dz) +
+          (pC[a_zz] * pC[c_0]) / dz + (pC[a_z] * pC[c_0]) / dz + (pC[a_yz] * pC[c_0]) / (2 * dz) +
+          (pC[a_yz] * pC[b_z]) / (4 * dy) + (pC[a_yy] * pC[b_z]) / (2 * dy) + (pC[a_y] * pC[b_z]) / (2 * dy) +
+          (pC[a_yz] * pC[b_yz]) / (8 * dy) + (pC[a_yy] * pC[b_yz]) / (4 * dy) + (pC[a_y] * pC[b_yz]) / (4 * dy) +
+          (pC[a_yz] * pC[b_yy]) / (12 * dy) + (pC[a_yy] * pC[b_yy]) / (6 * dy) + (pC[a_y] * pC[b_yy]) / (6 * dy) +
+          (pC[a_yz] * pC[b_y]) / (4 * dy) + (pC[a_yy] * pC[b_y]) / (2 * dy) + (pC[a_y] * pC[b_y]) / (2 * dy) +
+          (pC[a_xyz] * pC[b_xy]) / (48 * dy) + (pC[a_xyy] * pC[b_xy]) / (24 * dy) + (pC[a_xy] * pC[b_xy]) / (24 * dy) +
+          (pC[a_xyz] * pC[b_x]) / (24 * dy) + (pC[a_xyy] * pC[b_x]) / (12 * dy) + (pC[a_xy] * pC[b_x]) / (12 * dy) +
+          (pC[a_yz] * pC[b_0]) / (2 * dy) + (pC[a_yy] * pC[b_0]) / dy + (pC[a_y] * pC[b_0]) / dy -
+          (pC[c_xzz] * pC[c_zz]) / (36 * dx) - (pC[c_xz] * pC[c_zz]) / (12 * dx) - (pC[c_xyz] * pC[c_zz]) / (24 * dx) -
+          (pC[c_xy] * pC[c_zz]) / (12 * dx) - (pC[c_x] * pC[c_zz]) / (6 * dx) - (pC[c_xzz] * pC[c_z]) / (12 * dx) -
+          (pC[c_xz] * pC[c_z]) / (4 * dx) - (pC[c_xyz] * pC[c_z]) / (8 * dx) - (pC[c_xy] * pC[c_z]) / (4 * dx) -
+          (pC[c_x] * pC[c_z]) / (2 * dx) - (pC[c_xzz] * pC[c_yz]) / (24 * dx) - (pC[c_xz] * pC[c_yz]) / (8 * dx) -
+          (pC[c_xyz] * pC[c_yz]) / (16 * dx) - (pC[c_xy] * pC[c_yz]) / (8 * dx) - (pC[c_x] * pC[c_yz]) / (4 * dx) -
+          (pC[c_xzz] * pC[c_y]) / (12 * dx) - (pC[c_xz] * pC[c_y]) / (4 * dx) - (pC[c_xyz] * pC[c_y]) / (8 * dx) -
+          (pC[c_xy] * pC[c_y]) / (4 * dx) - (pC[c_x] * pC[c_y]) / (2 * dx) - (pC[c_0] * pC[c_xzz]) / (6 * dx) -
+          (pC[c_xxz] * pC[c_xz]) / (24 * dx) - (pC[c_xx] * pC[c_xz]) / (12 * dx) - (pC[c_0] * pC[c_xz]) / (2 * dx) -
+          (pC[c_0] * pC[c_xyz]) / (4 * dx) - (pC[c_0] * pC[c_xy]) / (2 * dx) - (pC[c_x] * pC[c_xxz]) / (12 * dx) -
+          (pC[c_x] * pC[c_xx]) / (6 * dx) - (pC[c_0] * pC[c_x]) / dx - (pC[b_xz] * pC[b_z]) / (4 * dx) -
+          (pC[b_xyz] * pC[b_z]) / (8 * dx) - (pC[b_xyy] * pC[b_z]) / (12 * dx) - (pC[b_xy] * pC[b_z]) / (4 * dx) -
+          (pC[b_x] * pC[b_z]) / (2 * dx) - (pC[b_xz] * pC[b_yz]) / (8 * dx) - (pC[b_xyz] * pC[b_yz]) / (16 * dx) -
+          (pC[b_xyy] * pC[b_yz]) / (24 * dx) - (pC[b_xy] * pC[b_yz]) / (8 * dx) - (pC[b_x] * pC[b_yz]) / (4 * dx) -
+          (pC[b_xz] * pC[b_yy]) / (12 * dx) - (pC[b_xyz] * pC[b_yy]) / (24 * dx) - (pC[b_xyy] * pC[b_yy]) / (36 * dx) -
+          (pC[b_xy] * pC[b_yy]) / (12 * dx) - (pC[b_x] * pC[b_yy]) / (6 * dx) - (pC[b_xz] * pC[b_y]) / (4 * dx) -
+          (pC[b_xyz] * pC[b_y]) / (8 * dx) - (pC[b_xyy] * pC[b_y]) / (12 * dx) - (pC[b_xy] * pC[b_y]) / (4 * dx) -
+          (pC[b_x] * pC[b_y]) / (2 * dx) - (pC[b_0] * pC[b_xz]) / (2 * dx) - (pC[b_0] * pC[b_xyz]) / (4 * dx) -
+          (pC[b_0] * pC[b_xyy]) / (6 * dx) - (pC[b_xxy] * pC[b_xy]) / (24 * dx) - (pC[b_xx] * pC[b_xy]) / (12 * dx) -
+          (pC[b_0] * pC[b_xy]) / (2 * dx) - (pC[b_x] * pC[b_xxy]) / (12 * dx) - (pC[b_x] * pC[b_xx]) / (6 * dx) -
+          (pC[b_0] * pC[b_x]) / dx;
+}
+
+/*! \brief Low-level Hall component computation
+ *
+ * Hall term computation following Balsara reconstruction, edge-averaged.
+ *
+ * \param pC Reconstruction coefficients
+ * \param BGBY Background By
+ * \param BGBZ Background Bz
+ * \param gridSpacing fsgrid cell size in x,y,z
+ *
+ * \sa calculateEdgeHallTermComponents
+ *
+ */
+template<typename REAL> inline
+__device__ REAL JXBX_011_111Device(
    const std::array<REAL, Rec::N_REC_COEFFICIENTS>& pC,
    creal BGBY,
    creal BGBZ,
@@ -364,7 +620,135 @@ REAL JXBY_000_010(
  *
  */
 template<typename REAL> inline
+__device__ REAL JXBY_000_010Device(
+   const std::array<REAL, Rec::N_REC_COEFFICIENTS>& pC,
+   creal BGBX,
+   creal BGBZ,
+   const std::array<Real, 3>& gridSpacing
+) {
+   using namespace Rec;
+   const auto dx = gridSpacing[0];
+   const auto dy = gridSpacing[1];
+   const auto dz = gridSpacing[2];
+   return -(pC[b_zz] * BGBZ) / dz + (pC[b_z] * BGBZ) / dz - (pC[b_xz] * BGBZ) / (2 * dz) -
+          (pC[c_yzz] * BGBZ) / (6 * dy) + (pC[c_yz] * BGBZ) / (2 * dy) - (pC[c_y] * BGBZ) / dy -
+          (pC[c_xyz] * BGBZ) / (4 * dy) + (pC[c_xy] * BGBZ) / (2 * dy) + (pC[a_yz] * BGBX) / (2 * dy) -
+          (pC[a_y] * BGBX) / dy - (pC[a_xyz] * BGBX) / (4 * dy) + (pC[a_xy] * BGBX) / (2 * dy) -
+          (pC[a_xxy] * BGBX) / (6 * dy) - (pC[b_xz] * BGBX) / (2 * dx) - (pC[b_xx] * BGBX) / dx +
+          (pC[b_x] * BGBX) / dx - (pC[b_zz] * pC[c_zz]) / (6 * dz) + (pC[b_z] * pC[c_zz]) / (6 * dz) -
+          (pC[b_xz] * pC[c_zz]) / (12 * dz) + (pC[b_zz] * pC[c_z]) / (2 * dz) - (pC[b_z] * pC[c_z]) / (2 * dz) +
+          (pC[b_xz] * pC[c_z]) / (4 * dz) + (pC[b_yzz] * pC[c_yz]) / (24 * dz) - (pC[b_yz] * pC[c_yz]) / (24 * dz) +
+          (pC[b_xyz] * pC[c_yz]) / (48 * dz) - (pC[b_yzz] * pC[c_y]) / (12 * dz) + (pC[b_yz] * pC[c_y]) / (12 * dz) -
+          (pC[b_xyz] * pC[c_y]) / (24 * dz) - (pC[b_zz] * pC[c_xz]) / (4 * dz) + (pC[b_z] * pC[c_xz]) / (4 * dz) -
+          (pC[b_xz] * pC[c_xz]) / (8 * dz) + (pC[b_zz] * pC[c_x]) / (2 * dz) - (pC[b_z] * pC[c_x]) / (2 * dz) +
+          (pC[b_xz] * pC[c_x]) / (4 * dz) - (pC[b_zz] * pC[c_0]) / dz + (pC[b_z] * pC[c_0]) / dz -
+          (pC[b_xz] * pC[c_0]) / (2 * dz) - (pC[c_yzz] * pC[c_zz]) / (36 * dy) + (pC[c_yz] * pC[c_zz]) / (12 * dy) -
+          (pC[c_y] * pC[c_zz]) / (6 * dy) - (pC[c_xyz] * pC[c_zz]) / (24 * dy) + (pC[c_xy] * pC[c_zz]) / (12 * dy) +
+          (pC[c_yzz] * pC[c_z]) / (12 * dy) - (pC[c_yz] * pC[c_z]) / (4 * dy) + (pC[c_y] * pC[c_z]) / (2 * dy) +
+          (pC[c_xyz] * pC[c_z]) / (8 * dy) - (pC[c_xy] * pC[c_z]) / (4 * dy) - (pC[c_xz] * pC[c_yzz]) / (24 * dy) +
+          (pC[c_x] * pC[c_yzz]) / (12 * dy) - (pC[c_0] * pC[c_yzz]) / (6 * dy) - (pC[c_yyz] * pC[c_yz]) / (24 * dy) +
+          (pC[c_yy] * pC[c_yz]) / (12 * dy) + (pC[c_xz] * pC[c_yz]) / (8 * dy) - (pC[c_x] * pC[c_yz]) / (4 * dy) +
+          (pC[c_0] * pC[c_yz]) / (2 * dy) + (pC[c_y] * pC[c_yyz]) / (12 * dy) - (pC[c_y] * pC[c_yy]) / (6 * dy) -
+          (pC[c_xz] * pC[c_y]) / (4 * dy) + (pC[c_x] * pC[c_y]) / (2 * dy) - (pC[c_0] * pC[c_y]) / dy -
+          (pC[c_xyz] * pC[c_xz]) / (16 * dy) + (pC[c_xy] * pC[c_xz]) / (8 * dy) + (pC[c_x] * pC[c_xyz]) / (8 * dy) -
+          (pC[c_0] * pC[c_xyz]) / (4 * dy) - (pC[c_x] * pC[c_xy]) / (4 * dy) + (pC[c_0] * pC[c_xy]) / (2 * dy) -
+          (pC[a_yz] * pC[a_z]) / (4 * dy) + (pC[a_y] * pC[a_z]) / (2 * dy) + (pC[a_xyz] * pC[a_z]) / (8 * dy) -
+          (pC[a_xy] * pC[a_z]) / (4 * dy) + (pC[a_xxy] * pC[a_z]) / (12 * dy) + (pC[a_xz] * pC[a_yz]) / (8 * dy) +
+          (pC[a_xx] * pC[a_yz]) / (12 * dy) - (pC[a_x] * pC[a_yz]) / (4 * dy) + (pC[a_0] * pC[a_yz]) / (2 * dy) -
+          (pC[a_y] * pC[a_yy]) / (6 * dy) + (pC[a_xy] * pC[a_yy]) / (12 * dy) - (pC[a_xz] * pC[a_y]) / (4 * dy) +
+          (pC[a_xyy] * pC[a_y]) / (12 * dy) - (pC[a_xx] * pC[a_y]) / (6 * dy) + (pC[a_x] * pC[a_y]) / (2 * dy) -
+          (pC[a_0] * pC[a_y]) / dy - (pC[a_xyz] * pC[a_xz]) / (16 * dy) + (pC[a_xy] * pC[a_xz]) / (8 * dy) -
+          (pC[a_xxy] * pC[a_xz]) / (24 * dy) - (pC[a_xx] * pC[a_xyz]) / (24 * dy) + (pC[a_x] * pC[a_xyz]) / (8 * dy) -
+          (pC[a_0] * pC[a_xyz]) / (4 * dy) - (pC[a_xy] * pC[a_xyy]) / (24 * dy) + (pC[a_xx] * pC[a_xy]) / (12 * dy) -
+          (pC[a_x] * pC[a_xy]) / (4 * dy) + (pC[a_0] * pC[a_xy]) / (2 * dy) - (pC[a_xx] * pC[a_xxy]) / (36 * dy) +
+          (pC[a_x] * pC[a_xxy]) / (12 * dy) - (pC[a_0] * pC[a_xxy]) / (6 * dy) + (pC[a_z] * pC[b_xz]) / (4 * dx) -
+          (pC[a_xz] * pC[b_xz]) / (8 * dx) - (pC[a_xx] * pC[b_xz]) / (12 * dx) + (pC[a_x] * pC[b_xz]) / (4 * dx) -
+          (pC[a_0] * pC[b_xz]) / (2 * dx) - (pC[a_y] * pC[b_xyz]) / (24 * dx) + (pC[a_xy] * pC[b_xyz]) / (48 * dx) +
+          (pC[a_y] * pC[b_xy]) / (12 * dx) - (pC[a_xy] * pC[b_xy]) / (24 * dx) - (pC[a_y] * pC[b_xxy]) / (12 * dx) +
+          (pC[a_xy] * pC[b_xxy]) / (24 * dx) + (pC[a_z] * pC[b_xx]) / (2 * dx) - (pC[a_xz] * pC[b_xx]) / (4 * dx) -
+          (pC[a_xx] * pC[b_xx]) / (6 * dx) + (pC[a_x] * pC[b_xx]) / (2 * dx) - (pC[a_0] * pC[b_xx]) / dx -
+          (pC[a_z] * pC[b_x]) / (2 * dx) + (pC[a_xz] * pC[b_x]) / (4 * dx) + (pC[a_xx] * pC[b_x]) / (6 * dx) -
+          (pC[a_x] * pC[b_x]) / (2 * dx) + (pC[a_0] * pC[b_x]) / dx;
+}
+
+/*! \brief Low-level Hall component computation
+ *
+ * Hall term computation following Balsara reconstruction, edge-averaged.
+ *
+ * \param pC Reconstruction coefficients
+ * \param BGBX Background Bx
+ * \param BGBZ Background Bz
+ * \param gridSpacing fsgrid cell size in x,y,z
+ *
+ * \sa calculateEdgeHallTermYComponents
+ *
+ */
+template<typename REAL> inline
 REAL JXBY_100_110(
+   const std::array<REAL, Rec::N_REC_COEFFICIENTS>& pC,
+   creal BGBX,
+   creal BGBZ,
+   const std::array<Real, 3>& gridSpacing
+) {
+   using namespace Rec;
+   const auto dx = gridSpacing[0];
+   const auto dy = gridSpacing[1];
+   const auto dz = gridSpacing[2];
+   return -(pC[b_zz] * BGBZ) / dz + (pC[b_z] * BGBZ) / dz + (pC[b_xz] * BGBZ) / (2 * dz) -
+          (pC[c_yzz] * BGBZ) / (6 * dy) + (pC[c_yz] * BGBZ) / (2 * dy) - (pC[c_y] * BGBZ) / dy +
+          (pC[c_xyz] * BGBZ) / (4 * dy) - (pC[c_xy] * BGBZ) / (2 * dy) + (pC[a_yz] * BGBX) / (2 * dy) -
+          (pC[a_y] * BGBX) / dy + (pC[a_xyz] * BGBX) / (4 * dy) - (pC[a_xy] * BGBX) / (2 * dy) -
+          (pC[a_xxy] * BGBX) / (6 * dy) - (pC[b_xz] * BGBX) / (2 * dx) + (pC[b_xx] * BGBX) / dx +
+          (pC[b_x] * BGBX) / dx - (pC[b_zz] * pC[c_zz]) / (6 * dz) + (pC[b_z] * pC[c_zz]) / (6 * dz) +
+          (pC[b_xz] * pC[c_zz]) / (12 * dz) + (pC[b_zz] * pC[c_z]) / (2 * dz) - (pC[b_z] * pC[c_z]) / (2 * dz) -
+          (pC[b_xz] * pC[c_z]) / (4 * dz) + (pC[b_yzz] * pC[c_yz]) / (24 * dz) - (pC[b_yz] * pC[c_yz]) / (24 * dz) -
+          (pC[b_xyz] * pC[c_yz]) / (48 * dz) - (pC[b_yzz] * pC[c_y]) / (12 * dz) + (pC[b_yz] * pC[c_y]) / (12 * dz) +
+          (pC[b_xyz] * pC[c_y]) / (24 * dz) + (pC[b_zz] * pC[c_xz]) / (4 * dz) - (pC[b_z] * pC[c_xz]) / (4 * dz) -
+          (pC[b_xz] * pC[c_xz]) / (8 * dz) - (pC[b_zz] * pC[c_x]) / (2 * dz) + (pC[b_z] * pC[c_x]) / (2 * dz) +
+          (pC[b_xz] * pC[c_x]) / (4 * dz) - (pC[b_zz] * pC[c_0]) / dz + (pC[b_z] * pC[c_0]) / dz +
+          (pC[b_xz] * pC[c_0]) / (2 * dz) - (pC[c_yzz] * pC[c_zz]) / (36 * dy) + (pC[c_yz] * pC[c_zz]) / (12 * dy) -
+          (pC[c_y] * pC[c_zz]) / (6 * dy) + (pC[c_xyz] * pC[c_zz]) / (24 * dy) - (pC[c_xy] * pC[c_zz]) / (12 * dy) +
+          (pC[c_yzz] * pC[c_z]) / (12 * dy) - (pC[c_yz] * pC[c_z]) / (4 * dy) + (pC[c_y] * pC[c_z]) / (2 * dy) -
+          (pC[c_xyz] * pC[c_z]) / (8 * dy) + (pC[c_xy] * pC[c_z]) / (4 * dy) + (pC[c_xz] * pC[c_yzz]) / (24 * dy) -
+          (pC[c_x] * pC[c_yzz]) / (12 * dy) - (pC[c_0] * pC[c_yzz]) / (6 * dy) - (pC[c_yyz] * pC[c_yz]) / (24 * dy) +
+          (pC[c_yy] * pC[c_yz]) / (12 * dy) - (pC[c_xz] * pC[c_yz]) / (8 * dy) + (pC[c_x] * pC[c_yz]) / (4 * dy) +
+          (pC[c_0] * pC[c_yz]) / (2 * dy) + (pC[c_y] * pC[c_yyz]) / (12 * dy) - (pC[c_y] * pC[c_yy]) / (6 * dy) +
+          (pC[c_xz] * pC[c_y]) / (4 * dy) - (pC[c_x] * pC[c_y]) / (2 * dy) - (pC[c_0] * pC[c_y]) / dy -
+          (pC[c_xyz] * pC[c_xz]) / (16 * dy) + (pC[c_xy] * pC[c_xz]) / (8 * dy) + (pC[c_x] * pC[c_xyz]) / (8 * dy) +
+          (pC[c_0] * pC[c_xyz]) / (4 * dy) - (pC[c_x] * pC[c_xy]) / (4 * dy) - (pC[c_0] * pC[c_xy]) / (2 * dy) -
+          (pC[a_yz] * pC[a_z]) / (4 * dy) + (pC[a_y] * pC[a_z]) / (2 * dy) - (pC[a_xyz] * pC[a_z]) / (8 * dy) +
+          (pC[a_xy] * pC[a_z]) / (4 * dy) + (pC[a_xxy] * pC[a_z]) / (12 * dy) - (pC[a_xz] * pC[a_yz]) / (8 * dy) +
+          (pC[a_xx] * pC[a_yz]) / (12 * dy) + (pC[a_x] * pC[a_yz]) / (4 * dy) + (pC[a_0] * pC[a_yz]) / (2 * dy) -
+          (pC[a_y] * pC[a_yy]) / (6 * dy) - (pC[a_xy] * pC[a_yy]) / (12 * dy) + (pC[a_xz] * pC[a_y]) / (4 * dy) -
+          (pC[a_xyy] * pC[a_y]) / (12 * dy) - (pC[a_xx] * pC[a_y]) / (6 * dy) - (pC[a_x] * pC[a_y]) / (2 * dy) -
+          (pC[a_0] * pC[a_y]) / dy - (pC[a_xyz] * pC[a_xz]) / (16 * dy) + (pC[a_xy] * pC[a_xz]) / (8 * dy) +
+          (pC[a_xxy] * pC[a_xz]) / (24 * dy) + (pC[a_xx] * pC[a_xyz]) / (24 * dy) + (pC[a_x] * pC[a_xyz]) / (8 * dy) +
+          (pC[a_0] * pC[a_xyz]) / (4 * dy) - (pC[a_xy] * pC[a_xyy]) / (24 * dy) - (pC[a_xx] * pC[a_xy]) / (12 * dy) -
+          (pC[a_x] * pC[a_xy]) / (4 * dy) - (pC[a_0] * pC[a_xy]) / (2 * dy) - (pC[a_xx] * pC[a_xxy]) / (36 * dy) -
+          (pC[a_x] * pC[a_xxy]) / (12 * dy) - (pC[a_0] * pC[a_xxy]) / (6 * dy) + (pC[a_z] * pC[b_xz]) / (4 * dx) +
+          (pC[a_xz] * pC[b_xz]) / (8 * dx) - (pC[a_xx] * pC[b_xz]) / (12 * dx) - (pC[a_x] * pC[b_xz]) / (4 * dx) -
+          (pC[a_0] * pC[b_xz]) / (2 * dx) - (pC[a_y] * pC[b_xyz]) / (24 * dx) - (pC[a_xy] * pC[b_xyz]) / (48 * dx) +
+          (pC[a_y] * pC[b_xy]) / (12 * dx) + (pC[a_xy] * pC[b_xy]) / (24 * dx) + (pC[a_y] * pC[b_xxy]) / (12 * dx) +
+          (pC[a_xy] * pC[b_xxy]) / (24 * dx) - (pC[a_z] * pC[b_xx]) / (2 * dx) - (pC[a_xz] * pC[b_xx]) / (4 * dx) +
+          (pC[a_xx] * pC[b_xx]) / (6 * dx) + (pC[a_x] * pC[b_xx]) / (2 * dx) + (pC[a_0] * pC[b_xx]) / dx -
+          (pC[a_z] * pC[b_x]) / (2 * dx) - (pC[a_xz] * pC[b_x]) / (4 * dx) + (pC[a_xx] * pC[b_x]) / (6 * dx) +
+          (pC[a_x] * pC[b_x]) / (2 * dx) + (pC[a_0] * pC[b_x]) / dx;
+}
+
+/*! \brief Low-level Hall component computation
+ *
+ * Hall term computation following Balsara reconstruction, edge-averaged.
+ *
+ * \param pC Reconstruction coefficients
+ * \param BGBX Background Bx
+ * \param BGBZ Background Bz
+ * \param gridSpacing fsgrid cell size in x,y,z
+ *
+ * \sa calculateEdgeHallTermYComponents
+ *
+ */
+template<typename REAL> inline
+__device__ REAL JXBY_100_110Device(
    const std::array<REAL, Rec::N_REC_COEFFICIENTS>& pC,
    creal BGBX,
    creal BGBZ,
@@ -492,7 +876,135 @@ REAL JXBY_001_011(
  *
  */
 template<typename REAL> inline
+__device__ REAL JXBY_001_011Device(
+   const std::array<REAL, Rec::N_REC_COEFFICIENTS>& pC,
+   creal BGBX,
+   creal BGBZ,
+   const std::array<Real, 3>& gridSpacing
+) {
+   using namespace Rec;
+   const auto dx = gridSpacing[0];
+   const auto dy = gridSpacing[1];
+   const auto dz = gridSpacing[2];
+   return (pC[b_zz] * BGBZ) / dz + (pC[b_z] * BGBZ) / dz - (pC[b_xz] * BGBZ) / (2 * dz) -
+          (pC[c_yzz] * BGBZ) / (6 * dy) - (pC[c_yz] * BGBZ) / (2 * dy) - (pC[c_y] * BGBZ) / dy +
+          (pC[c_xyz] * BGBZ) / (4 * dy) + (pC[c_xy] * BGBZ) / (2 * dy) - (pC[a_yz] * BGBX) / (2 * dy) -
+          (pC[a_y] * BGBX) / dy + (pC[a_xyz] * BGBX) / (4 * dy) + (pC[a_xy] * BGBX) / (2 * dy) -
+          (pC[a_xxy] * BGBX) / (6 * dy) + (pC[b_xz] * BGBX) / (2 * dx) - (pC[b_xx] * BGBX) / dx +
+          (pC[b_x] * BGBX) / dx + (pC[b_zz] * pC[c_zz]) / (6 * dz) + (pC[b_z] * pC[c_zz]) / (6 * dz) -
+          (pC[b_xz] * pC[c_zz]) / (12 * dz) + (pC[b_zz] * pC[c_z]) / (2 * dz) + (pC[b_z] * pC[c_z]) / (2 * dz) -
+          (pC[b_xz] * pC[c_z]) / (4 * dz) + (pC[b_yzz] * pC[c_yz]) / (24 * dz) + (pC[b_yz] * pC[c_yz]) / (24 * dz) -
+          (pC[b_xyz] * pC[c_yz]) / (48 * dz) + (pC[b_yzz] * pC[c_y]) / (12 * dz) + (pC[b_yz] * pC[c_y]) / (12 * dz) -
+          (pC[b_xyz] * pC[c_y]) / (24 * dz) - (pC[b_zz] * pC[c_xz]) / (4 * dz) - (pC[b_z] * pC[c_xz]) / (4 * dz) +
+          (pC[b_xz] * pC[c_xz]) / (8 * dz) - (pC[b_zz] * pC[c_x]) / (2 * dz) - (pC[b_z] * pC[c_x]) / (2 * dz) +
+          (pC[b_xz] * pC[c_x]) / (4 * dz) + (pC[b_zz] * pC[c_0]) / dz + (pC[b_z] * pC[c_0]) / dz -
+          (pC[b_xz] * pC[c_0]) / (2 * dz) - (pC[c_yzz] * pC[c_zz]) / (36 * dy) - (pC[c_yz] * pC[c_zz]) / (12 * dy) -
+          (pC[c_y] * pC[c_zz]) / (6 * dy) + (pC[c_xyz] * pC[c_zz]) / (24 * dy) + (pC[c_xy] * pC[c_zz]) / (12 * dy) -
+          (pC[c_yzz] * pC[c_z]) / (12 * dy) - (pC[c_yz] * pC[c_z]) / (4 * dy) - (pC[c_y] * pC[c_z]) / (2 * dy) +
+          (pC[c_xyz] * pC[c_z]) / (8 * dy) + (pC[c_xy] * pC[c_z]) / (4 * dy) + (pC[c_xz] * pC[c_yzz]) / (24 * dy) +
+          (pC[c_x] * pC[c_yzz]) / (12 * dy) - (pC[c_0] * pC[c_yzz]) / (6 * dy) - (pC[c_yyz] * pC[c_yz]) / (24 * dy) -
+          (pC[c_yy] * pC[c_yz]) / (12 * dy) + (pC[c_xz] * pC[c_yz]) / (8 * dy) + (pC[c_x] * pC[c_yz]) / (4 * dy) -
+          (pC[c_0] * pC[c_yz]) / (2 * dy) - (pC[c_y] * pC[c_yyz]) / (12 * dy) - (pC[c_y] * pC[c_yy]) / (6 * dy) +
+          (pC[c_xz] * pC[c_y]) / (4 * dy) + (pC[c_x] * pC[c_y]) / (2 * dy) - (pC[c_0] * pC[c_y]) / dy -
+          (pC[c_xyz] * pC[c_xz]) / (16 * dy) - (pC[c_xy] * pC[c_xz]) / (8 * dy) - (pC[c_x] * pC[c_xyz]) / (8 * dy) +
+          (pC[c_0] * pC[c_xyz]) / (4 * dy) - (pC[c_x] * pC[c_xy]) / (4 * dy) + (pC[c_0] * pC[c_xy]) / (2 * dy) -
+          (pC[a_yz] * pC[a_z]) / (4 * dy) - (pC[a_y] * pC[a_z]) / (2 * dy) + (pC[a_xyz] * pC[a_z]) / (8 * dy) +
+          (pC[a_xy] * pC[a_z]) / (4 * dy) - (pC[a_xxy] * pC[a_z]) / (12 * dy) + (pC[a_xz] * pC[a_yz]) / (8 * dy) -
+          (pC[a_xx] * pC[a_yz]) / (12 * dy) + (pC[a_x] * pC[a_yz]) / (4 * dy) - (pC[a_0] * pC[a_yz]) / (2 * dy) -
+          (pC[a_y] * pC[a_yy]) / (6 * dy) + (pC[a_xy] * pC[a_yy]) / (12 * dy) + (pC[a_xz] * pC[a_y]) / (4 * dy) +
+          (pC[a_xyy] * pC[a_y]) / (12 * dy) - (pC[a_xx] * pC[a_y]) / (6 * dy) + (pC[a_x] * pC[a_y]) / (2 * dy) -
+          (pC[a_0] * pC[a_y]) / dy - (pC[a_xyz] * pC[a_xz]) / (16 * dy) - (pC[a_xy] * pC[a_xz]) / (8 * dy) +
+          (pC[a_xxy] * pC[a_xz]) / (24 * dy) + (pC[a_xx] * pC[a_xyz]) / (24 * dy) - (pC[a_x] * pC[a_xyz]) / (8 * dy) +
+          (pC[a_0] * pC[a_xyz]) / (4 * dy) - (pC[a_xy] * pC[a_xyy]) / (24 * dy) + (pC[a_xx] * pC[a_xy]) / (12 * dy) -
+          (pC[a_x] * pC[a_xy]) / (4 * dy) + (pC[a_0] * pC[a_xy]) / (2 * dy) - (pC[a_xx] * pC[a_xxy]) / (36 * dy) +
+          (pC[a_x] * pC[a_xxy]) / (12 * dy) - (pC[a_0] * pC[a_xxy]) / (6 * dy) + (pC[a_z] * pC[b_xz]) / (4 * dx) -
+          (pC[a_xz] * pC[b_xz]) / (8 * dx) + (pC[a_xx] * pC[b_xz]) / (12 * dx) - (pC[a_x] * pC[b_xz]) / (4 * dx) +
+          (pC[a_0] * pC[b_xz]) / (2 * dx) + (pC[a_y] * pC[b_xyz]) / (24 * dx) - (pC[a_xy] * pC[b_xyz]) / (48 * dx) +
+          (pC[a_y] * pC[b_xy]) / (12 * dx) - (pC[a_xy] * pC[b_xy]) / (24 * dx) - (pC[a_y] * pC[b_xxy]) / (12 * dx) +
+          (pC[a_xy] * pC[b_xxy]) / (24 * dx) - (pC[a_z] * pC[b_xx]) / (2 * dx) + (pC[a_xz] * pC[b_xx]) / (4 * dx) -
+          (pC[a_xx] * pC[b_xx]) / (6 * dx) + (pC[a_x] * pC[b_xx]) / (2 * dx) - (pC[a_0] * pC[b_xx]) / dx +
+          (pC[a_z] * pC[b_x]) / (2 * dx) - (pC[a_xz] * pC[b_x]) / (4 * dx) + (pC[a_xx] * pC[b_x]) / (6 * dx) -
+          (pC[a_x] * pC[b_x]) / (2 * dx) + (pC[a_0] * pC[b_x]) / dx;
+}
+
+/*! \brief Low-level Hall component computation
+ *
+ * Hall term computation following Balsara reconstruction, edge-averaged.
+ *
+ * \param pC Reconstruction coefficients
+ * \param BGBX Background Bx
+ * \param BGBZ Background Bz
+ * \param gridSpacing fsgrid cell size in x,y,z
+ *
+ * \sa calculateEdgeHallTermYComponents
+ *
+ */
+template<typename REAL> inline
 REAL JXBY_101_111(
+   const std::array<REAL, Rec::N_REC_COEFFICIENTS>& pC,
+   creal BGBX,
+   creal BGBZ,
+   const std::array<Real, 3>& gridSpacing
+) {
+   using namespace Rec;
+   const auto dx = gridSpacing[0];
+   const auto dy = gridSpacing[1];
+   const auto dz = gridSpacing[2];
+   return (pC[b_zz] * BGBZ) / dz + (pC[b_z] * BGBZ) / dz + (pC[b_xz] * BGBZ) / (2 * dz) -
+          (pC[c_yzz] * BGBZ) / (6 * dy) - (pC[c_yz] * BGBZ) / (2 * dy) - (pC[c_y] * BGBZ) / dy -
+          (pC[c_xyz] * BGBZ) / (4 * dy) - (pC[c_xy] * BGBZ) / (2 * dy) - (pC[a_yz] * BGBX) / (2 * dy) -
+          (pC[a_y] * BGBX) / dy - (pC[a_xyz] * BGBX) / (4 * dy) - (pC[a_xy] * BGBX) / (2 * dy) -
+          (pC[a_xxy] * BGBX) / (6 * dy) + (pC[b_xz] * BGBX) / (2 * dx) + (pC[b_xx] * BGBX) / dx +
+          (pC[b_x] * BGBX) / dx + (pC[b_zz] * pC[c_zz]) / (6 * dz) + (pC[b_z] * pC[c_zz]) / (6 * dz) +
+          (pC[b_xz] * pC[c_zz]) / (12 * dz) + (pC[b_zz] * pC[c_z]) / (2 * dz) + (pC[b_z] * pC[c_z]) / (2 * dz) +
+          (pC[b_xz] * pC[c_z]) / (4 * dz) + (pC[b_yzz] * pC[c_yz]) / (24 * dz) + (pC[b_yz] * pC[c_yz]) / (24 * dz) +
+          (pC[b_xyz] * pC[c_yz]) / (48 * dz) + (pC[b_yzz] * pC[c_y]) / (12 * dz) + (pC[b_yz] * pC[c_y]) / (12 * dz) +
+          (pC[b_xyz] * pC[c_y]) / (24 * dz) + (pC[b_zz] * pC[c_xz]) / (4 * dz) + (pC[b_z] * pC[c_xz]) / (4 * dz) +
+          (pC[b_xz] * pC[c_xz]) / (8 * dz) + (pC[b_zz] * pC[c_x]) / (2 * dz) + (pC[b_z] * pC[c_x]) / (2 * dz) +
+          (pC[b_xz] * pC[c_x]) / (4 * dz) + (pC[b_zz] * pC[c_0]) / dz + (pC[b_z] * pC[c_0]) / dz +
+          (pC[b_xz] * pC[c_0]) / (2 * dz) - (pC[c_yzz] * pC[c_zz]) / (36 * dy) - (pC[c_yz] * pC[c_zz]) / (12 * dy) -
+          (pC[c_y] * pC[c_zz]) / (6 * dy) - (pC[c_xyz] * pC[c_zz]) / (24 * dy) - (pC[c_xy] * pC[c_zz]) / (12 * dy) -
+          (pC[c_yzz] * pC[c_z]) / (12 * dy) - (pC[c_yz] * pC[c_z]) / (4 * dy) - (pC[c_y] * pC[c_z]) / (2 * dy) -
+          (pC[c_xyz] * pC[c_z]) / (8 * dy) - (pC[c_xy] * pC[c_z]) / (4 * dy) - (pC[c_xz] * pC[c_yzz]) / (24 * dy) -
+          (pC[c_x] * pC[c_yzz]) / (12 * dy) - (pC[c_0] * pC[c_yzz]) / (6 * dy) - (pC[c_yyz] * pC[c_yz]) / (24 * dy) -
+          (pC[c_yy] * pC[c_yz]) / (12 * dy) - (pC[c_xz] * pC[c_yz]) / (8 * dy) - (pC[c_x] * pC[c_yz]) / (4 * dy) -
+          (pC[c_0] * pC[c_yz]) / (2 * dy) - (pC[c_y] * pC[c_yyz]) / (12 * dy) - (pC[c_y] * pC[c_yy]) / (6 * dy) -
+          (pC[c_xz] * pC[c_y]) / (4 * dy) - (pC[c_x] * pC[c_y]) / (2 * dy) - (pC[c_0] * pC[c_y]) / dy -
+          (pC[c_xyz] * pC[c_xz]) / (16 * dy) - (pC[c_xy] * pC[c_xz]) / (8 * dy) - (pC[c_x] * pC[c_xyz]) / (8 * dy) -
+          (pC[c_0] * pC[c_xyz]) / (4 * dy) - (pC[c_x] * pC[c_xy]) / (4 * dy) - (pC[c_0] * pC[c_xy]) / (2 * dy) -
+          (pC[a_yz] * pC[a_z]) / (4 * dy) - (pC[a_y] * pC[a_z]) / (2 * dy) - (pC[a_xyz] * pC[a_z]) / (8 * dy) -
+          (pC[a_xy] * pC[a_z]) / (4 * dy) - (pC[a_xxy] * pC[a_z]) / (12 * dy) - (pC[a_xz] * pC[a_yz]) / (8 * dy) -
+          (pC[a_xx] * pC[a_yz]) / (12 * dy) - (pC[a_x] * pC[a_yz]) / (4 * dy) - (pC[a_0] * pC[a_yz]) / (2 * dy) -
+          (pC[a_y] * pC[a_yy]) / (6 * dy) - (pC[a_xy] * pC[a_yy]) / (12 * dy) - (pC[a_xz] * pC[a_y]) / (4 * dy) -
+          (pC[a_xyy] * pC[a_y]) / (12 * dy) - (pC[a_xx] * pC[a_y]) / (6 * dy) - (pC[a_x] * pC[a_y]) / (2 * dy) -
+          (pC[a_0] * pC[a_y]) / dy - (pC[a_xyz] * pC[a_xz]) / (16 * dy) - (pC[a_xy] * pC[a_xz]) / (8 * dy) -
+          (pC[a_xxy] * pC[a_xz]) / (24 * dy) - (pC[a_xx] * pC[a_xyz]) / (24 * dy) - (pC[a_x] * pC[a_xyz]) / (8 * dy) -
+          (pC[a_0] * pC[a_xyz]) / (4 * dy) - (pC[a_xy] * pC[a_xyy]) / (24 * dy) - (pC[a_xx] * pC[a_xy]) / (12 * dy) -
+          (pC[a_x] * pC[a_xy]) / (4 * dy) - (pC[a_0] * pC[a_xy]) / (2 * dy) - (pC[a_xx] * pC[a_xxy]) / (36 * dy) -
+          (pC[a_x] * pC[a_xxy]) / (12 * dy) - (pC[a_0] * pC[a_xxy]) / (6 * dy) + (pC[a_z] * pC[b_xz]) / (4 * dx) +
+          (pC[a_xz] * pC[b_xz]) / (8 * dx) + (pC[a_xx] * pC[b_xz]) / (12 * dx) + (pC[a_x] * pC[b_xz]) / (4 * dx) +
+          (pC[a_0] * pC[b_xz]) / (2 * dx) + (pC[a_y] * pC[b_xyz]) / (24 * dx) + (pC[a_xy] * pC[b_xyz]) / (48 * dx) +
+          (pC[a_y] * pC[b_xy]) / (12 * dx) + (pC[a_xy] * pC[b_xy]) / (24 * dx) + (pC[a_y] * pC[b_xxy]) / (12 * dx) +
+          (pC[a_xy] * pC[b_xxy]) / (24 * dx) + (pC[a_z] * pC[b_xx]) / (2 * dx) + (pC[a_xz] * pC[b_xx]) / (4 * dx) +
+          (pC[a_xx] * pC[b_xx]) / (6 * dx) + (pC[a_x] * pC[b_xx]) / (2 * dx) + (pC[a_0] * pC[b_xx]) / dx +
+          (pC[a_z] * pC[b_x]) / (2 * dx) + (pC[a_xz] * pC[b_x]) / (4 * dx) + (pC[a_xx] * pC[b_x]) / (6 * dx) +
+          (pC[a_x] * pC[b_x]) / (2 * dx) + (pC[a_0] * pC[b_x]) / dx;
+}
+
+/*! \brief Low-level Hall component computation
+ *
+ * Hall term computation following Balsara reconstruction, edge-averaged.
+ *
+ * \param pC Reconstruction coefficients
+ * \param BGBX Background Bx
+ * \param BGBZ Background Bz
+ * \param gridSpacing fsgrid cell size in x,y,z
+ *
+ * \sa calculateEdgeHallTermYComponents
+ *
+ */
+template<typename REAL> inline
+__device__ REAL JXBY_101_111Device(
    const std::array<REAL, Rec::N_REC_COEFFICIENTS>& pC,
    creal BGBX,
    creal BGBZ,
@@ -621,7 +1133,135 @@ REAL JXBZ_000_001(
  *
  */
 template<typename REAL> inline
+__device__ REAL JXBZ_000_001Device(
+   const std::array<REAL, Rec::N_REC_COEFFICIENTS>& pC,
+   creal BGBX,
+   creal BGBY,
+   const std::array<Real, 3>& gridSpacing
+) {
+   using namespace Rec;
+   const auto dx = gridSpacing[0];
+   const auto dy = gridSpacing[1];
+   const auto dz = gridSpacing[2];
+   return -(pC[b_z] * BGBY) / dz + (pC[b_yz] * BGBY) / (2 * dz) - (pC[b_yyz] * BGBY) / (6 * dz) +
+          (pC[b_xz] * BGBY) / (2 * dz) - (pC[b_xyz] * BGBY) / (4 * dz) - (pC[c_yy] * BGBY) / dy +
+          (pC[c_y] * BGBY) / dy - (pC[c_xy] * BGBY) / (2 * dy) - (pC[a_z] * BGBX) / dz + (pC[a_yz] * BGBX) / (2 * dz) +
+          (pC[a_xz] * BGBX) / (2 * dz) - (pC[a_xyz] * BGBX) / (4 * dz) - (pC[a_xxz] * BGBX) / (6 * dz) -
+          (pC[c_xy] * BGBX) / (2 * dx) - (pC[c_xx] * BGBX) / dx + (pC[c_x] * BGBX) / dx -
+          (pC[b_z] * pC[b_zz]) / (6 * dz) + (pC[b_yz] * pC[b_zz]) / (12 * dz) + (pC[b_yzz] * pC[b_z]) / (12 * dz) -
+          (pC[b_yy] * pC[b_z]) / (6 * dz) + (pC[b_y] * pC[b_z]) / (2 * dz) - (pC[b_xy] * pC[b_z]) / (4 * dz) +
+          (pC[b_x] * pC[b_z]) / (2 * dz) - (pC[b_0] * pC[b_z]) / dz - (pC[b_yz] * pC[b_yzz]) / (24 * dz) +
+          (pC[b_yy] * pC[b_yz]) / (12 * dz) - (pC[b_y] * pC[b_yz]) / (4 * dz) + (pC[b_xy] * pC[b_yz]) / (8 * dz) -
+          (pC[b_x] * pC[b_yz]) / (4 * dz) + (pC[b_0] * pC[b_yz]) / (2 * dz) - (pC[b_yy] * pC[b_yyz]) / (36 * dz) +
+          (pC[b_y] * pC[b_yyz]) / (12 * dz) - (pC[b_xy] * pC[b_yyz]) / (24 * dz) + (pC[b_x] * pC[b_yyz]) / (12 * dz) -
+          (pC[b_0] * pC[b_yyz]) / (6 * dz) + (pC[b_xz] * pC[b_yy]) / (12 * dz) - (pC[b_xyz] * pC[b_yy]) / (24 * dz) -
+          (pC[b_xz] * pC[b_y]) / (4 * dz) + (pC[b_xyz] * pC[b_y]) / (8 * dz) + (pC[b_xy] * pC[b_xz]) / (8 * dz) -
+          (pC[b_x] * pC[b_xz]) / (4 * dz) + (pC[b_0] * pC[b_xz]) / (2 * dz) - (pC[b_xy] * pC[b_xyz]) / (16 * dz) +
+          (pC[b_x] * pC[b_xyz]) / (8 * dz) - (pC[b_0] * pC[b_xyz]) / (4 * dz) - (pC[a_z] * pC[a_zz]) / (6 * dz) +
+          (pC[a_xz] * pC[a_zz]) / (12 * dz) + (pC[a_y] * pC[a_z]) / (2 * dz) + (pC[a_xzz] * pC[a_z]) / (12 * dz) -
+          (pC[a_xy] * pC[a_z]) / (4 * dz) - (pC[a_xx] * pC[a_z]) / (6 * dz) + (pC[a_x] * pC[a_z]) / (2 * dz) -
+          (pC[a_0] * pC[a_z]) / dz - (pC[a_y] * pC[a_yz]) / (4 * dz) + (pC[a_xy] * pC[a_yz]) / (8 * dz) +
+          (pC[a_xx] * pC[a_yz]) / (12 * dz) - (pC[a_x] * pC[a_yz]) / (4 * dz) + (pC[a_0] * pC[a_yz]) / (2 * dz) -
+          (pC[a_xz] * pC[a_y]) / (4 * dz) + (pC[a_xyz] * pC[a_y]) / (8 * dz) + (pC[a_xxz] * pC[a_y]) / (12 * dz) -
+          (pC[a_xz] * pC[a_xzz]) / (24 * dz) + (pC[a_xy] * pC[a_xz]) / (8 * dz) + (pC[a_xx] * pC[a_xz]) / (12 * dz) -
+          (pC[a_x] * pC[a_xz]) / (4 * dz) + (pC[a_0] * pC[a_xz]) / (2 * dz) - (pC[a_xy] * pC[a_xyz]) / (16 * dz) -
+          (pC[a_xx] * pC[a_xyz]) / (24 * dz) + (pC[a_x] * pC[a_xyz]) / (8 * dz) - (pC[a_0] * pC[a_xyz]) / (4 * dz) -
+          (pC[a_xxz] * pC[a_xy]) / (24 * dz) - (pC[a_xx] * pC[a_xxz]) / (36 * dz) + (pC[a_x] * pC[a_xxz]) / (12 * dz) -
+          (pC[a_0] * pC[a_xxz]) / (6 * dz) + (pC[b_z] * pC[c_yz]) / (12 * dy) - (pC[b_yz] * pC[c_yz]) / (24 * dy) -
+          (pC[b_z] * pC[c_yyz]) / (12 * dy) + (pC[b_yz] * pC[c_yyz]) / (24 * dy) - (pC[b_yy] * pC[c_yy]) / (6 * dy) +
+          (pC[b_y] * pC[c_yy]) / (2 * dy) - (pC[b_xy] * pC[c_yy]) / (4 * dy) + (pC[b_x] * pC[c_yy]) / (2 * dy) -
+          (pC[b_0] * pC[c_yy]) / dy + (pC[b_yy] * pC[c_y]) / (6 * dy) - (pC[b_y] * pC[c_y]) / (2 * dy) +
+          (pC[b_xy] * pC[c_y]) / (4 * dy) - (pC[b_x] * pC[c_y]) / (2 * dy) + (pC[b_0] * pC[c_y]) / dy -
+          (pC[b_z] * pC[c_xyz]) / (24 * dy) + (pC[b_yz] * pC[c_xyz]) / (48 * dy) - (pC[b_yy] * pC[c_xy]) / (12 * dy) +
+          (pC[b_y] * pC[c_xy]) / (4 * dy) - (pC[b_xy] * pC[c_xy]) / (8 * dy) + (pC[b_x] * pC[c_xy]) / (4 * dy) -
+          (pC[b_0] * pC[c_xy]) / (2 * dy) + (pC[a_z] * pC[c_xz]) / (12 * dx) - (pC[a_xz] * pC[c_xz]) / (24 * dx) -
+          (pC[a_z] * pC[c_xyz]) / (24 * dx) + (pC[a_xz] * pC[c_xyz]) / (48 * dx) + (pC[a_y] * pC[c_xy]) / (4 * dx) -
+          (pC[a_xy] * pC[c_xy]) / (8 * dx) - (pC[a_xx] * pC[c_xy]) / (12 * dx) + (pC[a_x] * pC[c_xy]) / (4 * dx) -
+          (pC[a_0] * pC[c_xy]) / (2 * dx) - (pC[a_z] * pC[c_xxz]) / (12 * dx) + (pC[a_xz] * pC[c_xxz]) / (24 * dx) +
+          (pC[a_y] * pC[c_xx]) / (2 * dx) - (pC[a_xy] * pC[c_xx]) / (4 * dx) - (pC[a_xx] * pC[c_xx]) / (6 * dx) +
+          (pC[a_x] * pC[c_xx]) / (2 * dx) - (pC[a_0] * pC[c_xx]) / dx - (pC[a_y] * pC[c_x]) / (2 * dx) +
+          (pC[a_xy] * pC[c_x]) / (4 * dx) + (pC[a_xx] * pC[c_x]) / (6 * dx) - (pC[a_x] * pC[c_x]) / (2 * dx) +
+          (pC[a_0] * pC[c_x]) / dx;
+}
+
+/*! \brief Low-level Hall component computation
+ *
+ * Hall term computation following Balsara reconstruction, edge-averaged.
+ *
+ * \param pC Reconstruction coefficients
+ * \param BGBX Background Bx
+ * \param BGBY Background By
+ * \param gridSpacing fsgrid cell size in x,y,z
+ *
+ * \sa calculateEdgeHallTermZComponents
+ *
+ */
+template<typename REAL> inline
 REAL JXBZ_100_101(
+   const std::array<REAL, Rec::N_REC_COEFFICIENTS>& pC,
+   creal BGBX,
+   creal BGBY,
+   const std::array<Real, 3>& gridSpacing
+) {
+   using namespace Rec;
+   const auto dx = gridSpacing[0];
+   const auto dy = gridSpacing[1];
+   const auto dz = gridSpacing[2];
+   return -(pC[b_z] * BGBY) / dz + (pC[b_yz] * BGBY) / (2 * dz) - (pC[b_yyz] * BGBY) / (6 * dz) -
+          (pC[b_xz] * BGBY) / (2 * dz) + (pC[b_xyz] * BGBY) / (4 * dz) - (pC[c_yy] * BGBY) / dy +
+          (pC[c_y] * BGBY) / dy + (pC[c_xy] * BGBY) / (2 * dy) - (pC[a_z] * BGBX) / dz + (pC[a_yz] * BGBX) / (2 * dz) -
+          (pC[a_xz] * BGBX) / (2 * dz) + (pC[a_xyz] * BGBX) / (4 * dz) - (pC[a_xxz] * BGBX) / (6 * dz) -
+          (pC[c_xy] * BGBX) / (2 * dx) + (pC[c_xx] * BGBX) / dx + (pC[c_x] * BGBX) / dx -
+          (pC[b_z] * pC[b_zz]) / (6 * dz) + (pC[b_yz] * pC[b_zz]) / (12 * dz) + (pC[b_yzz] * pC[b_z]) / (12 * dz) -
+          (pC[b_yy] * pC[b_z]) / (6 * dz) + (pC[b_y] * pC[b_z]) / (2 * dz) + (pC[b_xy] * pC[b_z]) / (4 * dz) -
+          (pC[b_x] * pC[b_z]) / (2 * dz) - (pC[b_0] * pC[b_z]) / dz - (pC[b_yz] * pC[b_yzz]) / (24 * dz) +
+          (pC[b_yy] * pC[b_yz]) / (12 * dz) - (pC[b_y] * pC[b_yz]) / (4 * dz) - (pC[b_xy] * pC[b_yz]) / (8 * dz) +
+          (pC[b_x] * pC[b_yz]) / (4 * dz) + (pC[b_0] * pC[b_yz]) / (2 * dz) - (pC[b_yy] * pC[b_yyz]) / (36 * dz) +
+          (pC[b_y] * pC[b_yyz]) / (12 * dz) + (pC[b_xy] * pC[b_yyz]) / (24 * dz) - (pC[b_x] * pC[b_yyz]) / (12 * dz) -
+          (pC[b_0] * pC[b_yyz]) / (6 * dz) - (pC[b_xz] * pC[b_yy]) / (12 * dz) + (pC[b_xyz] * pC[b_yy]) / (24 * dz) +
+          (pC[b_xz] * pC[b_y]) / (4 * dz) - (pC[b_xyz] * pC[b_y]) / (8 * dz) + (pC[b_xy] * pC[b_xz]) / (8 * dz) -
+          (pC[b_x] * pC[b_xz]) / (4 * dz) - (pC[b_0] * pC[b_xz]) / (2 * dz) - (pC[b_xy] * pC[b_xyz]) / (16 * dz) +
+          (pC[b_x] * pC[b_xyz]) / (8 * dz) + (pC[b_0] * pC[b_xyz]) / (4 * dz) - (pC[a_z] * pC[a_zz]) / (6 * dz) -
+          (pC[a_xz] * pC[a_zz]) / (12 * dz) + (pC[a_y] * pC[a_z]) / (2 * dz) - (pC[a_xzz] * pC[a_z]) / (12 * dz) +
+          (pC[a_xy] * pC[a_z]) / (4 * dz) - (pC[a_xx] * pC[a_z]) / (6 * dz) - (pC[a_x] * pC[a_z]) / (2 * dz) -
+          (pC[a_0] * pC[a_z]) / dz - (pC[a_y] * pC[a_yz]) / (4 * dz) - (pC[a_xy] * pC[a_yz]) / (8 * dz) +
+          (pC[a_xx] * pC[a_yz]) / (12 * dz) + (pC[a_x] * pC[a_yz]) / (4 * dz) + (pC[a_0] * pC[a_yz]) / (2 * dz) +
+          (pC[a_xz] * pC[a_y]) / (4 * dz) - (pC[a_xyz] * pC[a_y]) / (8 * dz) + (pC[a_xxz] * pC[a_y]) / (12 * dz) -
+          (pC[a_xz] * pC[a_xzz]) / (24 * dz) + (pC[a_xy] * pC[a_xz]) / (8 * dz) - (pC[a_xx] * pC[a_xz]) / (12 * dz) -
+          (pC[a_x] * pC[a_xz]) / (4 * dz) - (pC[a_0] * pC[a_xz]) / (2 * dz) - (pC[a_xy] * pC[a_xyz]) / (16 * dz) +
+          (pC[a_xx] * pC[a_xyz]) / (24 * dz) + (pC[a_x] * pC[a_xyz]) / (8 * dz) + (pC[a_0] * pC[a_xyz]) / (4 * dz) +
+          (pC[a_xxz] * pC[a_xy]) / (24 * dz) - (pC[a_xx] * pC[a_xxz]) / (36 * dz) - (pC[a_x] * pC[a_xxz]) / (12 * dz) -
+          (pC[a_0] * pC[a_xxz]) / (6 * dz) + (pC[b_z] * pC[c_yz]) / (12 * dy) - (pC[b_yz] * pC[c_yz]) / (24 * dy) -
+          (pC[b_z] * pC[c_yyz]) / (12 * dy) + (pC[b_yz] * pC[c_yyz]) / (24 * dy) - (pC[b_yy] * pC[c_yy]) / (6 * dy) +
+          (pC[b_y] * pC[c_yy]) / (2 * dy) + (pC[b_xy] * pC[c_yy]) / (4 * dy) - (pC[b_x] * pC[c_yy]) / (2 * dy) -
+          (pC[b_0] * pC[c_yy]) / dy + (pC[b_yy] * pC[c_y]) / (6 * dy) - (pC[b_y] * pC[c_y]) / (2 * dy) -
+          (pC[b_xy] * pC[c_y]) / (4 * dy) + (pC[b_x] * pC[c_y]) / (2 * dy) + (pC[b_0] * pC[c_y]) / dy +
+          (pC[b_z] * pC[c_xyz]) / (24 * dy) - (pC[b_yz] * pC[c_xyz]) / (48 * dy) + (pC[b_yy] * pC[c_xy]) / (12 * dy) -
+          (pC[b_y] * pC[c_xy]) / (4 * dy) - (pC[b_xy] * pC[c_xy]) / (8 * dy) + (pC[b_x] * pC[c_xy]) / (4 * dy) +
+          (pC[b_0] * pC[c_xy]) / (2 * dy) + (pC[a_z] * pC[c_xz]) / (12 * dx) + (pC[a_xz] * pC[c_xz]) / (24 * dx) -
+          (pC[a_z] * pC[c_xyz]) / (24 * dx) - (pC[a_xz] * pC[c_xyz]) / (48 * dx) + (pC[a_y] * pC[c_xy]) / (4 * dx) +
+          (pC[a_xy] * pC[c_xy]) / (8 * dx) - (pC[a_xx] * pC[c_xy]) / (12 * dx) - (pC[a_x] * pC[c_xy]) / (4 * dx) -
+          (pC[a_0] * pC[c_xy]) / (2 * dx) + (pC[a_z] * pC[c_xxz]) / (12 * dx) + (pC[a_xz] * pC[c_xxz]) / (24 * dx) -
+          (pC[a_y] * pC[c_xx]) / (2 * dx) - (pC[a_xy] * pC[c_xx]) / (4 * dx) + (pC[a_xx] * pC[c_xx]) / (6 * dx) +
+          (pC[a_x] * pC[c_xx]) / (2 * dx) + (pC[a_0] * pC[c_xx]) / dx - (pC[a_y] * pC[c_x]) / (2 * dx) -
+          (pC[a_xy] * pC[c_x]) / (4 * dx) + (pC[a_xx] * pC[c_x]) / (6 * dx) + (pC[a_x] * pC[c_x]) / (2 * dx) +
+          (pC[a_0] * pC[c_x]) / dx;
+}
+
+/*! \brief Low-level Hall component computation
+ *
+ * Hall term computation following Balsara reconstruction, edge-averaged.
+ *
+ * \param pC Reconstruction coefficients
+ * \param BGBX Background Bx
+ * \param BGBY Background By
+ * \param gridSpacing fsgrid cell size in x,y,z
+ *
+ * \sa calculateEdgeHallTermZComponents
+ *
+ */
+template<typename REAL> inline
+__device__ REAL JXBZ_100_101Device(
    const std::array<REAL, Rec::N_REC_COEFFICIENTS>& pC,
    creal BGBX,
    creal BGBY,
@@ -749,7 +1389,135 @@ REAL JXBZ_010_011(
  *
  */
 template<typename REAL> inline
+__device__ REAL JXBZ_010_011Device(
+   const std::array<REAL, Rec::N_REC_COEFFICIENTS>& pC,
+   creal BGBX,
+   creal BGBY,
+   const std::array<Real, 3>& gridSpacing
+) {
+   using namespace Rec;
+   const auto dx = gridSpacing[0];
+   const auto dy = gridSpacing[1];
+   const auto dz = gridSpacing[2];
+   return -(pC[b_z] * BGBY) / dz - (pC[b_yz] * BGBY) / (2 * dz) - (pC[b_yyz] * BGBY) / (6 * dz) +
+          (pC[b_xz] * BGBY) / (2 * dz) + (pC[b_xyz] * BGBY) / (4 * dz) + (pC[c_yy] * BGBY) / dy +
+          (pC[c_y] * BGBY) / dy - (pC[c_xy] * BGBY) / (2 * dy) - (pC[a_z] * BGBX) / dz - (pC[a_yz] * BGBX) / (2 * dz) +
+          (pC[a_xz] * BGBX) / (2 * dz) + (pC[a_xyz] * BGBX) / (4 * dz) - (pC[a_xxz] * BGBX) / (6 * dz) +
+          (pC[c_xy] * BGBX) / (2 * dx) - (pC[c_xx] * BGBX) / dx + (pC[c_x] * BGBX) / dx -
+          (pC[b_z] * pC[b_zz]) / (6 * dz) - (pC[b_yz] * pC[b_zz]) / (12 * dz) - (pC[b_yzz] * pC[b_z]) / (12 * dz) -
+          (pC[b_yy] * pC[b_z]) / (6 * dz) - (pC[b_y] * pC[b_z]) / (2 * dz) + (pC[b_xy] * pC[b_z]) / (4 * dz) +
+          (pC[b_x] * pC[b_z]) / (2 * dz) - (pC[b_0] * pC[b_z]) / dz - (pC[b_yz] * pC[b_yzz]) / (24 * dz) -
+          (pC[b_yy] * pC[b_yz]) / (12 * dz) - (pC[b_y] * pC[b_yz]) / (4 * dz) + (pC[b_xy] * pC[b_yz]) / (8 * dz) +
+          (pC[b_x] * pC[b_yz]) / (4 * dz) - (pC[b_0] * pC[b_yz]) / (2 * dz) - (pC[b_yy] * pC[b_yyz]) / (36 * dz) -
+          (pC[b_y] * pC[b_yyz]) / (12 * dz) + (pC[b_xy] * pC[b_yyz]) / (24 * dz) + (pC[b_x] * pC[b_yyz]) / (12 * dz) -
+          (pC[b_0] * pC[b_yyz]) / (6 * dz) + (pC[b_xz] * pC[b_yy]) / (12 * dz) + (pC[b_xyz] * pC[b_yy]) / (24 * dz) +
+          (pC[b_xz] * pC[b_y]) / (4 * dz) + (pC[b_xyz] * pC[b_y]) / (8 * dz) - (pC[b_xy] * pC[b_xz]) / (8 * dz) -
+          (pC[b_x] * pC[b_xz]) / (4 * dz) + (pC[b_0] * pC[b_xz]) / (2 * dz) - (pC[b_xy] * pC[b_xyz]) / (16 * dz) -
+          (pC[b_x] * pC[b_xyz]) / (8 * dz) + (pC[b_0] * pC[b_xyz]) / (4 * dz) - (pC[a_z] * pC[a_zz]) / (6 * dz) +
+          (pC[a_xz] * pC[a_zz]) / (12 * dz) - (pC[a_y] * pC[a_z]) / (2 * dz) + (pC[a_xzz] * pC[a_z]) / (12 * dz) +
+          (pC[a_xy] * pC[a_z]) / (4 * dz) - (pC[a_xx] * pC[a_z]) / (6 * dz) + (pC[a_x] * pC[a_z]) / (2 * dz) -
+          (pC[a_0] * pC[a_z]) / dz - (pC[a_y] * pC[a_yz]) / (4 * dz) + (pC[a_xy] * pC[a_yz]) / (8 * dz) -
+          (pC[a_xx] * pC[a_yz]) / (12 * dz) + (pC[a_x] * pC[a_yz]) / (4 * dz) - (pC[a_0] * pC[a_yz]) / (2 * dz) +
+          (pC[a_xz] * pC[a_y]) / (4 * dz) + (pC[a_xyz] * pC[a_y]) / (8 * dz) - (pC[a_xxz] * pC[a_y]) / (12 * dz) -
+          (pC[a_xz] * pC[a_xzz]) / (24 * dz) - (pC[a_xy] * pC[a_xz]) / (8 * dz) + (pC[a_xx] * pC[a_xz]) / (12 * dz) -
+          (pC[a_x] * pC[a_xz]) / (4 * dz) + (pC[a_0] * pC[a_xz]) / (2 * dz) - (pC[a_xy] * pC[a_xyz]) / (16 * dz) +
+          (pC[a_xx] * pC[a_xyz]) / (24 * dz) - (pC[a_x] * pC[a_xyz]) / (8 * dz) + (pC[a_0] * pC[a_xyz]) / (4 * dz) +
+          (pC[a_xxz] * pC[a_xy]) / (24 * dz) - (pC[a_xx] * pC[a_xxz]) / (36 * dz) + (pC[a_x] * pC[a_xxz]) / (12 * dz) -
+          (pC[a_0] * pC[a_xxz]) / (6 * dz) + (pC[b_z] * pC[c_yz]) / (12 * dy) + (pC[b_yz] * pC[c_yz]) / (24 * dy) +
+          (pC[b_z] * pC[c_yyz]) / (12 * dy) + (pC[b_yz] * pC[c_yyz]) / (24 * dy) + (pC[b_yy] * pC[c_yy]) / (6 * dy) +
+          (pC[b_y] * pC[c_yy]) / (2 * dy) - (pC[b_xy] * pC[c_yy]) / (4 * dy) - (pC[b_x] * pC[c_yy]) / (2 * dy) +
+          (pC[b_0] * pC[c_yy]) / dy + (pC[b_yy] * pC[c_y]) / (6 * dy) + (pC[b_y] * pC[c_y]) / (2 * dy) -
+          (pC[b_xy] * pC[c_y]) / (4 * dy) - (pC[b_x] * pC[c_y]) / (2 * dy) + (pC[b_0] * pC[c_y]) / dy -
+          (pC[b_z] * pC[c_xyz]) / (24 * dy) - (pC[b_yz] * pC[c_xyz]) / (48 * dy) - (pC[b_yy] * pC[c_xy]) / (12 * dy) -
+          (pC[b_y] * pC[c_xy]) / (4 * dy) + (pC[b_xy] * pC[c_xy]) / (8 * dy) + (pC[b_x] * pC[c_xy]) / (4 * dy) -
+          (pC[b_0] * pC[c_xy]) / (2 * dy) + (pC[a_z] * pC[c_xz]) / (12 * dx) - (pC[a_xz] * pC[c_xz]) / (24 * dx) +
+          (pC[a_z] * pC[c_xyz]) / (24 * dx) - (pC[a_xz] * pC[c_xyz]) / (48 * dx) + (pC[a_y] * pC[c_xy]) / (4 * dx) -
+          (pC[a_xy] * pC[c_xy]) / (8 * dx) + (pC[a_xx] * pC[c_xy]) / (12 * dx) - (pC[a_x] * pC[c_xy]) / (4 * dx) +
+          (pC[a_0] * pC[c_xy]) / (2 * dx) - (pC[a_z] * pC[c_xxz]) / (12 * dx) + (pC[a_xz] * pC[c_xxz]) / (24 * dx) -
+          (pC[a_y] * pC[c_xx]) / (2 * dx) + (pC[a_xy] * pC[c_xx]) / (4 * dx) - (pC[a_xx] * pC[c_xx]) / (6 * dx) +
+          (pC[a_x] * pC[c_xx]) / (2 * dx) - (pC[a_0] * pC[c_xx]) / dx + (pC[a_y] * pC[c_x]) / (2 * dx) -
+          (pC[a_xy] * pC[c_x]) / (4 * dx) + (pC[a_xx] * pC[c_x]) / (6 * dx) - (pC[a_x] * pC[c_x]) / (2 * dx) +
+          (pC[a_0] * pC[c_x]) / dx;
+}
+
+/*! \brief Low-level Hall component computation
+ *
+ * Hall term computation following Balsara reconstruction, edge-averaged.
+ *
+ * \param pC Reconstruction coefficients
+ * \param BGBX Background Bx
+ * \param BGBY Background By
+ * \param gridSpacing fsgrid cell size in x,y,z
+ *
+ * \sa calculateEdgeHallTermZComponents
+ *
+ */
+template<typename REAL> inline
 REAL JXBZ_110_111(
+   const std::array<REAL, Rec::N_REC_COEFFICIENTS>& pC,
+   creal BGBX,
+   creal BGBY,
+   const std::array<Real, 3>& gridSpacing
+) {
+   using namespace Rec;
+   const auto dx = gridSpacing[0];
+   const auto dy = gridSpacing[1];
+   const auto dz = gridSpacing[2];
+   return -(pC[b_z] * BGBY) / dz - (pC[b_yz] * BGBY) / (2 * dz) - (pC[b_yyz] * BGBY) / (6 * dz) -
+          (pC[b_xz] * BGBY) / (2 * dz) - (pC[b_xyz] * BGBY) / (4 * dz) + (pC[c_yy] * BGBY) / dy +
+          (pC[c_y] * BGBY) / dy + (pC[c_xy] * BGBY) / (2 * dy) - (pC[a_z] * BGBX) / dz - (pC[a_yz] * BGBX) / (2 * dz) -
+          (pC[a_xz] * BGBX) / (2 * dz) - (pC[a_xyz] * BGBX) / (4 * dz) - (pC[a_xxz] * BGBX) / (6 * dz) +
+          (pC[c_xy] * BGBX) / (2 * dx) + (pC[c_xx] * BGBX) / dx + (pC[c_x] * BGBX) / dx -
+          (pC[b_z] * pC[b_zz]) / (6 * dz) - (pC[b_yz] * pC[b_zz]) / (12 * dz) - (pC[b_yzz] * pC[b_z]) / (12 * dz) -
+          (pC[b_yy] * pC[b_z]) / (6 * dz) - (pC[b_y] * pC[b_z]) / (2 * dz) - (pC[b_xy] * pC[b_z]) / (4 * dz) -
+          (pC[b_x] * pC[b_z]) / (2 * dz) - (pC[b_0] * pC[b_z]) / dz - (pC[b_yz] * pC[b_yzz]) / (24 * dz) -
+          (pC[b_yy] * pC[b_yz]) / (12 * dz) - (pC[b_y] * pC[b_yz]) / (4 * dz) - (pC[b_xy] * pC[b_yz]) / (8 * dz) -
+          (pC[b_x] * pC[b_yz]) / (4 * dz) - (pC[b_0] * pC[b_yz]) / (2 * dz) - (pC[b_yy] * pC[b_yyz]) / (36 * dz) -
+          (pC[b_y] * pC[b_yyz]) / (12 * dz) - (pC[b_xy] * pC[b_yyz]) / (24 * dz) - (pC[b_x] * pC[b_yyz]) / (12 * dz) -
+          (pC[b_0] * pC[b_yyz]) / (6 * dz) - (pC[b_xz] * pC[b_yy]) / (12 * dz) - (pC[b_xyz] * pC[b_yy]) / (24 * dz) -
+          (pC[b_xz] * pC[b_y]) / (4 * dz) - (pC[b_xyz] * pC[b_y]) / (8 * dz) - (pC[b_xy] * pC[b_xz]) / (8 * dz) -
+          (pC[b_x] * pC[b_xz]) / (4 * dz) - (pC[b_0] * pC[b_xz]) / (2 * dz) - (pC[b_xy] * pC[b_xyz]) / (16 * dz) -
+          (pC[b_x] * pC[b_xyz]) / (8 * dz) - (pC[b_0] * pC[b_xyz]) / (4 * dz) - (pC[a_z] * pC[a_zz]) / (6 * dz) -
+          (pC[a_xz] * pC[a_zz]) / (12 * dz) - (pC[a_y] * pC[a_z]) / (2 * dz) - (pC[a_xzz] * pC[a_z]) / (12 * dz) -
+          (pC[a_xy] * pC[a_z]) / (4 * dz) - (pC[a_xx] * pC[a_z]) / (6 * dz) - (pC[a_x] * pC[a_z]) / (2 * dz) -
+          (pC[a_0] * pC[a_z]) / dz - (pC[a_y] * pC[a_yz]) / (4 * dz) - (pC[a_xy] * pC[a_yz]) / (8 * dz) -
+          (pC[a_xx] * pC[a_yz]) / (12 * dz) - (pC[a_x] * pC[a_yz]) / (4 * dz) - (pC[a_0] * pC[a_yz]) / (2 * dz) -
+          (pC[a_xz] * pC[a_y]) / (4 * dz) - (pC[a_xyz] * pC[a_y]) / (8 * dz) - (pC[a_xxz] * pC[a_y]) / (12 * dz) -
+          (pC[a_xz] * pC[a_xzz]) / (24 * dz) - (pC[a_xy] * pC[a_xz]) / (8 * dz) - (pC[a_xx] * pC[a_xz]) / (12 * dz) -
+          (pC[a_x] * pC[a_xz]) / (4 * dz) - (pC[a_0] * pC[a_xz]) / (2 * dz) - (pC[a_xy] * pC[a_xyz]) / (16 * dz) -
+          (pC[a_xx] * pC[a_xyz]) / (24 * dz) - (pC[a_x] * pC[a_xyz]) / (8 * dz) - (pC[a_0] * pC[a_xyz]) / (4 * dz) -
+          (pC[a_xxz] * pC[a_xy]) / (24 * dz) - (pC[a_xx] * pC[a_xxz]) / (36 * dz) - (pC[a_x] * pC[a_xxz]) / (12 * dz) -
+          (pC[a_0] * pC[a_xxz]) / (6 * dz) + (pC[b_z] * pC[c_yz]) / (12 * dy) + (pC[b_yz] * pC[c_yz]) / (24 * dy) +
+          (pC[b_z] * pC[c_yyz]) / (12 * dy) + (pC[b_yz] * pC[c_yyz]) / (24 * dy) + (pC[b_yy] * pC[c_yy]) / (6 * dy) +
+          (pC[b_y] * pC[c_yy]) / (2 * dy) + (pC[b_xy] * pC[c_yy]) / (4 * dy) + (pC[b_x] * pC[c_yy]) / (2 * dy) +
+          (pC[b_0] * pC[c_yy]) / dy + (pC[b_yy] * pC[c_y]) / (6 * dy) + (pC[b_y] * pC[c_y]) / (2 * dy) +
+          (pC[b_xy] * pC[c_y]) / (4 * dy) + (pC[b_x] * pC[c_y]) / (2 * dy) + (pC[b_0] * pC[c_y]) / dy +
+          (pC[b_z] * pC[c_xyz]) / (24 * dy) + (pC[b_yz] * pC[c_xyz]) / (48 * dy) + (pC[b_yy] * pC[c_xy]) / (12 * dy) +
+          (pC[b_y] * pC[c_xy]) / (4 * dy) + (pC[b_xy] * pC[c_xy]) / (8 * dy) + (pC[b_x] * pC[c_xy]) / (4 * dy) +
+          (pC[b_0] * pC[c_xy]) / (2 * dy) + (pC[a_z] * pC[c_xz]) / (12 * dx) + (pC[a_xz] * pC[c_xz]) / (24 * dx) +
+          (pC[a_z] * pC[c_xyz]) / (24 * dx) + (pC[a_xz] * pC[c_xyz]) / (48 * dx) + (pC[a_y] * pC[c_xy]) / (4 * dx) +
+          (pC[a_xy] * pC[c_xy]) / (8 * dx) + (pC[a_xx] * pC[c_xy]) / (12 * dx) + (pC[a_x] * pC[c_xy]) / (4 * dx) +
+          (pC[a_0] * pC[c_xy]) / (2 * dx) + (pC[a_z] * pC[c_xxz]) / (12 * dx) + (pC[a_xz] * pC[c_xxz]) / (24 * dx) +
+          (pC[a_y] * pC[c_xx]) / (2 * dx) + (pC[a_xy] * pC[c_xx]) / (4 * dx) + (pC[a_xx] * pC[c_xx]) / (6 * dx) +
+          (pC[a_x] * pC[c_xx]) / (2 * dx) + (pC[a_0] * pC[c_xx]) / dx + (pC[a_y] * pC[c_x]) / (2 * dx) +
+          (pC[a_xy] * pC[c_x]) / (4 * dx) + (pC[a_xx] * pC[c_x]) / (6 * dx) + (pC[a_x] * pC[c_x]) / (2 * dx) +
+          (pC[a_0] * pC[c_x]) / dx;
+}
+
+/*! \brief Low-level Hall component computation
+ *
+ * Hall term computation following Balsara reconstruction, edge-averaged.
+ *
+ * \param pC Reconstruction coefficients
+ * \param BGBX Background Bx
+ * \param BGBY Background By
+ * \param gridSpacing fsgrid cell size in x,y,z
+ *
+ * \sa calculateEdgeHallTermZComponents
+ *
+ */
+template<typename REAL> inline
+__device__ REAL JXBZ_110_111Device(
    const std::array<REAL, Rec::N_REC_COEFFICIENTS>& pC,
    creal BGBX,
    creal BGBY,
@@ -839,6 +1607,53 @@ inline REAL JXB(fsgrids::ehall term, const std::array<REAL, Rec::N_REC_COEFFICIE
    }
    case fsgrids::EZHALL_110_111: {
       return JXBZ_110_111(pC, BGBX, BGBY, gridSpacing);
+   }
+   case fsgrids::N_EHALL: {
+      break;
+   }
+   }
+   return 0.0;
+}
+
+template <typename REAL>
+__device__ inline REAL JXBDevice(fsgrids::ehall term, const std::array<REAL, Rec::N_REC_COEFFICIENTS>& pC, Real BGBX, Real BGBY,
+                Real BGBZ, const std::array<Real, 3>& gridSpacing) {
+   switch (term) {
+   case fsgrids::EXHALL_000_100: {
+      return JXBX_000_100Device(pC, BGBY, BGBZ, gridSpacing);
+   }
+   case fsgrids::EXHALL_010_110: {
+      return JXBX_010_110Device(pC, BGBY, BGBZ, gridSpacing);
+   }
+   case fsgrids::EXHALL_001_101: {
+      return JXBX_001_101Device(pC, BGBY, BGBZ, gridSpacing);
+   }
+   case fsgrids::EXHALL_011_111: {
+      return JXBX_011_111Device(pC, BGBY, BGBZ, gridSpacing);
+   }
+   case fsgrids::EYHALL_000_010: {
+      return JXBY_000_010Device(pC, BGBX, BGBZ, gridSpacing);
+   }
+   case fsgrids::EYHALL_100_110: {
+      return JXBY_100_110Device(pC, BGBX, BGBZ, gridSpacing);
+   }
+   case fsgrids::EYHALL_001_011: {
+      return JXBY_001_011Device(pC, BGBX, BGBZ, gridSpacing);
+   }
+   case fsgrids::EYHALL_101_111: {
+      return JXBY_101_111Device(pC, BGBX, BGBZ, gridSpacing);
+   }
+   case fsgrids::EZHALL_000_001: {
+      return JXBZ_000_001Device(pC, BGBX, BGBY, gridSpacing);
+   }
+   case fsgrids::EZHALL_100_101: {
+      return JXBZ_100_101Device(pC, BGBX, BGBY, gridSpacing);
+   }
+   case fsgrids::EZHALL_010_011: {
+      return JXBZ_010_011Device(pC, BGBX, BGBY, gridSpacing);
+   }
+   case fsgrids::EZHALL_110_111: {
+      return JXBZ_110_111Device(pC, BGBX, BGBY, gridSpacing);
    }
    case fsgrids::N_EHALL: {
       break;
@@ -1043,6 +1858,203 @@ void calculateEdgeHallTermComponents(fsgrids::perbspan perbs,
    }
 }
 
+/*! \brief Low-level function computing the Hall term numerator x components.
+ *
+ * Calls the lower-level inline templates and scales the components properly.
+ *
+ * \param perbs fsGrid holding the perturbed B quantities
+ * \param ehalls fsGrid holding the Hall contributions to the electric field
+ * \param moments fsGrid holding the moment quantities
+ * \param dperbs fsGrid holding the derivatives of perturbed B
+ * \param bgbs fsGrid holding the background B quantities
+ * \param gridSpacing fsgrid cell size in x,y,z
+ * \param perturbedCoefficients Reconstruction coefficients
+ * \param stencil fsGrid stencil for current cell
+ *
+ * \sa calculateHallTerm JXBX_000_100 JXBX_001_101 JXBX_010_110 JXBX_011_111
+ *
+ */
+__device__ void calculateEdgeHallTermComponentsDevice(fsgrids::perbspan perbs,
+                                     fsgrids::ehallspan ehalls,
+                                     fsgrids::constmomentsspan moments,
+                                     fsgrids::constdperbspan dperbs,
+                                     fsgrids::constbgbspan bgbs,
+                                     const std::array<Real, 3>& gridSpacing,
+                                     const std::array<Real, Rec::N_REC_COEFFICIENTS>& perturbedCoefficients,
+                                     const fsgrid::FsStencil& stencil, const DeviceParameters& parameters) {
+   const auto ooo = stencil.ooo();
+   const auto& bgb = bgbs[ooo];
+   const auto& perb = perbs[ooo];
+   const auto& dperb = dperbs[ooo];
+   const auto& moment = moments[ooo];
+   auto& ehall = ehalls[ooo];
+
+   const Real bgbx = bgb[fsgrids::bgbfield::BGBX];
+   const Real bgby = bgb[fsgrids::bgbfield::BGBY];
+   const Real bgbz = bgb[fsgrids::bgbfield::BGBZ];
+
+   auto computeHallRhoq = [&moments, &moment, &parameters](const std::array<size_t, 4>& indices) {
+      const auto min = parameters.hallMinimumRhoq;
+      const auto max = std::numeric_limits<Real>::max();
+
+      return std::clamp(
+          parameters.ohmHallTerm == 1
+              ? moment[fsgrids::moments::RHOQ]
+              : FOURTH * (moments[indices[0]][fsgrids::moments::RHOQ] + moments[indices[1]][fsgrids::moments::RHOQ] +
+                          moments[indices[2]][fsgrids::moments::RHOQ] + moments[indices[3]][fsgrids::moments::RHOQ]),
+          min, max);
+   };
+
+   switch (parameters.ohmHallTerm) {
+   case 0:
+      printf("You shouldn't be in a Hall term function if Parameters::ohmHallTerm == 0.\n");
+      assert(false);
+      break;
+
+   case 1: {
+      const Real Bx = perb[fsgrids::bfield::PERBX] + bgbx;
+      const Real By = perb[fsgrids::bfield::PERBY] + bgby;
+      const Real Bz = perb[fsgrids::bfield::PERBZ] + bgbz;
+
+      const Real invHallRhoqMU0 = 1.0 / (physicalconstants::MU_0 * computeHallRhoq({}));
+
+      const Real ydx = (bgb[fsgrids::bgbfield::dBGBydx] + dperb[fsgrids::dperb::dPERBydx]) / gridSpacing[0];
+      const Real zdx = (bgb[fsgrids::bgbfield::dBGBzdx] + dperb[fsgrids::dperb::dPERBzdx]) / gridSpacing[0];
+      const Real xdy = (bgb[fsgrids::bgbfield::dBGBxdy] + dperb[fsgrids::dperb::dPERBxdy]) / gridSpacing[1];
+      const Real zdy = (bgb[fsgrids::bgbfield::dBGBzdy] + dperb[fsgrids::dperb::dPERBzdy]) / gridSpacing[1];
+      const Real xdz = (bgb[fsgrids::bgbfield::dBGBxdz] + dperb[fsgrids::dperb::dPERBxdz]) / gridSpacing[2];
+      const Real ydz = (bgb[fsgrids::bgbfield::dBGBydz] + dperb[fsgrids::dperb::dPERBydz]) / gridSpacing[2];
+
+      const Real EXHall = (Bz * (xdz - zdx) - By * (ydx - xdy)) * invHallRhoqMU0;
+      ehall[fsgrids::ehall::EXHALL_000_100] = EXHall;
+      ehall[fsgrids::ehall::EXHALL_010_110] = EXHall;
+      ehall[fsgrids::ehall::EXHALL_001_101] = EXHall;
+      ehall[fsgrids::ehall::EXHALL_011_111] = EXHall;
+
+      const Real EYHall = (Bx * (ydx - xdy) - Bz * (zdy - ydz)) * invHallRhoqMU0;
+      ehall[fsgrids::ehall::EYHALL_000_010] = EYHall;
+      ehall[fsgrids::ehall::EYHALL_100_110] = EYHall;
+      ehall[fsgrids::ehall::EYHALL_101_111] = EYHall;
+      ehall[fsgrids::ehall::EYHALL_001_011] = EYHall;
+
+      const Real EZHall = (By * (zdy - ydz) - Bx * (xdz - zdx)) * invHallRhoqMU0;
+      ehall[fsgrids::ehall::EZHALL_000_001] = EZHall;
+      ehall[fsgrids::ehall::EZHALL_100_101] = EZHall;
+      ehall[fsgrids::ehall::EZHALL_110_111] = EZHall;
+      ehall[fsgrids::ehall::EZHALL_010_011] = EZHall;
+
+      break;
+   }
+   case 2: {
+      auto computeEHall = [&perturbedCoefficients, &bgbx, &bgby, &bgbz, &gridSpacing](fsgrids::ehall term,
+                                                                                      Real hallRhoq) {
+         return JXBDevice(term, perturbedCoefficients, bgbx, bgby, bgbz, gridSpacing) / (physicalconstants::MU_0 * hallRhoq);
+      };
+
+      const auto omo = stencil.omo();
+      const auto opo = stencil.opo();
+      const auto moo = stencil.moo();
+      const auto poo = stencil.poo();
+      const auto oom = stencil.oom();
+      const auto oop = stencil.oop();
+      // clang-format off
+      const std::array<std::array<size_t, 4>, 12> indices = {
+          std::array{
+              ooo,
+              omo,
+              oom,
+              stencil.omm(),
+          },
+          std::array{
+              ooo,
+              moo,
+              oom,
+              stencil.mom(),
+          },
+          std::array{
+              ooo,
+              moo,
+              omo,
+              stencil.mmo(),
+          },
+          std::array{
+              ooo,
+              poo,
+              oom,
+              stencil.pom(),
+          },
+          std::array{
+              ooo,
+              poo,
+              omo,
+              stencil.pmo(),
+          },
+          std::array{
+              ooo,
+              opo,
+              oom,
+              stencil.opm(),
+          },
+          std::array{
+              ooo,
+              moo,
+              opo,
+              stencil.mpo(),
+          },
+          std::array{
+              ooo,
+              poo,
+              opo,
+              stencil.ppo(),
+          },
+          std::array{
+              ooo,
+              omo,
+              oop,
+              stencil.omp(),
+          },
+          std::array{
+              ooo,
+              moo,
+              oop,
+              stencil.mop(),
+          },
+          std::array{
+              ooo,
+              poo,
+              oop,
+              stencil.pop(),
+          },
+          std::array{
+              ooo,
+              opo,
+              oop,
+              stencil.opp(),
+          },
+      };
+      // clang-format on
+
+      const std::array<fsgrids::ehall, 12> terms = {
+          fsgrids::ehall::EXHALL_000_100, fsgrids::ehall::EYHALL_000_010, fsgrids::ehall::EZHALL_000_001,
+          fsgrids::ehall::EYHALL_100_110, fsgrids::ehall::EZHALL_100_101, fsgrids::ehall::EXHALL_010_110,
+          fsgrids::ehall::EZHALL_010_011, fsgrids::ehall::EZHALL_110_111, fsgrids::ehall::EXHALL_001_101,
+          fsgrids::ehall::EYHALL_001_011, fsgrids::ehall::EYHALL_101_111, fsgrids::ehall::EXHALL_011_111,
+      };
+
+      for (size_t index = 0; index < terms.size(); index++) {
+         ehall[terms[index]] = computeEHall(terms[index], computeHallRhoq(indices[index]));
+      }
+
+      break;
+   }
+
+   default:
+      printf("You are welcome to code higher-order Hall term correction terms.");
+      assert(false);
+      break;
+   }
+}
+
 /** \brief Calculate the numerator of the Hall term on all given cells.
  *
  * \param perb fsGrid holding the perturbed B quantities
@@ -1092,6 +2104,80 @@ void calculateHallTerm(fsgrids::perbspan perb,
       sb->fieldSolverBoundaryCondHallElectricField(ehall, stencil, 2);
    } else {
       calculateEdgeHallTermComponents(perb, ehall, moments, dperb, bgb, gridSpacing, perturbedCoefficients, stencil);
+   }
+}
+
+__device__ inline void fieldSolverBoundaryCondHallElectricFieldDevice(cuint cellSysBoundaryFlag, SysBoundaryDevice *sysBoundaries, fsgrids::ehallspan ehall, const fsgrid::FsStencil& stencil, cuint component) {
+   switch (cellSysBoundaryFlag) {
+      case sysboundarytype::OUTFLOW: {
+         static_cast<SBC::OutflowDevice*>(sysBoundaries[0].getSysBoundary(cellSysBoundaryFlag))->SBC::OutflowDevice::fieldSolverBoundaryCondHallElectricField(ehall, stencil, component);
+         break;
+      }
+      case sysboundarytype::MAXWELLIAN: {
+         static_cast<SBC::MaxwellianDevice*>(sysBoundaries[0].getSysBoundary(cellSysBoundaryFlag))->SBC::MaxwellianDevice::fieldSolverBoundaryCondHallElectricField(ehall, stencil, component);
+         break;
+      }
+      case sysboundarytype::IONOSPHERE: {
+         break;
+      }
+      case sysboundarytype::DO_NOT_COMPUTE: {
+         static_cast<SBC::DoNotComputeDevice*>(sysBoundaries[0].getSysBoundary(cellSysBoundaryFlag))->SBC::DoNotComputeDevice::fieldSolverBoundaryCondHallElectricField(ehall, stencil, component);
+         break;
+      }
+      case sysboundarytype::COPYSPHERE: {
+         break;
+      }
+   }
+}
+
+/** \brief Calculate the numerator of the Hall term on all given cells.
+ *
+ * \param perb fsGrid holding the perturbed B quantities
+ * \param ehall fsGrid holding the Hall contributions to the electric field
+ * \param moments fsGrid holding the moment quantities
+ * \param dperb fsGrid holding the derivatives of perturbed B
+ * \param bgb fsGrid holding the background B quantities
+ * \param technical fsGrid holding technical information (such as boundary types)
+ * \param stencil fsgrid stencil of current cell
+ * \param sysBoundaries System boundary condition functions.
+ * \param gridSpacing fsgrid cell size in x,y,z
+ *
+ * \sa calculateHallTermSimple calculateEdgeHallTermComponents
+ */
+__device__ void calculateHallTermDevice(fsgrids::perbspan perb,
+                       fsgrids::ehallspan ehall,
+                       fsgrids::constmomentsspan moments,
+                       fsgrids::constdperbspan dperb,
+                       fsgrids::constbgbspan bgb,
+                       fsgrids::consttechnicalspan technical, const fsgrid::FsStencil& stencil,
+                       SysBoundaryDevice *sysBoundaries, const std::array<Real, 3>& gridSpacing, const DeviceParameters& parameters) {
+#ifdef DEBUG_FSOLVER
+   if (!stencil.cellExists(0, 0, 0)) {
+      cerr << "Out-of-bounds access in " << __FILE__ << ":" << __LINE__ << endl;
+      exit(1);
+   }
+#endif
+
+   const auto& tech = technical[stencil.ooo()];
+   cuint cellSysBoundaryFlag = tech.sysBoundaryFlag;
+   cuint cellSysBoundaryLayer = tech.sysBoundaryLayer;
+
+   if (cellSysBoundaryFlag == sysboundarytype::DO_NOT_COMPUTE ||
+       cellSysBoundaryFlag == sysboundarytype::OUTER_BOUNDARY_PADDING) {
+      return;
+   }
+
+   // Reconstruction order of the fields after Balsara 2009, 2 used for general B, 3 used
+   // here for 2nd-order Hall term
+   const std::array<Real, Rec::N_REC_COEFFICIENTS> perturbedCoefficients =
+       reconstructionCoefficientsDevice(perb, dperb, stencil, 3);
+
+   if ((cellSysBoundaryFlag != sysboundarytype::NOT_SYSBOUNDARY) && (cellSysBoundaryLayer != 1)) {
+      fieldSolverBoundaryCondHallElectricFieldDevice(cellSysBoundaryFlag, sysBoundaries, ehall, stencil, 0);
+      fieldSolverBoundaryCondHallElectricFieldDevice(cellSysBoundaryFlag, sysBoundaries, ehall, stencil, 1);
+      fieldSolverBoundaryCondHallElectricFieldDevice(cellSysBoundaryFlag, sysBoundaries, ehall, stencil, 2);
+   } else {
+      calculateEdgeHallTermComponentsDevice(perb, ehall, moments, dperb, bgb, gridSpacing, perturbedCoefficients, stencil, parameters);
    }
 }
 
@@ -1150,6 +2236,66 @@ void calculateHallTermSimple(fsgrids::perbspan perb,
                        phiprof::initializeTimer("EHall compute cells"), technical,
                        [=, &sysBoundaries](const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
                           calculateHallTerm(perb, ehall, moments, dperb, bgb, technical, stencil, sysBoundaries, coordinates.physicalGridSpacing);
+                       });
+
+   hallTimer.stop(numCells, "Spatial Cells");
+}
+
+/*! \brief High-level function computing the Hall term.
+ *
+ * Performs the communication before and after the computation as well as the computation of all Hall term numerator
+ * components.
+ *
+ * \param perb fsGrid holding the perturbed B quantities
+ * \param perbdt2 fsGrid holding the perturbed B quantities at runge-kutta half step
+ * \param ehall fsGrid holding the Hall contributions to the electric field
+ * \param moments fsGrid holding the moment quantities
+ * \param momentsdt2 fsGrid holding the moment quantities at runge-kutta half step
+ * \param dperb fsGrid holding the derivatives of perturbed B
+ * \param dmoments fsGrid holding the derivatives of moments
+ * \param dmomentsdt2 fsGrid holding the derivatives of moments at Runge-Kutta half step
+ * \param bgb fsGrid holding the background B quantities
+ * \param technical fsGrid holding technical information (such as boundary types)
+ * \param fsgrid fsgrids container
+ * \param sysBoundaries System boundary condition functions.
+ * \param RKCase Element in the enum defining the Runge-Kutta method steps
+ * \param communicateMomentsDerivatives Boolean flag whether to ghost update moments derivatives
+ *
+ * \sa calculateHallTerm
+ */
+void calculateHallTermSimpleDevice(fsgrids::perbspan perb,
+                             fsgrids::perbspan perbdt2,
+                             fsgrids::ehallspan ehall,
+                             fsgrids::momentsspan moments,
+                             fsgrids::momentsspan momentsdt2,
+                             fsgrids::dperbspan dperb,
+                             fsgrids::dmomentsspan dmoments,
+                             fsgrids::dmomentsspan dmomentsdt2,
+                             fsgrids::bgbspan bgb,
+                             fsgrids::technicalspan technical, FieldSolverGrid &fsgrid,
+                             SysBoundaryDevice *sysBoundaries, int32_t RKCase, const bool communicateMomentsDerivatives, const DeviceParameters& parameters) {
+
+
+   if (not(RKCase == RK_ORDER1 || RKCase == RK_ORDER2_STEP2)) {
+      perb = perbdt2;
+      moments = momentsdt2;
+      dmoments = dmomentsdt2;
+   }
+   phiprof::Timer hallTimer{"Calculate Hall term"};
+
+   const size_t numCells = fsgrid.getNumCells();
+
+   phiprof::Timer mpiTimer{"EHall ghost updates MPI", {"MPI"}};
+   fsgrid.updateGhostCellsDevice(dperb);
+   if (P::ohmGradPeTerm == 0 && communicateMomentsDerivatives) {
+      fsgrid.updateGhostCellsDevice(dmoments);
+   }
+   mpiTimer.stop();
+
+   fsgrid.parallel_for_GPU([](int timerId) -> phiprof::Timer { return phiprof::Timer{timerId}; },
+                       phiprof::initializeTimer("EHall compute cells"), technical,
+                       [=] __device__(const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
+                          calculateHallTermDevice(perb, ehall, moments, dperb, bgb, technical, stencil, sysBoundaries, coordinates.physicalGridSpacing, parameters);
                        });
 
    hallTimer.stop(numCells, "Spatial Cells");

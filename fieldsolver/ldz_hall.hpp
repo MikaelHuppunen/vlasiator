@@ -21,6 +21,9 @@
 #define LDZ_HALL_HPP
 
 #include "../definitions.h"
+#include "../sysboundary/donotcompute.h"
+#include "../sysboundary/outflow.h"
+#include "../sysboundary/setmaxwellian.h"
 
 void calculateHallTermSimple(fsgrids::perbspan perb,
                              fsgrids::perbspan perbdt2,
@@ -33,5 +36,17 @@ void calculateHallTermSimple(fsgrids::perbspan perb,
                              fsgrids::bgbspan bgb,
                              fsgrids::technicalspan technical, FieldSolverGrid &fsgrid,
                              SysBoundary& sysBoundaries, int32_t RKCase, const bool communicateMomentsDerivatives);
+
+void calculateHallTermSimpleDevice(fsgrids::perbspan perb,
+                             fsgrids::perbspan perbdt2,
+                             fsgrids::ehallspan ehall,
+                             fsgrids::momentsspan moments,
+                             fsgrids::momentsspan momentsdt2,
+                             fsgrids::dperbspan dperb,
+                             fsgrids::dmomentsspan dmoments,
+                             fsgrids::dmomentsspan dmomentsdt2,
+                             fsgrids::bgbspan bgb,
+                             fsgrids::technicalspan technical, FieldSolverGrid &fsgrid,
+                             SysBoundaryDevice *sysBoundaries, int32_t RKCase, const bool communicateMomentsDerivatives, const DeviceParameters& parameters);
 
 #endif

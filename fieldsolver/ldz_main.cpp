@@ -130,8 +130,7 @@ bool propagateFields(fsgrids::perbspan perb,
          calculateGradPeTermSimpleDevice(egradpe, egradpedt2, moments, momentsdt2, dmoments, dmomentsdt2, technical, fsgrid, sysBoundaries, RK_ORDER1, parameters);
       }
       if (P::ohmHallTerm > 0) {
-         std::cerr << "TODO: calculateHallTermSimple not implemented" << std::endl;
-         calculateHallTermSimple(
+         calculateHallTermSimpleDevice(
             perb,
             perbdt2,
             ehall,
@@ -145,7 +144,8 @@ bool propagateFields(fsgrids::perbspan perb,
             fsgrid,
             sysBoundaries,
             RK_ORDER1,
-            true // communicateMomentsDerivatives
+            true, // communicateMomentsDerivatives
+            parameters
          );
       }
       calculateUpwindedElectricFieldSimpleDevice(
@@ -176,9 +176,7 @@ bool propagateFields(fsgrids::perbspan perb,
          calculateGradPeTermSimpleDevice(egradpe, egradpedt2, moments, momentsdt2, dmoments, dmomentsdt2, technical, fsgrid, sysBoundaries, RK_ORDER2_STEP1, parameters);
       }
       if (P::ohmHallTerm > 0) {
-         std::cerr << "TODO: calculateHallTermSimple not implemented" << std::endl;
-         /*
-         calculateHallTermSimple(
+         calculateHallTermSimpleDevice(
             perb,
             perbdt2,
             ehall,
@@ -192,9 +190,9 @@ bool propagateFields(fsgrids::perbspan perb,
             fsgrid,
             sysBoundaries,
             RK_ORDER2_STEP1,
-            true // communicateMomentsDerivatives
+            true, // communicateMomentsDerivatives
+            parameters
          );
-         */
       }
       calculateUpwindedElectricFieldSimpleDevice(
          perb,
@@ -223,9 +221,7 @@ bool propagateFields(fsgrids::perbspan perb,
          calculateGradPeTermSimpleDevice(egradpe, egradpedt2, moments, momentsdt2, dmoments, dmomentsdt2, technical, fsgrid, sysBoundaries, RK_ORDER2_STEP2, parameters);
       }
       if (P::ohmHallTerm > 0) {
-         std::cerr << "TODO: calculateHallTermSimple not implemented" << std::endl;
-         /*
-         calculateHallTermSimple(
+         calculateHallTermSimpleDevice(
             perb,
             perbdt2,
             ehall,
@@ -239,9 +235,9 @@ bool propagateFields(fsgrids::perbspan perb,
             fsgrid,
             sysBoundaries,
             RK_ORDER2_STEP2,
-            true // communicateMomentsDerivatives
+            true, // communicateMomentsDerivatives
+            parameters
          );
-         */
       }
       calculateUpwindedElectricFieldSimpleDevice(
          perb,
@@ -290,7 +286,7 @@ bool propagateFields(fsgrids::perbspan perb,
             calculateGradPeTermSimpleDevice(egradpe, egradpedt2, moments, momentsdt2, dmoments, dmomentsdt2, technical, fsgrid, sysBoundaries, RK_ORDER2_STEP1, parameters);
          }
          if (P::ohmHallTerm > 0) {
-            calculateHallTermSimple(
+            calculateHallTermSimpleDevice(
                perb,
                perbdt2,
                ehall,
@@ -304,7 +300,8 @@ bool propagateFields(fsgrids::perbspan perb,
                fsgrid,
                sysBoundaries,
                RK_ORDER2_STEP1,
-               subcycleCount == 0 // communicateMomentsDerivatives
+               subcycleCount == 0, // communicateMomentsDerivatives
+               parameters
             );
          }
          calculateUpwindedElectricFieldSimpleDevice(
@@ -338,7 +335,7 @@ bool propagateFields(fsgrids::perbspan perb,
             calculateGradPeTermSimpleDevice(egradpe, egradpedt2, moments, momentsdt2, dmoments, dmomentsdt2, technical, fsgrid, sysBoundaries, RK_ORDER2_STEP2, parameters);
          }
          if (P::ohmHallTerm > 0) {
-            calculateHallTermSimple(
+            calculateHallTermSimpleDevice(
                perb,
                perbdt2,
                ehall,
@@ -352,7 +349,8 @@ bool propagateFields(fsgrids::perbspan perb,
                fsgrid,
                sysBoundaries,
                RK_ORDER2_STEP2,
-               subcycleCount == 0 // communicateMomentsDerivatives
+               subcycleCount == 0, // communicateMomentsDerivatives
+               parameters
             );
          }
          calculateUpwindedElectricFieldSimpleDevice(
