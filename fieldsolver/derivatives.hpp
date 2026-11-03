@@ -52,6 +52,10 @@ void calculateCurvatureSimple(fsgrids::volspan vol,
                               fsgrids::constbgbspan bgb,
                               fsgrids::technicalspan technical, FieldSolverGrid &fsgrid);
 
+void calculateCurvatureSimpleDevice(fsgrids::volspan vol,
+                              fsgrids::constbgbspan bgb,
+                              fsgrids::technicalspan technical, FieldSolverGrid &fsgrid);
+
 void calculateScaledDeltasSimple(dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geometry>& mpiGrid);
 
 #endif

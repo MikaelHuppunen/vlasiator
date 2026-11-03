@@ -779,6 +779,57 @@ void calculateCurvature(fsgrids::volspan vol,
                                                bz * 0.5 * (rght_z_bz - left_z_bz) / gridSpacing[2];
 }
 
+/*! \brief Low-level curvature calculation.
+ *
+ *
+ * \param vol fsGrid holding the volume averaged fields
+ * \param bgb fsGrid holding the background fields
+ * \param stencil fsgrid stencil
+ * \param gridSpacing cell sizes in x,y,z
+ *
+ * http://fusionwiki.ciemat.es/wiki/Magnetic_curvature
+ *
+ * \sa calculateDerivatives calculateBVOLDerivativesSimple calculateDerivativesSimple
+ */
+
+__device__ void calculateCurvatureDevice(fsgrids::volspan vol,
+                        fsgrids::constbgbspan bgb,
+                        const fsgrid::FsStencil& stencil, const std::array<Real, 3>& gridSpacing) {
+   auto normalize = [&vol, &bgb](auto i) -> std::array<Real, 3> {
+      const auto& b = bgb[i];
+      const auto& v = vol[i];
+      const Real bx = b[fsgrids::bgbfield::BGBXVOL] + v[fsgrids::volfields::PERBXVOL];
+      const Real by = b[fsgrids::bgbfield::BGBYVOL] + v[fsgrids::volfields::PERBYVOL];
+      const Real bz = b[fsgrids::bgbfield::BGBZVOL] + v[fsgrids::volfields::PERBZVOL];
+      const Real bnorm = sqrt(bx*bx + by*by + bz*bz);
+
+      return {
+          bx / bnorm,
+          by / bnorm,
+          bz / bnorm,
+      };
+   };
+
+   const auto [bx, by, bz] = normalize(stencil.ooo());
+   const auto [left_x_bx, left_x_by, left_x_bz] = normalize(stencil.moo());
+   const auto [rght_x_bx, rght_x_by, rght_x_bz] = normalize(stencil.poo());
+   const auto [left_y_bx, left_y_by, left_y_bz] = normalize(stencil.omo());
+   const auto [rght_y_bx, rght_y_by, rght_y_bz] = normalize(stencil.opo());
+   const auto [left_z_bx, left_z_by, left_z_bz] = normalize(stencil.oom());
+   const auto [rght_z_bx, rght_z_by, rght_z_bz] = normalize(stencil.oop());
+
+   auto& volCenter = vol[stencil.ooo()];
+   volCenter[fsgrids::volfields::CURVATUREX] = bx * 0.5 * (rght_x_bx - left_x_bx) / gridSpacing[0] +
+                                               by * 0.5 * (rght_y_bx - left_y_bx) / gridSpacing[1] +
+                                               bz * 0.5 * (rght_z_bx - left_z_bx) / gridSpacing[2];
+   volCenter[fsgrids::volfields::CURVATUREY] = bx * 0.5 * (rght_x_by - left_x_by) / gridSpacing[0] +
+                                               by * 0.5 * (rght_y_by - left_y_by) / gridSpacing[1] +
+                                               bz * 0.5 * (rght_z_by - left_z_by) / gridSpacing[2];
+   volCenter[fsgrids::volfields::CURVATUREZ] = bx * 0.5 * (rght_x_bz - left_x_bz) / gridSpacing[0] +
+                                               by * 0.5 * (rght_y_bz - left_y_bz) / gridSpacing[1] +
+                                               bz * 0.5 * (rght_z_bz - left_z_bz) / gridSpacing[2];
+}
+
 /*! \brief High-level curvature calculation wrapper function.
  *
  * \param vol fsGrid holding the volume averaged fields
@@ -805,6 +856,37 @@ void calculateCurvatureSimple(fsgrids::volspan vol,
                                      sysBoundaryLayer != 1 && sysBoundaryLayer != 2);
                           if (compute) {
                              calculateCurvature(vol, bgb, stencil, coordinates.physicalGridSpacing);
+                          }
+                       });
+   curvatureTimer.stop(numCells, "Spatial Cells");
+}
+
+/*! \brief High-level curvature calculation wrapper function.
+ *
+ * \param vol fsGrid holding the volume averaged fields
+ * \param bgb fsGrid holding the background fields
+ * \param technical fsGrid holding technical information (such as boundary types)
+ * \param fsgrid fsgrid container
+ *
+ * \sa calculateDerivatives calculateBVOLDerivatives calculateDerivativesSimple
+ */
+void calculateCurvatureSimpleDevice(fsgrids::volspan vol,
+                              fsgrids::constbgbspan bgb,
+                              fsgrids::technicalspan technical, FieldSolverGrid &fsgrid) {
+   phiprof::Timer curvatureTimer{"Calculate curvature"};
+   const size_t numCells = fsgrid.getNumCells();
+
+   phiprof::Timer commTimer{"Calculate curvature ghost updates MPI", {"MPI"}};
+   fsgrid.updateGhostCellsDevice(vol);
+   commTimer.stop(numCells, "Spatial Cells");
+
+   fsgrid.parallel_for_GPU([](int timerId) -> phiprof::Timer { return phiprof::Timer{timerId}; },
+                       phiprof::initializeTimer("Calculate curvature compute cells"), technical,
+                       [=] __device__(const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
+                          const bool compute = (sysBoundaryFlag == sysboundarytype::NOT_SYSBOUNDARY &&
+                                     sysBoundaryLayer != 1 && sysBoundaryLayer != 2);
+                          if (compute) {
+                             calculateCurvatureDevice(vol, bgb, stencil, coordinates.physicalGridSpacing);
                           }
                        });
    curvatureTimer.stop(numCells, "Spatial Cells");
