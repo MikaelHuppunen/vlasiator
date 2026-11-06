@@ -116,6 +116,7 @@ void copyMomentsToOutflowDevice(std::span<fsgrids::momentsElement>& moments,
          moments[stencil.ooo()][e] = moments[stencil.indexFromOffset(closestCellOffset[0], closestCellOffset[1], closestCellOffset[2])][fsgrids::moments::RHOM+e];
       }
    });
+   CHK_ERR(cudaGetLastError());
    cudaDeviceSynchronize();
 }
 
@@ -288,6 +289,7 @@ void filterMomentsDevice(std::span<fsgrids::momentsElement>& moments,
                              } // else
                });
 
+      CHK_ERR(cudaGetLastError());
       cudaDeviceSynchronize();
 
       using std::swap;

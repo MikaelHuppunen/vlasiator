@@ -336,7 +336,8 @@ void propagateMagneticFieldSimple(fsgrids::perbspan perb,
                              perb, perbdt2, e, edt2, stencil, dt, RKCase, ((bitfield & compute::BX) == compute::BX),
                              ((bitfield & compute::BY) == compute::BY), ((bitfield & compute::BZ) == compute::BZ), coordinates.physicalGridSpacing);
                        });
-                       
+                      
+   CHK_ERR(cudaGetLastError()); 
    cudaDeviceSynchronize();
 
    // This communication is needed for boundary conditions, in practice almost all
@@ -381,9 +382,10 @@ void propagateMagneticFieldSimple(fsgrids::perbspan perb,
          }
       }
    });
+   CHK_ERR(cudaGetLastError());
+   cudaDeviceSynchronize();
    sysBoundaryTimer.stop();
 
-   cudaDeviceSynchronize();
 
    mpiTimer.start();
    if (RKCase == RK_ORDER1 || RKCase == RK_ORDER2_STEP2) {
@@ -418,8 +420,8 @@ void propagateMagneticFieldSimple(fsgrids::perbspan perb,
          }
       }
    });
+   CHK_ERR(cudaGetLastError());
+   cudaDeviceSynchronize();
    sysBoundaryTimer.stop();
    propagateBTimer.stop(numCells, "Spatial Cells");
-
-   cudaDeviceSynchronize();
 }

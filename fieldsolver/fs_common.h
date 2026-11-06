@@ -76,6 +76,7 @@ bool propagateFields(fsgrids::perbspan perb,
                      fsgrids::dmomentsspan dmomentsdt2,
                      fsgrids::bgbspan bgb,
                      fsgrids::volspan vol,
+                     fsgrids::technicalspan host_technical,
                      fsgrids::technicalspan technical, FieldSolverGrid &fsgrid, SysBoundaryDevice *sysBoundaries,
                      creal& dt, cuint subcycles, const DeviceParameters& parameters);
 

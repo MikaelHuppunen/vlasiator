@@ -2297,6 +2297,8 @@ void calculateHallTermSimpleDevice(fsgrids::perbspan perb,
                        [=] __device__(const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
                           calculateHallTermDevice(perb, ehall, moments, dperb, bgb, technical, stencil, sysBoundaries, coordinates.physicalGridSpacing, parameters);
                        });
+   CHK_ERR(cudaGetLastError());
+   cudaDeviceSynchronize();
 
    hallTimer.stop(numCells, "Spatial Cells");
 }

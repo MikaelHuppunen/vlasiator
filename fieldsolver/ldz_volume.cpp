@@ -196,6 +196,7 @@ void calculateVolumeAveragedFieldsSimpleDevice(fsgrids::perbspan perb,
                           calculateVolumeAveragedFieldsDevice(perb, e, dperb, vol, stencil, sysBoundaryFlag,
                                                         sysBoundaryLayer);
                        });
+   CHK_ERR(cudaGetLastError());
    cudaDeviceSynchronize();
    timer.stop(numCells, "Spatial Cells");
 }

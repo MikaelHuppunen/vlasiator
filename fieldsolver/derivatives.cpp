@@ -519,6 +519,7 @@ void calculateDerivativesSimpleDevice(fsgrids::perbspan perb,
                        [=] __device__(const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
                           calculateDerivativesDevice(perb, moments, dperb, dmoments, stencil, sysBoundaryFlag, sysBoundaryLayer, doMoments, parameters);
                        });
+   CHK_ERR(cudaGetLastError());
    cudaDeviceSynchronize();
 
    derivativesTimer.stop(numCells, "Spatial Cells");
@@ -723,6 +724,7 @@ void calculateBVOLDerivativesSimpleDevice(fsgrids::volspan vol,
                        [=] __device__(const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
                           calculateBVOLDerivativesDevice(vol, technical, stencil, parameters);
                       });
+   CHK_ERR(cudaGetLastError());
    cudaDeviceSynchronize();
 
    derivsTimer.stop(numCells, "Spatial Cells");
@@ -889,6 +891,8 @@ void calculateCurvatureSimpleDevice(fsgrids::volspan vol,
                              calculateCurvatureDevice(vol, bgb, stencil, coordinates.physicalGridSpacing);
                           }
                        });
+   CHK_ERR(cudaGetLastError());
+   cudaDeviceSynchronize();
    curvatureTimer.stop(numCells, "Spatial Cells");
 }
 

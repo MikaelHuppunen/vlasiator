@@ -294,6 +294,8 @@ void calculateGradPeTermSimpleDevice(fsgrids::egradpespan egradpe,
                        [=] __device__(const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
                           calculateGradPeTermDevice(egradpe, moments, dmoments, technical, stencil, coordinates.physicalGridSpacing, sysBoundaries, parameters);
                        });
+   CHK_ERR(cudaGetLastError());
+   cudaDeviceSynchronize();
 
    gradPeTimer.stop(numCells, "Spatial Cells");
 }

@@ -2440,6 +2440,7 @@ void calculateUpwindedElectricFieldSimpleDevice(fsgrids::perbspan perb,
                                                  coordinates.physicalGridSpacing, sysBoundaries, RKCase, parameters);
                        });
 
+   CHK_ERR(cudaGetLastError());
    cudaDeviceSynchronize();
 
    mpiTimer.start();

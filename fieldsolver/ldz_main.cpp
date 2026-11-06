@@ -102,6 +102,7 @@ bool propagateFields(fsgrids::perbspan perb,
                      fsgrids::dmomentsspan dmomentsdt2,
                      fsgrids::bgbspan bgb,
                      fsgrids::volspan vol,
+                     fsgrids::technicalspan host_technical,
                      fsgrids::technicalspan technical,
                      FieldSolverGrid &fsgrid,
                      SysBoundaryDevice *sysBoundaries,
@@ -121,6 +122,8 @@ bool propagateFields(fsgrids::perbspan perb,
                      [=] __device__(const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
                         technical[stencil.ooo()].maxFsDt = std::numeric_limits<Real>::max();
                      });
+   CHK_ERR(cudaGetLastError());
+   cudaDeviceSynchronize();
 
    if (subcycles == 1) {
 #ifdef FS_1ST_ORDER_TIME
@@ -262,8 +265,6 @@ bool propagateFields(fsgrids::perbspan perb,
       );
 #endif
    } else {
-      std::cerr << "TODO: subcycles > 1 not implemented" << std::endl;
-      /*
       Real subcycleDt = dt / convert<Real>(subcycles);
       Real subcycleT = P::t;
       creal targetT = P::t + dt;
@@ -272,7 +273,6 @@ bool propagateFields(fsgrids::perbspan perb,
       int myRank = fsgrid.getRank();
 
       while (subcycleCount < maxSubcycleCount) {
-         //TODO:this path
          // In case of subcycling, we decided to go for a blunt Runge-Kutta subcycling even though e.g. moments are not
          // going along. Result of the Summer of Debugging 2016, the behaviour in wave dispersion was much improved with
          // this.
@@ -280,7 +280,7 @@ bool propagateFields(fsgrids::perbspan perb,
          propagateMagneticFieldSimple(perb, perbdt2, bgb, e, edt2, technical, fsgrid, sysBoundaries, subcycleDt, RK_ORDER2_STEP1, parameters);
          // We need to calculate derivatives of the moments at every substep, but the moments only
          // need to be communicated in the first one.
-         calculateDerivativesSimpleDevice(perbdt2, momentsdt2, dperb, dmomentsdt2, technical, fsgrid, (subcycleCount == 0) *//*doMoments*//*, parameters);
+         calculateDerivativesSimpleDevice(perbdt2, momentsdt2, dperb, dmomentsdt2, technical, fsgrid, (subcycleCount == 0) /*doMoments*/, parameters);
 
          if (P::ohmGradPeTerm > 0 && subcycleCount == 0) {
             calculateGradPeTermSimpleDevice(egradpe, egradpedt2, moments, momentsdt2, dmoments, dmomentsdt2, technical, fsgrid, sysBoundaries, RK_ORDER2_STEP1, parameters);
@@ -329,7 +329,7 @@ bool propagateFields(fsgrids::perbspan perb,
          propagateMagneticFieldSimple(perb, perbdt2, bgb, e, edt2, technical, fsgrid, sysBoundaries, subcycleDt, RK_ORDER2_STEP2, parameters);
          // We need to calculate derivatives of the moments at every substep, but the moments only
          // need to be communicated in the first one.
-         calculateDerivativesSimpleDevice(perb, moments, dperb, dmoments, technical, fsgrid, (subcycleCount == 0) *//*doMoments*//*, parameters);
+         calculateDerivativesSimpleDevice(perb, moments, dperb, dmoments, technical, fsgrid, (subcycleCount == 0) /*doMoments*/, parameters);
 
          if (P::ohmGradPeTerm > 0 && subcycleCount == 0) {
             calculateGradPeTermSimpleDevice(egradpe, egradpedt2, moments, momentsdt2, dmoments, dmomentsdt2, technical, fsgrid, sysBoundaries, RK_ORDER2_STEP2, parameters);
@@ -390,14 +390,15 @@ bool propagateFields(fsgrids::perbspan perb,
 
          // Reassess subcycle dt
          Real dtMaxGlobal = 0.0;
+         cudaMemcpy(host_technical.data(), technical.data(), technical.size() * sizeof(fsgrids::technical), cudaMemcpyDeviceToHost);
          Real dtMaxLocal = fsgrid.parallel_reduction([](int timerId) ->  phiprof::Timer { return phiprof::Timer{timerId}; },
-                                                   phiprof::initializeTimer("compute-subcycle-dt-reduction-loop"), technical,
+                                                   phiprof::initializeTimer("compute-subcycle-dt-reduction-loop"), host_technical,
                                                    [](Real a, Real b) { return std::min<Real>(a, b); },
                                                    std::numeric_limits<Real>::max(),
                                                    [=](const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer, creal maximum) {
             if (sysBoundaryFlag == sysboundarytype::NOT_SYSBOUNDARY ||
                (sysBoundaryLayer == 1 && sysBoundaryFlag != sysboundarytype::NOT_SYSBOUNDARY)) {
-               return technical[stencil.ooo()].maxFsDt;
+               return host_technical[stencil.ooo()].maxFsDt;
             } else {
                return maximum;
             }
@@ -434,7 +435,6 @@ bool propagateFields(fsgrids::perbspan perb,
       if (subcycles != subcycleCount && myRank == MASTER_RANK) {
          logFile << "Effective field solver subcycles were " << subcycleCount << " instead of " << P::fieldSolverSubcycles << " on step " << P::tstep << std::endl;
       }
-      */
    }
 
    calculateVolumeAveragedFieldsSimpleDevice(perb, e, dperb, vol, technical, fsgrid);

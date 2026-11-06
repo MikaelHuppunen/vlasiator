@@ -746,7 +746,6 @@ int simulate(int argn,char* args[]) {
    std::span<fsgrids::egradpeElement> host_egradpe(h_egradpe, egradpe.size());
    std::span<fsgrids::volElement> host_vol(h_vol, vol.size());
 
-   cudaMemcpy(dev_sysBoundaries, &host_sysBoundaries,  sizeof(SysBoundaryDevice), cudaMemcpyHostToDevice);
    cudaMemcpy(h_perbdt2, perbdt2.data(), perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyHostToHost);
    cudaMemcpy(h_e, e.data(), e.size() * sizeof(fsgrids::efieldElement), cudaMemcpyHostToHost);
    cudaMemcpy(h_ehall, ehall.data(), ehall.size() * sizeof(fsgrids::ehallElement), cudaMemcpyHostToHost);
@@ -755,8 +754,12 @@ int simulate(int argn,char* args[]) {
    cudaMemcpy(h_momentsdt2, momentsdt2.data(), momentsdt2.size() * sizeof(fsgrids::momentsElement), cudaMemcpyHostToHost);
    cudaMemcpy(h_egradpe, egradpe.data(), egradpe.size() * sizeof(fsgrids::egradpeElement), cudaMemcpyHostToHost);
    cudaMemcpy(h_vol, vol.data(), vol.size() * sizeof(fsgrids::volElement), cudaMemcpyHostToHost);
+   cudaMemcpy(h_perb, perb.data(), perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyHostToHost);
+   cudaMemcpy(h_dperb, dperb.data(), dperb.size() * sizeof(fsgrids::dperbElement), cudaMemcpyHostToHost);
+   cudaMemcpy(h_dmoments, dmoments.data(), dmoments.size() * sizeof(fsgrids::dmomentsElement), cudaMemcpyHostToHost);
 
    cudaMemcpy(d_bgb, host_bgb.data(),  host_bgb.size() * sizeof(fsgrids::bgbElement), cudaMemcpyHostToDevice);
+   cudaMemcpy(dev_sysBoundaries, &host_sysBoundaries,  sizeof(SysBoundaryDevice), cudaMemcpyHostToDevice);
    if(P::isRestart == false) {
       ALLOCATE_GPU(gpuMemoryManager, d_technical, technical.size() * sizeof(fsgrids::technical));
       ALLOCATE_GPU(gpuMemoryManager, d_edt2, edt2.size() * sizeof(fsgrids::efieldElement));
@@ -800,6 +803,7 @@ int simulate(int argn,char* args[]) {
          dev_dmomentsdt2,
          dev_bgb,
          dev_vol,
+         technical.view(),
          dev_technical,
          fsgrid,
          dev_sysBoundaries, 0.0, 1.0,
@@ -1542,6 +1546,7 @@ int simulate(int argn,char* args[]) {
             dev_dmomentsdt2,
             dev_bgb,
             dev_vol,
+            technical.view(),
             dev_technical,
             fsgrid,
             dev_sysBoundaries,
