@@ -707,7 +707,6 @@ int simulate(int argn,char* args[]) {
    CREATE_UNIQUE_POINTER(gpuMemoryManager, h_perb);
    CREATE_UNIQUE_POINTER(gpuMemoryManager, h_dperb);
    CREATE_UNIQUE_POINTER(gpuMemoryManager, h_dmoments);
-   CREATE_UNIQUE_POINTER(gpuMemoryManager, h_bgb);
    CREATE_UNIQUE_POINTER(gpuMemoryManager, h_moments);
    CREATE_UNIQUE_POINTER(gpuMemoryManager, h_momentsdt2);
    CREATE_UNIQUE_POINTER(gpuMemoryManager, h_vol);
@@ -718,7 +717,6 @@ int simulate(int argn,char* args[]) {
    HOST_ALLOCATE_GPU(gpuMemoryManager, h_perb, perb.size() * sizeof(fsgrids::perbElement));
    HOST_ALLOCATE_GPU(gpuMemoryManager, h_dperb, dperb.size() * sizeof(fsgrids::dperbElement));
    HOST_ALLOCATE_GPU(gpuMemoryManager, h_dmoments, dmoments.size() * sizeof(fsgrids::dmomentsElement));
-   HOST_ALLOCATE_GPU(gpuMemoryManager, h_bgb, bgb.size() * sizeof(fsgrids::bgbElement));
    HOST_ALLOCATE_GPU(gpuMemoryManager, h_moments, moments.size() * sizeof(fsgrids::momentsElement));
    HOST_ALLOCATE_GPU(gpuMemoryManager, h_momentsdt2, momentsdt2.size() * sizeof(fsgrids::momentsElement));
    HOST_ALLOCATE_GPU(gpuMemoryManager, h_egradpe, egradpe.size() * sizeof(fsgrids::egradpeElement));
@@ -729,7 +727,6 @@ int simulate(int argn,char* args[]) {
    fsgrids::perbElement *h_perb = GET_POINTER(gpuMemoryManager, fsgrids::perbElement, h_perb);
    fsgrids::dperbElement *h_dperb = GET_POINTER(gpuMemoryManager, fsgrids::dperbElement, h_dperb);
    fsgrids::dmomentsElement *h_dmoments = GET_POINTER(gpuMemoryManager, fsgrids::dmomentsElement, h_dmoments);
-   fsgrids::bgbElement *h_bgb = GET_POINTER(gpuMemoryManager, fsgrids::bgbElement, h_bgb);
    fsgrids::momentsElement *h_moments = GET_POINTER(gpuMemoryManager, fsgrids::momentsElement, h_moments);
    fsgrids::momentsElement *h_momentsdt2 = GET_POINTER(gpuMemoryManager, fsgrids::momentsElement, h_momentsdt2);
    fsgrids::egradpeElement *h_egradpe = GET_POINTER(gpuMemoryManager, fsgrids::egradpeElement, h_egradpe);
@@ -740,7 +737,6 @@ int simulate(int argn,char* args[]) {
    std::span<fsgrids::perbElement> host_perb(h_perb, perb.size());
    std::span<fsgrids::dperbElement> host_dperb(h_dperb, dperb.size());
    std::span<fsgrids::dmomentsElement> host_dmoments(h_dmoments, dmoments.size());
-   std::span<fsgrids::bgbElement> host_bgb(h_bgb, bgb.size());
    std::span<fsgrids::momentsElement> host_moments(h_moments, moments.size());
    std::span<fsgrids::momentsElement> host_momentsdt2(h_momentsdt2, moments.size());
    std::span<fsgrids::egradpeElement> host_egradpe(h_egradpe, egradpe.size());
@@ -749,7 +745,6 @@ int simulate(int argn,char* args[]) {
    cudaMemcpy(h_perbdt2, perbdt2.data(), perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyHostToHost);
    cudaMemcpy(h_e, e.data(), e.size() * sizeof(fsgrids::efieldElement), cudaMemcpyHostToHost);
    cudaMemcpy(h_ehall, ehall.data(), ehall.size() * sizeof(fsgrids::ehallElement), cudaMemcpyHostToHost);
-   cudaMemcpy(h_bgb, bgb.data(), bgb.size() * sizeof(fsgrids::bgbElement), cudaMemcpyHostToHost);
    cudaMemcpy(h_moments, moments.data(), moments.size() * sizeof(fsgrids::momentsElement), cudaMemcpyHostToHost);
    cudaMemcpy(h_momentsdt2, momentsdt2.data(), momentsdt2.size() * sizeof(fsgrids::momentsElement), cudaMemcpyHostToHost);
    cudaMemcpy(h_egradpe, egradpe.data(), egradpe.size() * sizeof(fsgrids::egradpeElement), cudaMemcpyHostToHost);
@@ -758,7 +753,7 @@ int simulate(int argn,char* args[]) {
    cudaMemcpy(h_dperb, dperb.data(), dperb.size() * sizeof(fsgrids::dperbElement), cudaMemcpyHostToHost);
    cudaMemcpy(h_dmoments, dmoments.data(), dmoments.size() * sizeof(fsgrids::dmomentsElement), cudaMemcpyHostToHost);
 
-   cudaMemcpy(d_bgb, host_bgb.data(),  host_bgb.size() * sizeof(fsgrids::bgbElement), cudaMemcpyHostToDevice);
+   cudaMemcpy(dev_bgb.data(), bgb.data(), bgb.size() * sizeof(fsgrids::bgbElement), cudaMemcpyHostToDevice);
    cudaMemcpy(dev_sysBoundaries, &host_sysBoundaries,  sizeof(SysBoundaryDevice), cudaMemcpyHostToDevice);
    if(P::isRestart == false) {
       ALLOCATE_GPU(gpuMemoryManager, d_technical, technical.size() * sizeof(fsgrids::technical));
@@ -827,7 +822,7 @@ int simulate(int argn,char* args[]) {
 
    phiprof::Timer getFieldsTimer {"getFieldsFromFsGrid"};
    fsgrid.updateGhostCells(host_vol);
-   getFieldsFromFsGrid(host_vol, host_bgb, host_egradpe, host_dmoments, technical.view(), fsgrid, mpiGrid, cells);
+   getFieldsFromFsGrid(host_vol, bgb.view(), host_egradpe, host_dmoments, technical.view(), fsgrid, mpiGrid, cells);
    getFieldsTimer.stop();
 
    // Build communicator for ionosphere solving
@@ -1141,19 +1136,36 @@ int simulate(int argn,char* args[]) {
             // Calculate these so refinement parameters can be tuned based on the vlsv
             calculateScaledDeltasSimple(mpiGrid);
 
+            cudaMemcpy(host_perb.data(), d_perb, host_perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
+            cudaMemcpy(host_perbdt2.data(), d_perbdt2, host_perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
             cudaMemcpy(host_dperb.data(), d_dperb, host_dperb.size() * sizeof(fsgrids::dperbElement), cudaMemcpyDeviceToHost);
-            cudaMemcpy(perbdt2.data(), d_perbdt2, perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
-            cudaMemcpy(e.data(), d_e, e.size() * sizeof(fsgrids::efieldElement), cudaMemcpyDeviceToHost);
+            cudaMemcpy(host_dmoments.data(), d_dmoments, host_dmoments.size() * sizeof(fsgrids::dmomentsElement), cudaMemcpyDeviceToHost);
+            cudaMemcpy(technical.data(), d_technical, technical.size() * sizeof(fsgrids::technical), cudaMemcpyDeviceToHost);
+            cudaMemcpy(host_e.data(), d_e, host_e.size() * sizeof(fsgrids::efieldElement), cudaMemcpyDeviceToHost);
             cudaMemcpy(edt2.data(), d_edt2, edt2.size() * sizeof(fsgrids::efieldElement), cudaMemcpyDeviceToHost);
+            cudaMemcpy(host_moments.data(), d_moments, host_moments.size() * sizeof(fsgrids::momentsElement), cudaMemcpyDeviceToHost);
             cudaMemcpy(dmomentsdt2.data(), d_dmomentsdt2, dmomentsdt2.size() * sizeof(fsgrids::dmomentsElement), cudaMemcpyDeviceToHost);
-            cudaMemcpy(ehall.data(), d_ehall, ehall.size() * sizeof(fsgrids::ehallElement), cudaMemcpyDeviceToHost);
+            cudaMemcpy(host_momentsdt2.data(), d_momentsdt2, host_momentsdt2.size() * sizeof(fsgrids::momentsElement), cudaMemcpyDeviceToHost);
+            cudaMemcpy(host_ehall.data(), d_ehall, host_ehall.size() * sizeof(fsgrids::ehallElement), cudaMemcpyDeviceToHost);
+            cudaMemcpy(host_egradpe.data(), d_egradpe, host_egradpe.size() * sizeof(fsgrids::egradpeElement), cudaMemcpyDeviceToHost);
             cudaMemcpy(egradpedt2.data(), d_egradpedt2, egradpedt2.size() * sizeof(fsgrids::egradpeElement), cudaMemcpyDeviceToHost);
+            cudaMemcpy(host_vol.data(), d_vol, host_vol.size() * sizeof(fsgrids::volElement), cudaMemcpyDeviceToHost);
             if (P::amrMaxSpatialRefLevel > 0) {
                cudaMemcpy(host_moments.data(), fieldSolverData.moments.data(), host_moments.size() * sizeof(fsgrids::momentsElement), cudaMemcpyDeviceToHost);
                cudaMemcpy(host_momentsdt2.data(), fieldSolverData.momentsDt2.data(), host_momentsdt2.size() * sizeof(fsgrids::momentsElement), cudaMemcpyDeviceToHost);
                fieldSolverData.moments = host_moments;
                fieldSolverData.momentsDt2 = host_momentsdt2;
             }
+            fieldSolverData.perB = host_perb;
+            fieldSolverData.perBDt2 = host_perbdt2;
+            fieldSolverData.E = host_e;
+            fieldSolverData.EHall = host_ehall;
+            fieldSolverData.EGradPe = host_egradpe;
+            fieldSolverData.moments = host_moments;
+            fieldSolverData.momentsDt2 = host_momentsdt2;
+            fieldSolverData.dPerB = host_dperb;
+            fieldSolverData.dMoments = host_dmoments;
+            fieldSolverData.vol = host_vol;
 
             // Call the reductions (e.g. field tracing)
             FieldTracing::reduceData(technical.view(), fsgrid, host_perb, host_dperb, mpiGrid, SBC::ionosphereGrid.nodes);
@@ -1249,18 +1261,36 @@ int simulate(int argn,char* args[]) {
          if (myRank == MASTER_RANK)
             logFile << "(IO): Writing restart data to disk, tstep = " << P::tstep << " t = " << P::t << endl << writeVerbose;
          //Write the restart:
-         cudaMemcpy(perbdt2.data(), d_perbdt2, perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
-         cudaMemcpy(e.data(), d_e, e.size() * sizeof(fsgrids::efieldElement), cudaMemcpyDeviceToHost);
+         cudaMemcpy(host_perb.data(), d_perb, host_perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
+         cudaMemcpy(host_perbdt2.data(), d_perbdt2, host_perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
+         cudaMemcpy(host_dperb.data(), d_dperb, host_dperb.size() * sizeof(fsgrids::dperbElement), cudaMemcpyDeviceToHost);
+         cudaMemcpy(host_dmoments.data(), d_dmoments, host_dmoments.size() * sizeof(fsgrids::dmomentsElement), cudaMemcpyDeviceToHost);
+         cudaMemcpy(technical.data(), d_technical, technical.size() * sizeof(fsgrids::technical), cudaMemcpyDeviceToHost);
+         cudaMemcpy(host_e.data(), d_e, host_e.size() * sizeof(fsgrids::efieldElement), cudaMemcpyDeviceToHost);
          cudaMemcpy(edt2.data(), d_edt2, edt2.size() * sizeof(fsgrids::efieldElement), cudaMemcpyDeviceToHost);
+         cudaMemcpy(host_moments.data(), d_moments, host_moments.size() * sizeof(fsgrids::momentsElement), cudaMemcpyDeviceToHost);
          cudaMemcpy(dmomentsdt2.data(), d_dmomentsdt2, dmomentsdt2.size() * sizeof(fsgrids::dmomentsElement), cudaMemcpyDeviceToHost);
-         cudaMemcpy(ehall.data(), d_ehall, ehall.size() * sizeof(fsgrids::ehallElement), cudaMemcpyDeviceToHost);
+         cudaMemcpy(host_momentsdt2.data(), d_momentsdt2, host_momentsdt2.size() * sizeof(fsgrids::momentsElement), cudaMemcpyDeviceToHost);
+         cudaMemcpy(host_ehall.data(), d_ehall, host_ehall.size() * sizeof(fsgrids::ehallElement), cudaMemcpyDeviceToHost);
+         cudaMemcpy(host_egradpe.data(), d_egradpe, host_egradpe.size() * sizeof(fsgrids::egradpeElement), cudaMemcpyDeviceToHost);
          cudaMemcpy(egradpedt2.data(), d_egradpedt2, egradpedt2.size() * sizeof(fsgrids::egradpeElement), cudaMemcpyDeviceToHost);
+         cudaMemcpy(host_vol.data(), d_vol, host_vol.size() * sizeof(fsgrids::volElement), cudaMemcpyDeviceToHost);
          if (P::amrMaxSpatialRefLevel > 0) {
             cudaMemcpy(host_moments.data(), fieldSolverData.moments.data(), host_moments.size() * sizeof(fsgrids::momentsElement), cudaMemcpyDeviceToHost);
             cudaMemcpy(host_momentsdt2.data(), fieldSolverData.momentsDt2.data(), host_momentsdt2.size() * sizeof(fsgrids::momentsElement), cudaMemcpyDeviceToHost);
             fieldSolverData.moments = host_moments;
             fieldSolverData.momentsDt2 = host_momentsdt2;
          }
+         fieldSolverData.perB = host_perb;
+         fieldSolverData.perBDt2 = host_perbdt2;
+         fieldSolverData.E = host_e;
+         fieldSolverData.EHall = host_ehall;
+         fieldSolverData.EGradPe = host_egradpe;
+         fieldSolverData.moments = host_moments;
+         fieldSolverData.momentsDt2 = host_momentsdt2;
+         fieldSolverData.dPerB = host_dperb;
+         fieldSolverData.dMoments = host_dmoments;
+         fieldSolverData.vol = host_vol;
          if (writeRestart(
                 mpiGrid,
                 fieldSolverData,
@@ -1292,18 +1322,36 @@ int simulate(int argn,char* args[]) {
          if (myRank == MASTER_RANK)
             logFile << "(IO): Writing recover data to disk, index = " << recoverCounter % P::recoverMaxFiles << ", tstep = " << P::tstep << " t = " << P::t << endl << writeVerbose;
          //Write the recover:
-         cudaMemcpy(perbdt2.data(), d_perbdt2, perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
-         cudaMemcpy(e.data(), d_e, e.size() * sizeof(fsgrids::efieldElement), cudaMemcpyDeviceToHost);
+         cudaMemcpy(host_perb.data(), d_perb, host_perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
+         cudaMemcpy(host_perbdt2.data(), d_perbdt2, host_perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
+         cudaMemcpy(host_dperb.data(), d_dperb, host_dperb.size() * sizeof(fsgrids::dperbElement), cudaMemcpyDeviceToHost);
+         cudaMemcpy(host_dmoments.data(), d_dmoments, host_dmoments.size() * sizeof(fsgrids::dmomentsElement), cudaMemcpyDeviceToHost);
+         cudaMemcpy(technical.data(), d_technical, technical.size() * sizeof(fsgrids::technical), cudaMemcpyDeviceToHost);
+         cudaMemcpy(host_e.data(), d_e, host_e.size() * sizeof(fsgrids::efieldElement), cudaMemcpyDeviceToHost);
          cudaMemcpy(edt2.data(), d_edt2, edt2.size() * sizeof(fsgrids::efieldElement), cudaMemcpyDeviceToHost);
+         cudaMemcpy(host_moments.data(), d_moments, host_moments.size() * sizeof(fsgrids::momentsElement), cudaMemcpyDeviceToHost);
          cudaMemcpy(dmomentsdt2.data(), d_dmomentsdt2, dmomentsdt2.size() * sizeof(fsgrids::dmomentsElement), cudaMemcpyDeviceToHost);
-         cudaMemcpy(ehall.data(), d_ehall, ehall.size() * sizeof(fsgrids::ehallElement), cudaMemcpyDeviceToHost);
+         cudaMemcpy(host_momentsdt2.data(), d_momentsdt2, host_momentsdt2.size() * sizeof(fsgrids::momentsElement), cudaMemcpyDeviceToHost);
+         cudaMemcpy(host_ehall.data(), d_ehall, host_ehall.size() * sizeof(fsgrids::ehallElement), cudaMemcpyDeviceToHost);
+         cudaMemcpy(host_egradpe.data(), d_egradpe, host_egradpe.size() * sizeof(fsgrids::egradpeElement), cudaMemcpyDeviceToHost);
          cudaMemcpy(egradpedt2.data(), d_egradpedt2, egradpedt2.size() * sizeof(fsgrids::egradpeElement), cudaMemcpyDeviceToHost);
+         cudaMemcpy(host_vol.data(), d_vol, host_vol.size() * sizeof(fsgrids::volElement), cudaMemcpyDeviceToHost);
          if (P::amrMaxSpatialRefLevel > 0) {
             cudaMemcpy(host_moments.data(), fieldSolverData.moments.data(), host_moments.size() * sizeof(fsgrids::momentsElement), cudaMemcpyDeviceToHost);
             cudaMemcpy(host_momentsdt2.data(), fieldSolverData.momentsDt2.data(), host_momentsdt2.size() * sizeof(fsgrids::momentsElement), cudaMemcpyDeviceToHost);
             fieldSolverData.moments = host_moments;
             fieldSolverData.momentsDt2 = host_momentsdt2;
          }
+         fieldSolverData.perB = host_perb;
+         fieldSolverData.perBDt2 = host_perbdt2;
+         fieldSolverData.E = host_e;
+         fieldSolverData.EHall = host_ehall;
+         fieldSolverData.EGradPe = host_egradpe;
+         fieldSolverData.moments = host_moments;
+         fieldSolverData.momentsDt2 = host_momentsdt2;
+         fieldSolverData.dPerB = host_dperb;
+         fieldSolverData.dMoments = host_dmoments;
+         fieldSolverData.vol = host_vol;
          if (writeRestart(
                 mpiGrid,
                 fieldSolverData,
@@ -1456,7 +1504,7 @@ int simulate(int argn,char* args[]) {
       if (P::propagateVlasovTranslation || P::propagateVlasovAcceleration) {
          phiprof::Timer timer {"Update system boundaries (Vlasov pre-translation)"};
 
-         sysBoundaryContainer.updateState(mpiGrid, technical.view(), fsgrid, host_perb, host_bgb, P::t + 0.5 * P::dt);
+         sysBoundaryContainer.updateState(mpiGrid, technical.view(), fsgrid, host_perb, bgb.view(), P::t + 0.5 * P::dt);
 
          // updateState leaves mpiGrid and fsgrid in mismatching states, interpolated moments need to be recalculated
          // TODO: Check whether updated state is the same as previously so synchronization can be skipped when not needed?
@@ -1555,7 +1603,6 @@ int simulate(int argn,char* args[]) {
             parameters
          );
 
-         cudaMemcpy(technical.data(), d_technical, technical.size() * sizeof(fsgrids::technical), cudaMemcpyDeviceToHost);
          cudaMemcpy(host_perb.data(), d_perb, host_perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
 
          phiprof::Timer getFieldsTimer {"getFieldsFromFsGrid"};
@@ -1563,11 +1610,12 @@ int simulate(int argn,char* args[]) {
          fsgrid.updateGhostCellsDevice(dev_vol);
          fsgrid.updateGhostCellsDevice(dev_technical);
 
+         cudaMemcpy(technical.data(), d_technical, technical.size() * sizeof(fsgrids::technical), cudaMemcpyDeviceToHost);
          cudaMemcpy(host_dmoments.data(), d_dmoments, host_dmoments.size() * sizeof(fsgrids::dmomentsElement), cudaMemcpyDeviceToHost);
          cudaMemcpy(host_egradpe.data(), d_egradpe, host_egradpe.size() * sizeof(fsgrids::egradpeElement), cudaMemcpyDeviceToHost);
          cudaMemcpy(host_vol.data(), d_vol, host_vol.size() * sizeof(fsgrids::volElement), cudaMemcpyDeviceToHost);
 
-         getFieldsFromFsGrid(host_vol, host_bgb, host_egradpe, host_dmoments, technical.view(), fsgrid, mpiGrid, cells);
+         getFieldsFromFsGrid(host_vol, bgb.view(), host_egradpe, host_dmoments, technical.view(), fsgrid, mpiGrid, cells);
          getFieldsTimer.stop();
          propagateTimer.stop(cells.size(),"SpatialCells");
          addTimedBarrier("barrier-after-field-solver");
