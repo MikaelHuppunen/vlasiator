@@ -1136,7 +1136,6 @@ int simulate(int argn,char* args[]) {
             // Calculate these so refinement parameters can be tuned based on the vlsv
             calculateScaledDeltasSimple(mpiGrid);
 
-            cudaMemcpy(host_perb.data(), d_perb, host_perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
             cudaMemcpy(host_perbdt2.data(), d_perbdt2, host_perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
             cudaMemcpy(host_dperb.data(), d_dperb, host_dperb.size() * sizeof(fsgrids::dperbElement), cudaMemcpyDeviceToHost);
             cudaMemcpy(host_dmoments.data(), d_dmoments, host_dmoments.size() * sizeof(fsgrids::dmomentsElement), cudaMemcpyDeviceToHost);
@@ -1261,7 +1260,6 @@ int simulate(int argn,char* args[]) {
          if (myRank == MASTER_RANK)
             logFile << "(IO): Writing restart data to disk, tstep = " << P::tstep << " t = " << P::t << endl << writeVerbose;
          //Write the restart:
-         cudaMemcpy(host_perb.data(), d_perb, host_perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
          cudaMemcpy(host_perbdt2.data(), d_perbdt2, host_perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
          cudaMemcpy(host_dperb.data(), d_dperb, host_dperb.size() * sizeof(fsgrids::dperbElement), cudaMemcpyDeviceToHost);
          cudaMemcpy(host_dmoments.data(), d_dmoments, host_dmoments.size() * sizeof(fsgrids::dmomentsElement), cudaMemcpyDeviceToHost);
@@ -1322,7 +1320,6 @@ int simulate(int argn,char* args[]) {
          if (myRank == MASTER_RANK)
             logFile << "(IO): Writing recover data to disk, index = " << recoverCounter % P::recoverMaxFiles << ", tstep = " << P::tstep << " t = " << P::t << endl << writeVerbose;
          //Write the recover:
-         cudaMemcpy(host_perb.data(), d_perb, host_perb.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
          cudaMemcpy(host_perbdt2.data(), d_perbdt2, host_perbdt2.size() * sizeof(fsgrids::perbElement), cudaMemcpyDeviceToHost);
          cudaMemcpy(host_dperb.data(), d_dperb, host_dperb.size() * sizeof(fsgrids::dperbElement), cudaMemcpyDeviceToHost);
          cudaMemcpy(host_dmoments.data(), d_dmoments, host_dmoments.size() * sizeof(fsgrids::dmomentsElement), cudaMemcpyDeviceToHost);

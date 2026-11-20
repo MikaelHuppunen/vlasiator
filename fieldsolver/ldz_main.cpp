@@ -56,6 +56,32 @@
 #include "../logger.h"
 extern Logger logFile;
 
+template <typename REAL>
+struct AtomicMinReal {
+   __device__ void operator()(REAL* result, REAL thread_result) const {
+      //only valid for non-negative values
+      assert(thread_result >= REAL(0.0));
+      assert(!isnan(thread_result));
+      assert(isfinite(thread_result));
+      //handle -0.0
+      if (thread_result == REAL(0.0)) {
+         thread_result = REAL(0.0);
+      }
+
+      if constexpr (std::is_same_v<REAL, float>) {
+         unsigned int* address = reinterpret_cast<unsigned int*>(result);
+
+         unsigned int value = __float_as_uint(thread_result);
+         atomicMin(address, value);
+      } else {
+         unsigned long long int* address = reinterpret_cast<unsigned long long int*>(result);
+
+         unsigned long long int value = __double_as_longlong(thread_result);
+         atomicMin(address, value);
+      }
+   }
+};
+
 /*! \brief Top-level field propagation function.
  *
  * Propagates the magnetic field, computes the derivatives and the upwinded
@@ -390,19 +416,27 @@ bool propagateFields(fsgrids::perbspan perb,
 
          // Reassess subcycle dt
          Real dtMaxGlobal = 0.0;
-         cudaMemcpy(host_technical.data(), technical.data(), technical.size() * sizeof(fsgrids::technical), cudaMemcpyDeviceToHost);
-         Real dtMaxLocal = fsgrid.parallel_reduction([](int timerId) ->  phiprof::Timer { return phiprof::Timer{timerId}; },
-                                                   phiprof::initializeTimer("compute-subcycle-dt-reduction-loop"), host_technical,
-                                                   [](Real a, Real b) { return std::min<Real>(a, b); },
+         Real dtMaxLocal = std::numeric_limits<Real>::max();
+         Real *dev_dtMaxLocal;
+         cudaMalloc(&dev_dtMaxLocal, sizeof(Real));
+         cudaMemcpy(dev_dtMaxLocal, &dtMaxLocal, sizeof(Real), cudaMemcpyHostToDevice);
+         fsgrid.parallel_reduction_GPU([](int timerId) ->  phiprof::Timer { return phiprof::Timer{timerId}; },
+                                                   phiprof::initializeTimer("compute-subcycle-dt-reduction-loop"), technical,
+                                                   [] __device__ (Real a, Real b) { return std::min<Real>(a, b); },
+                                                   AtomicMinReal<Real>{},
                                                    std::numeric_limits<Real>::max(),
-                                                   [=](const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer, creal maximum) {
+                                                   dev_dtMaxLocal,
+                                                   [=] __device__(const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer, creal maximum) {
             if (sysBoundaryFlag == sysboundarytype::NOT_SYSBOUNDARY ||
                (sysBoundaryLayer == 1 && sysBoundaryFlag != sysboundarytype::NOT_SYSBOUNDARY)) {
-               return host_technical[stencil.ooo()].maxFsDt;
+               return technical[stencil.ooo()].maxFsDt;
             } else {
                return maximum;
             }
          });
+         CHK_ERR(cudaGetLastError());
+         cudaDeviceSynchronize();
+         cudaMemcpy(&dtMaxLocal, dev_dtMaxLocal, sizeof(Real), cudaMemcpyDeviceToHost);
 
          phiprof::Timer allreduceTimer{"MPI_Allreduce"};
          fsgrid.Allreduce(&(dtMaxLocal), &(dtMaxGlobal), 1, MPI_Type<Real>(), MPI_MIN);
