@@ -29,6 +29,7 @@
 #include "../sysboundary/outflow.h"
 #include "../sysboundary/setmaxwellian.h"
 #include "../sysboundary/copysphere.h"
+#include "../sysboundary/ionosphere.h"
 
 #include "fs_common.h"
 
@@ -44,6 +45,7 @@ __global__ void constructDoNotCompute(SBC::SysBoundaryConditionDevice* mem, cons
 __global__ void constructMaxwellian(SBC::SysBoundaryConditionDevice* mem, const bool* periodic, const Real (*templateB)[3]);
 __global__ void constructOutflow(SBC::SysBoundaryConditionDevice* mem, const bool* periodic);
 __global__ void constructCopysphere(SBC::CopysphereDevice* mem, const bool* periodic, bool zeroPerB);
+__global__ void constructIonosphere(SBC::IonosphereDevice* mem, const bool* periodic);
 void uploadIndexToSysBoundary(SysBoundary& sysBoundaries, SysBoundaryDevice& host_sysBoundaries);
 
 #endif

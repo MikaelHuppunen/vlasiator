@@ -2118,6 +2118,7 @@ __device__ inline void fieldSolverBoundaryCondHallElectricFieldDevice(cuint cell
          break;
       }
       case sysboundarytype::IONOSPHERE: {
+         static_cast<SBC::IonosphereDevice*>(sysBoundaries[0].getSysBoundary(cellSysBoundaryFlag))->SBC::IonosphereDevice::fieldSolverBoundaryCondHallElectricField(ehall, stencil, component);
          break;
       }
       case sysboundarytype::DO_NOT_COMPUTE: {
