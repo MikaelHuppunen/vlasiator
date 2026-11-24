@@ -28,6 +28,7 @@
 #include "../sysboundary/donotcompute.h"
 #include "../sysboundary/outflow.h"
 #include "../sysboundary/setmaxwellian.h"
+#include "../sysboundary/copysphere.h"
 
 #include "fs_common.h"
 
@@ -39,9 +40,10 @@ void propagateMagneticFieldSimple(fsgrids::perbspan perb,
                                   fsgrids::technicalspan technical, FieldSolverGrid &fsgrid,
                                   SysBoundaryDevice *sysBoundaries, creal& dt, cint& RKCase, const DeviceParameters& parameters);
 
-__global__ void constructDoNotCompute(SBC::SysBoundaryConditionDevice* mem);
-__global__ void constructMaxwellian(SBC::SysBoundaryConditionDevice* mem, const Real (*templateB)[3]);
-__global__ void constructOutflow(SBC::SysBoundaryConditionDevice* mem);
+__global__ void constructDoNotCompute(SBC::SysBoundaryConditionDevice* mem, const bool* periodic);
+__global__ void constructMaxwellian(SBC::SysBoundaryConditionDevice* mem, const bool* periodic, const Real (*templateB)[3]);
+__global__ void constructOutflow(SBC::SysBoundaryConditionDevice* mem, const bool* periodic);
+__global__ void constructCopysphere(SBC::CopysphereDevice* mem, const bool* periodic, bool zeroPerB);
 void uploadIndexToSysBoundary(SysBoundary& sysBoundaries, SysBoundaryDevice& host_sysBoundaries);
 
 #endif

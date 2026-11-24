@@ -247,6 +247,10 @@ __global__ void constructOutflow(SBC::SysBoundaryConditionDevice* mem, const boo
    new (mem) SBC::OutflowDevice(periodic);
 }
 
+__global__ void constructCopysphere(SBC::SysBoundaryConditionDevice* mem, const bool* periodic, bool zeroPerB) {
+   new (mem) SBC::CopysphereDevice(periodic, zeroPerB);
+}
+
 void uploadIndexToSysBoundary(SysBoundary& sysBoundaries, SysBoundaryDevice& host_sysBoundaries) {
    for (const auto& [type, host_condition] : sysBoundaries.getIndexToSysBoundary()) {
       SBC::SysBoundaryConditionDevice* dev_condition = nullptr;
@@ -285,9 +289,10 @@ void uploadIndexToSysBoundary(SysBoundary& sysBoundaries, SysBoundaryDevice& hos
             break;
          }
          case sysboundarytype::COPYSPHERE: {
-            std::cerr << "COPYSPHERE not implemented" << std::endl;
-            cudaMalloc(&dev_condition, sizeof(SBC::OutflowDevice));
-            constructOutflow<<<1,1>>>(dev_condition, dev_periodic);
+            auto* host_copysphere = static_cast<SBC::Copysphere*>(host_condition);
+            bool zeroPerB = host_copysphere->zeroPerB;
+            cudaMalloc(&dev_condition, sizeof(SBC::CopysphereDevice));
+            constructCopysphere<<<1,1>>>(dev_condition, dev_periodic, zeroPerB);
             cudaDeviceSynchronize();
             break;
          }

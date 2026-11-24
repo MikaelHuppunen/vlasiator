@@ -120,6 +120,143 @@ namespace SBC {
       spatial_cell::SpatialCell templateCell;
 
    };
+
+   class CopysphereDevice: public SysBoundaryConditionDevice {
+   public:
+      __device__ CopysphereDevice(const bool* periodic_input, bool zeroPerB_input) : SysBoundaryConditionDevice(periodic_input) {
+         zeroPerB = zeroPerB_input;
+      };
+
+      virtual ~CopysphereDevice() = default;
+
+      __device__ inline Real fieldSolverBoundaryCondMagneticField(
+         fsgrids::perbspan b, fsgrids::constbgbspan bgb, fsgrids::consttechnicalspan technical, const std::array<Real, 3>& gridSpacing,
+         const std::array<fsgrid::FsSize_t, 3>& globalCoordinates, const fsgrid::FsStencil& stencil, cuint component, const DeviceParameters& parameters)
+      {
+         const uint32_t perbComponent = fsgrids::bfield::PERBX + component;
+         const uint32_t bitfield = 1 << component;
+
+         // clang-format off
+         static constexpr std::array permutations = {
+            std::array {
+               0, 1, 2, 3, 4, 5,
+            },
+            std::array {
+               2, 3, 0, 1, 4, 5,
+            },
+            std::array {
+               4, 5, 0, 1, 2, 3,
+            },
+         };
+
+         const std::array permutation = permutations[component];
+
+         const std::array<size_t, 6> inds = {
+            stencil.moo(),
+            stencil.poo(),
+            stencil.omo(),
+            stencil.opo(),
+            stencil.oom(),
+            stencil.oop(),
+         };
+         // clang-format on
+
+         auto bitFieldSet = [&bitfield](auto& tech) { return (tech.SOLVE & bitfield) == bitfield; };
+         auto sbLayerIsOne = [](auto& tech) { return tech.sysBoundaryLayer == 1; };
+         auto averageNeigbours = [&technical, &b, &inds, &permutation, &perbComponent,
+                                 &bitFieldSet](auto begin, auto end, auto& sum, auto& nCells) {
+            for (size_t i = begin; i < end; i++) {
+               const auto j = inds[permutation[i]];
+               if (bitFieldSet(technical[j])) {
+                  sum += b[j][perbComponent];
+                  nCells++;
+               }
+            }
+         };
+
+         auto averageAllNeighbours = [&stencil, &technical, &b, &perbComponent](auto predicateLambda, auto& sum,
+                                                                              auto& nCells) {
+            for (const auto& i : stencil.indices()) {
+               if (predicateLambda(technical[i])) {
+                  sum += b[i][perbComponent];
+                  nCells++;
+               }
+            }
+         };
+
+         Real sum = 0.0;
+         uint nCells = 0;
+         if (this->zeroPerB == true) {
+            sum = b[stencil.ooo()][perbComponent];
+            nCells = 1;
+         } else {
+            if (sbLayerIsOne(technical[stencil.ooo()])) {
+               averageNeigbours(0ul, 2ul, sum, nCells);
+
+               if (nCells == 0) {
+                  averageNeigbours(2ul, 6ul, sum, nCells);
+               }
+
+               if (nCells == 0) {
+                  averageAllNeighbours(bitFieldSet, sum, nCells);
+               }
+            } else {
+               // L2 cells
+               averageAllNeighbours(sbLayerIsOne, sum, nCells);
+            }
+         }
+
+         if (nCells == 0) {
+            printf(": ERROR: this should not have fallen through.\n");
+            sum = 0.0;
+            nCells = 1;
+         }
+
+         return sum / nCells;
+      }
+
+      __device__ inline void fieldSolverBoundaryCondElectricField(
+         fsgrids::efieldspan e, const fsgrid::FsStencil& stencil, cuint component)
+      {
+         e[stencil.ooo()][fsgrids::efield::EX + component] = 0.0;
+      }
+
+      __device__ inline void fieldSolverBoundaryCondGradPeElectricField(
+         fsgrids::egradpespan EGradPe, const fsgrid::FsStencil& stencil, cuint component)
+      {
+         EGradPe[stencil.ooo()][fsgrids::egradpe::EXGRADPE + component] = 0.0;
+      }
+
+      __device__ inline void fieldSolverBoundaryCondHallElectricField(
+         fsgrids::ehallspan ehall, const fsgrid::FsStencil& stencil, cuint component)
+      {
+         std::array<Real, fsgrids::ehall::N_EHALL>& cp = ehall[stencil.ooo()];
+         switch (component) {
+         case 0:
+            cp[fsgrids::ehall::EXHALL_000_100] = 0.0;
+            cp[fsgrids::ehall::EXHALL_010_110] = 0.0;
+            cp[fsgrids::ehall::EXHALL_001_101] = 0.0;
+            cp[fsgrids::ehall::EXHALL_011_111] = 0.0;
+            break;
+         case 1:
+            cp[fsgrids::ehall::EYHALL_000_010] = 0.0;
+            cp[fsgrids::ehall::EYHALL_100_110] = 0.0;
+            cp[fsgrids::ehall::EYHALL_001_011] = 0.0;
+            cp[fsgrids::ehall::EYHALL_101_111] = 0.0;
+            break;
+         case 2:
+            cp[fsgrids::ehall::EZHALL_000_001] = 0.0;
+            cp[fsgrids::ehall::EZHALL_100_101] = 0.0;
+            cp[fsgrids::ehall::EZHALL_010_011] = 0.0;
+            cp[fsgrids::ehall::EZHALL_110_111] = 0.0;
+            break;
+         default:
+            printf("Invalid component\n");
+         }
+      }
+
+      bool zeroPerB;
+   };
 }
 
 #endif

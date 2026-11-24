@@ -24,6 +24,7 @@
 #include "../sysboundary/donotcompute.h"
 #include "../sysboundary/outflow.h"
 #include "../sysboundary/setmaxwellian.h"
+#include "../sysboundary/copysphere.h"
 
 void calculateHallTermSimple(fsgrids::perbspan perb,
                              fsgrids::perbspan perbdt2,

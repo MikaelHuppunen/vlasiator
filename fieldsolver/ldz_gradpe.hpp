@@ -24,6 +24,7 @@
 #include "../sysboundary/donotcompute.h"
 #include "../sysboundary/outflow.h"
 #include "../sysboundary/setmaxwellian.h"
+#include "../sysboundary/copysphere.h"
 
 void calculateGradPeTermSimple(fsgrids::egradpespan egradpe,
                                fsgrids::egradpespan egradpedt2,

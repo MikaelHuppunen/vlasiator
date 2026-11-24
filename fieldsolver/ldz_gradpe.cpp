@@ -172,6 +172,7 @@ __device__ inline void fieldSolverBoundaryCondGradPeElectricFieldDevice(cuint ce
          break;
       }
       case sysboundarytype::COPYSPHERE: {
+         static_cast<SBC::CopysphereDevice*>(sysBoundaries[0].getSysBoundary(cellSysBoundaryFlag))->SBC::CopysphereDevice::fieldSolverBoundaryCondGradPeElectricField(egradpe, stencil, component);
          break;
       }
    }

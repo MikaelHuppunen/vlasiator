@@ -2201,6 +2201,7 @@ __device__ inline void fieldSolverBoundaryCondElectricFieldDevice(cuint cellSysB
          break;
       }
       case sysboundarytype::COPYSPHERE: {
+         static_cast<SBC::CopysphereDevice*>(sysBoundaries[0].getSysBoundary(cellSysBoundaryFlag))->SBC::CopysphereDevice::fieldSolverBoundaryCondElectricField(e, stencil, component);
          break;
       }
    }
