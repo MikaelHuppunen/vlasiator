@@ -154,7 +154,7 @@ bool propagateFields(fsgrids::perbspan perb,
    if (subcycles == 1) {
 #ifdef FS_1ST_ORDER_TIME
       propagateMagneticFieldSimple(perb, perbdt2, bgb, e, edt2, technical, fsgrid, sysBoundaries, dt, RK_ORDER1, parameters);
-      calculateDerivativesSimpleDevice(perb, moments, dperb, dmoments, technical, fsgrid, true /*doMoments*/, parameters);
+      calculateDerivativesSimple(perb, moments, dperb, dmoments, technical, fsgrid, true /*doMoments*/, parameters);
       if (P::ohmGradPeTerm > 0) {
          calculateGradPeTermSimpleDevice(egradpe, egradpedt2, moments, momentsdt2, dmoments, dmomentsdt2, technical, fsgrid, sysBoundaries, RK_ORDER1, parameters);
       }
@@ -200,7 +200,7 @@ bool propagateFields(fsgrids::perbspan perb,
       );
 #else
       propagateMagneticFieldSimple(perb, perbdt2, bgb, e, edt2, technical, fsgrid, sysBoundaries, dt, RK_ORDER2_STEP1, parameters);
-      calculateDerivativesSimpleDevice(perbdt2, momentsdt2, dperb, dmomentsdt2, technical, fsgrid, true /*doMoments*/, parameters);
+      calculateDerivativesSimple(perbdt2, momentsdt2, dperb, dmomentsdt2, technical, fsgrid, true /*doMoments*/, parameters);
       if (P::ohmGradPeTerm > 0) {
          calculateGradPeTermSimpleDevice(egradpe, egradpedt2, moments, momentsdt2, dmoments, dmomentsdt2, technical, fsgrid, sysBoundaries, RK_ORDER2_STEP1, parameters);
       }
@@ -245,7 +245,7 @@ bool propagateFields(fsgrids::perbspan perb,
          parameters
       );
       propagateMagneticFieldSimple(perb, perbdt2, bgb, e, edt2, technical, fsgrid, sysBoundaries, dt, RK_ORDER2_STEP2, parameters);
-      calculateDerivativesSimpleDevice(perb, moments, dperb, dmoments, technical, fsgrid, true /*doMoments*/, parameters);
+      calculateDerivativesSimple(perb, moments, dperb, dmoments, technical, fsgrid, true /*doMoments*/, parameters);
       if (P::ohmGradPeTerm > 0) {
          calculateGradPeTermSimpleDevice(egradpe, egradpedt2, moments, momentsdt2, dmoments, dmomentsdt2, technical, fsgrid, sysBoundaries, RK_ORDER2_STEP2, parameters);
       }
@@ -306,7 +306,7 @@ bool propagateFields(fsgrids::perbspan perb,
          propagateMagneticFieldSimple(perb, perbdt2, bgb, e, edt2, technical, fsgrid, sysBoundaries, subcycleDt, RK_ORDER2_STEP1, parameters);
          // We need to calculate derivatives of the moments at every substep, but the moments only
          // need to be communicated in the first one.
-         calculateDerivativesSimpleDevice(perbdt2, momentsdt2, dperb, dmomentsdt2, technical, fsgrid, (subcycleCount == 0) /*doMoments*/, parameters);
+         calculateDerivativesSimple(perbdt2, momentsdt2, dperb, dmomentsdt2, technical, fsgrid, (subcycleCount == 0) /*doMoments*/, parameters);
 
          if (P::ohmGradPeTerm > 0 && subcycleCount == 0) {
             calculateGradPeTermSimpleDevice(egradpe, egradpedt2, moments, momentsdt2, dmoments, dmomentsdt2, technical, fsgrid, sysBoundaries, RK_ORDER2_STEP1, parameters);
@@ -355,7 +355,7 @@ bool propagateFields(fsgrids::perbspan perb,
          propagateMagneticFieldSimple(perb, perbdt2, bgb, e, edt2, technical, fsgrid, sysBoundaries, subcycleDt, RK_ORDER2_STEP2, parameters);
          // We need to calculate derivatives of the moments at every substep, but the moments only
          // need to be communicated in the first one.
-         calculateDerivativesSimpleDevice(perb, moments, dperb, dmoments, technical, fsgrid, (subcycleCount == 0) /*doMoments*/, parameters);
+         calculateDerivativesSimple(perb, moments, dperb, dmoments, technical, fsgrid, (subcycleCount == 0) /*doMoments*/, parameters);
 
          if (P::ohmGradPeTerm > 0 && subcycleCount == 0) {
             calculateGradPeTermSimpleDevice(egradpe, egradpedt2, moments, momentsdt2, dmoments, dmomentsdt2, technical, fsgrid, sysBoundaries, RK_ORDER2_STEP2, parameters);
@@ -472,10 +472,10 @@ bool propagateFields(fsgrids::perbspan perb,
    }
 
    calculateVolumeAveragedFieldsSimpleDevice(perb, e, dperb, vol, technical, fsgrid);
-   calculateBVOLDerivativesSimpleDevice(vol, technical, fsgrid, parameters);
+   calculateBVOLDerivativesSimple(vol, technical, fsgrid, parameters);
    if (FieldTracing::fieldTracingParameters.doTraceFullBox || Parameters::computeCurvature) {
       fsgrid.updateGhostCellsDevice(vol);
-      calculateCurvatureSimpleDevice(vol, bgb, technical, fsgrid);
+      calculateCurvatureSimple(vol, bgb, technical, fsgrid);
    }
    return true;
 }

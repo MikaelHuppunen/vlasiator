@@ -26,12 +26,6 @@
 
 #include "ldz_magnetic_field.hpp"
 
-#ifdef USE_GPU
-#define functionDevice __device__
-#else
-#define functionDevice __host__
-#endif
-
 functionDevice void propagateMagneticField(fsgrids::perbspan perb,
                             fsgrids::perbspan perbdt2,
                             fsgrids::constefieldspan e,

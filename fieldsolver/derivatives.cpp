@@ -38,93 +38,16 @@ template <typename T, size_t N> struct DerivativesData {
    const std::array<T, N>& oom = {};
 };
 
+#ifdef USE_GPU
+__device__ void computeMomentsDerivatives(fsgrids::constmomentsspan moments,
+                               fsgrids::dmomentsspan dmoments,
+                               const fsgrid::FsStencil& stencil, const bool atSysBoundary, const DeviceParameters& parameters)
+#else
 void computeMomentsDerivatives(fsgrids::constmomentsspan moments,
                                fsgrids::dmomentsspan dmoments,
-                               const fsgrid::FsStencil& stencil, const bool atSysBoundary) {
-   using dmo = fsgrids::dmoments;
-   using mom = fsgrids::moments;
-
-   std::array<Real, dmo::N_DMOMENTS>& dMoments = dmoments[stencil.ooo()];
-
-   auto computeDiff = [](const auto& i, const auto& right, const auto& left) { return 0.5 * (right[i] - left[i]); };
-
-   auto computeLimiter = [](const auto& i, const auto& right, const auto& left, const auto& center) {
-      return limiter(left[i], center[i], right[i]);
-   };
-
-   // Constants for electron pressure derivatives, see also ldz_gradpe.cpp
-   // Calculate anchor point constants: First the pressure, then a derived constant.
-   const Real Pe_anchor = Parameters::electronTemperature * Parameters::electronDensity * physicalconstants::K_B;
-   const Real Pe_const = Pe_anchor * pow(Parameters::electronDensity, -Parameters::electronPTindex);
-   auto computeGradPeLimiter = [=](const auto& right, const auto& left, const auto& center) {
-      // pres_e = const * np.power(rho_e, index)
-      return Pe_const * limiter(pow(left[mom::RHOQ]   / physicalconstants::CHARGE, Parameters::electronPTindex),
-                                pow(center[mom::RHOQ] / physicalconstants::CHARGE, Parameters::electronPTindex),
-                                pow(right[mom::RHOQ]  / physicalconstants::CHARGE, Parameters::electronPTindex));
-   };
-
-   auto computeGradPeDiff = [=](const auto& right, const auto& left) {
-      return Pe_const * 0.5 * (pow(right[mom::RHOQ] / physicalconstants::CHARGE, Parameters::electronPTindex) - pow(left[mom::RHOQ] / physicalconstants::CHARGE, Parameters::electronPTindex));
-   };
-
-   const DerivativesData momData{
-       moments[stencil.ooo()],
-       moments[stencil.poo()], moments[stencil.moo()],
-       moments[stencil.opo()], moments[stencil.omo()],
-       moments[stencil.oop()], moments[stencil.oom()],
-   };
-
-   {
-#ifdef DEBUG_SOLVERS
-      const auto& cv = momData.ooo[mom::RHOM];
-      if (cv <= 0) {
-         std::cerr << __FILE__ << ":" << __LINE__ << (cv < 0 ? " Negative" : " Zero") << " density in fsgrid cell " << stencil.indexFromOffset( 0,0,0) << std::endl;
-         abort();
-      }
-
-      const auto& lv = momData.moo[mom::RHOM];
-      if (lv <= 0) {
-         std::cerr << __FILE__ << ":" << __LINE__ << (lv < 0 ? " Negative" : " Zero") << " density in fsgrid cell " << stencil.indexFromOffset(-1,0,0) << std::endl;
-         abort();
-      }
-
-      const auto& rv = momData.poo[mom::RHOM];
-      if (rv <= 0) {
-         std::cerr << __FILE__ << ":" << __LINE__ << (rv < 0 ? " Negative" : " Zero") << " density in fsgrid cell " << stencil.indexFromOffset( 1,0,0) << std::endl;
-         abort();
-      }
+                               const fsgrid::FsStencil& stencil, const bool atSysBoundary)
 #endif
-   }
-
-   static constexpr std::array moms{mom::RHOM, mom::RHOQ, mom::P_11, mom::P_22, mom::P_33, mom::VX, mom::VY, mom::VZ};
-   static constexpr std::array dmix{dmo::drhomdx, dmo::drhoqdx, dmo::dp11dx, dmo::dp22dx, dmo::dp33dx, dmo::dVxdx, dmo::dVydx, dmo::dVzdx};
-   static constexpr std::array dmiy{dmo::drhomdy, dmo::drhoqdy, dmo::dp11dy, dmo::dp22dy, dmo::dp33dy, dmo::dVxdy, dmo::dVydy, dmo::dVzdy};
-   static constexpr std::array dmiz{dmo::drhomdz, dmo::drhoqdz, dmo::dp11dz, dmo::dp22dz, dmo::dp33dz, dmo::dVxdz, dmo::dVydz, dmo::dVzdz};
-
-   if (P::fieldSolverFiniteDifferencingAtBoundaries && atSysBoundary) {
-      for (size_t i = 0; i < moms.size(); i++) {
-         dMoments[dmix[i]] = computeDiff(moms[i], momData.poo, momData.moo);
-         dMoments[dmiy[i]] = computeDiff(moms[i], momData.opo, momData.omo);
-         dMoments[dmiz[i]] = computeDiff(moms[i], momData.oop, momData.oom);
-      }
-      dMoments[dmo::dPedx] = computeGradPeDiff(momData.poo, momData.moo);
-      dMoments[dmo::dPedy] = computeGradPeDiff(momData.opo, momData.omo);
-      dMoments[dmo::dPedz] = computeGradPeDiff(momData.oop, momData.oom);
-   } else {
-      for (size_t i = 0; i < moms.size(); i++) {
-         dMoments[dmix[i]] = computeLimiter(moms[i], momData.poo, momData.moo, momData.ooo);
-         dMoments[dmiy[i]] = computeLimiter(moms[i], momData.opo, momData.omo, momData.ooo);
-         dMoments[dmiz[i]] = computeLimiter(moms[i], momData.oop, momData.oom, momData.ooo);
-      }
-      dMoments[dmo::dPedx] = computeGradPeLimiter(momData.poo, momData.moo, momData.ooo);
-      dMoments[dmo::dPedy] = computeGradPeLimiter(momData.opo, momData.omo, momData.ooo);
-      dMoments[dmo::dPedz] = computeGradPeLimiter(momData.oop, momData.oom, momData.ooo);
-   }
-}
-
-__device__ void computeMomentsDerivativesDevice(fsgrids::constmomentsspan moments,
-                               fsgrids::dmomentsspan dmoments,
-                               const fsgrid::FsStencil& stencil, const bool atSysBoundary, const DeviceParameters& parameters) {
+{
    using dmo = fsgrids::dmoments;
    using mom = fsgrids::moments;
 
@@ -133,22 +56,42 @@ __device__ void computeMomentsDerivativesDevice(fsgrids::constmomentsspan moment
    auto computeDiff = [](const auto& i, const auto& right, const auto& left) { return 0.5 * (right[i] - left[i]); };
 
    auto computeLimiter = [](const auto& i, const auto& right, const auto& left, const auto& center) {
+      #ifdef USE_GPU
       return deviceLimiter(left[i], center[i], right[i]);
+      #else
+      return limiter(left[i], center[i], right[i]);
+      #endif
    };
 
    // Constants for electron pressure derivatives, see also ldz_gradpe.cpp
    // Calculate anchor point constants: First the pressure, then a derived constant.
+
+   #ifdef USE_GPU
    const Real Pe_anchor = parameters.electronTemperature * parameters.electronDensity * physicalconstants::K_B;
    const Real Pe_const = Pe_anchor * pow(parameters.electronDensity, -parameters.electronPTindex);
+   #else
+   const Real Pe_anchor = Parameters::electronTemperature * Parameters::electronDensity * physicalconstants::K_B;
+   const Real Pe_const = Pe_anchor * pow(Parameters::electronDensity, -Parameters::electronPTindex);
+   #endif
    auto computeGradPeLimiter = [=](const auto& right, const auto& left, const auto& center) {
       // pres_e = const * np.power(rho_e, index)
+      #ifdef USE_GPU
       return Pe_const * deviceLimiter(pow(left[mom::RHOQ]   / physicalconstants::CHARGE, parameters.electronPTindex),
                                 pow(center[mom::RHOQ] / physicalconstants::CHARGE, parameters.electronPTindex),
                                 pow(right[mom::RHOQ]  / physicalconstants::CHARGE, parameters.electronPTindex));
+      #else
+      return Pe_const * limiter(pow(left[mom::RHOQ]   / physicalconstants::CHARGE, Parameters::electronPTindex),
+                                pow(center[mom::RHOQ] / physicalconstants::CHARGE, Parameters::electronPTindex),
+                                pow(right[mom::RHOQ]  / physicalconstants::CHARGE, Parameters::electronPTindex));
+      #endif
    };
 
    auto computeGradPeDiff = [=](const auto& right, const auto& left) {
+      #ifdef USE_GPU
       return Pe_const * 0.5 * (pow(right[mom::RHOQ] / physicalconstants::CHARGE, parameters.electronPTindex) - pow(left[mom::RHOQ] / physicalconstants::CHARGE, parameters.electronPTindex));
+      #else
+      return Pe_const * 0.5 * (pow(right[mom::RHOQ] / physicalconstants::CHARGE, Parameters::electronPTindex) - pow(left[mom::RHOQ] / physicalconstants::CHARGE, Parameters::electronPTindex));
+      #endif
    };
 
    const DerivativesData momData{
@@ -185,7 +128,12 @@ __device__ void computeMomentsDerivativesDevice(fsgrids::constmomentsspan moment
    static constexpr std::array dmiy{dmo::drhomdy, dmo::drhoqdy, dmo::dp11dy, dmo::dp22dy, dmo::dp33dy, dmo::dVxdy, dmo::dVydy, dmo::dVzdy};
    static constexpr std::array dmiz{dmo::drhomdz, dmo::drhoqdz, dmo::dp11dz, dmo::dp22dz, dmo::dp33dz, dmo::dVxdz, dmo::dVydz, dmo::dVzdz};
 
-   if (parameters.fieldSolverFiniteDifferencingAtBoundaries && atSysBoundary) {
+   #ifdef USE_GPU
+   if (parameters.fieldSolverFiniteDifferencingAtBoundaries && atSysBoundary)
+   #else
+   if (P::fieldSolverFiniteDifferencingAtBoundaries && atSysBoundary)
+   #endif
+   {
       for (size_t i = 0; i < moms.size(); i++) {
          dMoments[dmix[i]] = computeDiff(moms[i], momData.poo, momData.moo);
          dMoments[dmiy[i]] = computeDiff(moms[i], momData.opo, momData.omo);
@@ -206,9 +154,16 @@ __device__ void computeMomentsDerivativesDevice(fsgrids::constmomentsspan moment
    }
 }
 
+#ifdef USE_GPU
+__device__ void computePerbDerivatives(fsgrids::perbspan perb,
+                            fsgrids::dperbspan dperb, const fsgrid::FsStencil& stencil,
+                            bool dontCompute2ndDerivatives, bool atSysBoundary, cuint sysBoundaryFlag, const DeviceParameters& parameters)
+#else
 void computePerbDerivatives(fsgrids::perbspan perb,
                             fsgrids::dperbspan dperb, const fsgrid::FsStencil& stencil,
-                            bool dontCompute2ndDerivatives, bool atSysBoundary, cuint sysBoundaryFlag) {
+                            bool dontCompute2ndDerivatives, bool atSysBoundary, cuint sysBoundaryFlag)
+#endif
+{
    using dpb = fsgrids::dperb;
    using bfi = fsgrids::bfield;
    std::array<Real, dpb::N_DPERB>& dPerB = dperb[stencil.ooo()];
@@ -216,84 +171,23 @@ void computePerbDerivatives(fsgrids::perbspan perb,
    auto computeDiff = [](const auto& i, const auto& right, const auto& left) { return 0.5 * (right[i] - left[i]); };
 
    auto computeLimiter = [](const auto& i, const auto& right, const auto& left, const auto& center) {
-      return limiter(left[i], center[i], right[i]);
-   };
-   const DerivativesData perbData{
-       perb[stencil.ooo()], perb[stencil.poo()], perb[stencil.moo()], perb[stencil.opo()],
-       perb[stencil.omo()],   perb[stencil.oop()],  perb[stencil.oom()],
-   };
-
-   if (P::fieldSolverFiniteDifferencingAtBoundaries && atSysBoundary) {
-      dPerB[dpb::dPERBydx] = computeDiff(bfi::PERBY, perbData.poo, perbData.moo);
-      dPerB[dpb::dPERBzdx] = computeDiff(bfi::PERBZ, perbData.poo, perbData.moo);
-      dPerB[dpb::dPERBxdy] = computeDiff(bfi::PERBX, perbData.opo, perbData.omo);
-      dPerB[dpb::dPERBzdy] = computeDiff(bfi::PERBZ, perbData.opo, perbData.omo);
-      dPerB[dpb::dPERBxdz] = computeDiff(bfi::PERBX, perbData.oop, perbData.oom);
-      dPerB[dpb::dPERBydz] = computeDiff(bfi::PERBY, perbData.oop, perbData.oom);
-   } else {
-      dPerB[dpb::dPERBydx] = computeLimiter(bfi::PERBY, perbData.poo, perbData.moo, perbData.ooo);
-      dPerB[dpb::dPERBzdx] = computeLimiter(bfi::PERBZ, perbData.poo, perbData.moo, perbData.ooo);
-      dPerB[dpb::dPERBxdy] = computeLimiter(bfi::PERBX, perbData.opo, perbData.omo, perbData.ooo);
-      dPerB[dpb::dPERBzdy] = computeLimiter(bfi::PERBZ, perbData.opo, perbData.omo, perbData.ooo);
-      dPerB[dpb::dPERBxdz] = computeLimiter(bfi::PERBX, perbData.oop, perbData.oom, perbData.ooo);
-      dPerB[dpb::dPERBydz] = computeLimiter(bfi::PERBY, perbData.oop, perbData.oom, perbData.ooo);
-   }
-
-   if (dontCompute2ndDerivatives) {
-      dPerB[dpb::dPERBydxx] = 0.0;
-      dPerB[dpb::dPERBzdxx] = 0.0;
-      dPerB[dpb::dPERBxdyy] = 0.0;
-      dPerB[dpb::dPERBzdyy] = 0.0;
-      dPerB[dpb::dPERBxdzz] = 0.0;
-      dPerB[dpb::dPERBydzz] = 0.0;
-      dPerB[dpb::dPERBxdyz] = 0.0;
-      dPerB[dpb::dPERBydxz] = 0.0;
-      dPerB[dpb::dPERBzdxy] = 0.0;
-   } else {
-      auto compute2ndDerivative = [](auto i, const auto& right, const auto& left, const auto& center) {
-         return left[i] + right[i] - 2.0 * center[i];
-      };
-      dPerB[dpb::dPERBydxx] = compute2ndDerivative(bfi::PERBY, perbData.poo, perbData.moo, perbData.ooo);
-      dPerB[dpb::dPERBzdxx] = compute2ndDerivative(bfi::PERBZ, perbData.poo, perbData.moo, perbData.ooo);
-      dPerB[dpb::dPERBxdyy] = compute2ndDerivative(bfi::PERBX, perbData.opo, perbData.omo, perbData.ooo);
-      dPerB[dpb::dPERBzdyy] = compute2ndDerivative(bfi::PERBZ, perbData.opo, perbData.omo, perbData.ooo);
-      dPerB[dpb::dPERBxdzz] = compute2ndDerivative(bfi::PERBX, perbData.oop, perbData.oom, perbData.ooo);
-      dPerB[dpb::dPERBydzz] = compute2ndDerivative(bfi::PERBY, perbData.oop, perbData.oom, perbData.ooo);
-
-      if (sysBoundaryFlag == sysboundarytype::NOT_SYSBOUNDARY) {
-         auto crossDerivative = [&perb](auto bl, auto br, auto tl, auto tr, auto i) {
-            const auto& botLeft = perb[bl];
-            const auto& botRght = perb[br];
-            const auto& topLeft = perb[tl];
-            const auto& topRght = perb[tr];
-            return FOURTH * (botLeft[i] + topRght[i] - botRght[i] - topLeft[i]);
-         };
-
-         dPerB[dpb::dPERBxdyz] = crossDerivative(stencil.omm(), stencil.opm(), stencil.omp(), stencil.opp(), bfi::PERBX);
-         dPerB[dpb::dPERBydxz] = crossDerivative(stencil.mom(), stencil.pom(), stencil.mop(), stencil.pop(), bfi::PERBY);
-         dPerB[dpb::dPERBzdxy] = crossDerivative(stencil.mmo(), stencil.pmo(), stencil.mpo(), stencil.ppo(), bfi::PERBZ);
-      }
-   }
-}
-
-__device__ void computePerbDerivativesDevice(fsgrids::perbspan perb,
-                            fsgrids::dperbspan dperb, const fsgrid::FsStencil& stencil,
-                            bool dontCompute2ndDerivatives, bool atSysBoundary, cuint sysBoundaryFlag, const DeviceParameters& parameters) {
-   using dpb = fsgrids::dperb;
-   using bfi = fsgrids::bfield;
-   std::array<Real, dpb::N_DPERB>& dPerB = dperb[stencil.ooo()];
-
-   auto computeDiff = [](const auto& i, const auto& right, const auto& left) { return 0.5 * (right[i] - left[i]); };
-
-   auto computeLimiter = [](const auto& i, const auto& right, const auto& left, const auto& center) {
+      #ifdef USE_GPU
       return deviceLimiter(left[i], center[i], right[i]);
+      #else
+      return limiter(left[i], center[i], right[i]);
+      #endif
    };
    const DerivativesData perbData{
        perb[stencil.ooo()], perb[stencil.poo()], perb[stencil.moo()], perb[stencil.opo()],
        perb[stencil.omo()],   perb[stencil.oop()],  perb[stencil.oom()],
    };
 
-   if (parameters.fieldSolverFiniteDifferencingAtBoundaries && atSysBoundary) {
+   #ifdef USE_GPU
+   if (parameters.fieldSolverFiniteDifferencingAtBoundaries && atSysBoundary)
+   #else
+   if (P::fieldSolverFiniteDifferencingAtBoundaries && atSysBoundary)
+   #endif
+   {
       dPerB[dpb::dPERBydx] = computeDiff(bfi::PERBY, perbData.poo, perbData.moo);
       dPerB[dpb::dPERBzdx] = computeDiff(bfi::PERBZ, perbData.poo, perbData.moo);
       dPerB[dpb::dPERBxdy] = computeDiff(bfi::PERBX, perbData.opo, perbData.omo);
@@ -361,72 +255,58 @@ __device__ void computePerbDerivativesDevice(fsgrids::perbspan perb,
  *
  * \sa calculateDerivativesSimple calculateBVOLDerivativesSimple calculateBVOLDerivatives
  */
+#ifdef USE_GPU
+__device__ void calculateDerivatives(fsgrids::perbspan perb,
+                          fsgrids::constmomentsspan moments,
+                          fsgrids::dperbspan dperb,
+                          fsgrids::dmomentsspan dmoments,
+                          const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer,
+                          const bool doMoments, const DeviceParameters& parameters)
+#else
 void calculateDerivatives(fsgrids::perbspan perb,
                           fsgrids::constmomentsspan moments,
                           fsgrids::dperbspan dperb,
                           fsgrids::dmomentsspan dmoments,
                           const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer,
-                          const bool doMoments) {
+                          const bool doMoments)
+#endif 
+{
    /*
     * For sysBoundaryLayer 1 or 2, we are near a boundary, and we wish to use regular centered differences instead of
     * slope limiter-adjusted values. This is to minimize oscillations as a smooth behaviour is required near artificial
     * boundaries, unlike at boundaries and shocks inside the simulation domain.
     */
    const bool atSysBoundary = sysBoundaryLayer == 1 || (sysBoundaryLayer == 2 && sysBoundaryFlag == sysboundarytype::NOT_SYSBOUNDARY);
-   const bool dontCompute2ndDerivatives = Parameters::ohmHallTerm < 2 || sysBoundaryLayer == 1;
-
-   if (doMoments) {
-      computeMomentsDerivatives(moments, dmoments, stencil, atSysBoundary);
-   }
-
-   computePerbDerivatives(perb, dperb, stencil, dontCompute2ndDerivatives, atSysBoundary, sysBoundaryFlag);
-
-   if (sysBoundaryFlag != sysboundarytype::NOT_SYSBOUNDARY) {
-      SBC::SysBoundaryCondition::setCellDerivativesToZero(dperb, dmoments, stencil, 3);
-      SBC::SysBoundaryCondition::setCellDerivativesToZero(dperb, dmoments, stencil, 4);
-      SBC::SysBoundaryCondition::setCellDerivativesToZero(dperb, dmoments, stencil, 5);
-   }
-}
-
-/*! \brief Low-level spatial derivatives calculation.
- *
- * Calculate the spatial derivatives or apply the derivative boundary conditions.
- *
- * \param perb fsGrid holding the perturbed B quantities
- * \param moments fsGrid holding the moment quantities
- * \param dperb fsGrid holding the derivatives of perturbed B
- * \param dmoments fsGrid holding the derviatives of moments
- * \param stencil fsgrid stencil for the cell
- * \param sysBoundaryFlag system boundary flag for the cell
- * \param sysBoundaryLayer system boundary layer for the cell
- * \param doMoments Bool telling whether the derivatives for moments need updating too.
- *
- * \sa calculateDerivativesSimple calculateBVOLDerivativesSimple calculateBVOLDerivatives
- */
-__device__ void calculateDerivativesDevice(fsgrids::perbspan perb,
-                          fsgrids::constmomentsspan moments,
-                          fsgrids::dperbspan dperb,
-                          fsgrids::dmomentsspan dmoments,
-                          const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer,
-                          const bool doMoments, const DeviceParameters& parameters) {
-   /*
-    * For sysBoundaryLayer 1 or 2, we are near a boundary, and we wish to use regular centered differences instead of
-    * slope limiter-adjusted values. This is to minimize oscillations as a smooth behaviour is required near artificial
-    * boundaries, unlike at boundaries and shocks inside the simulation domain.
-    */
-   const bool atSysBoundary = sysBoundaryLayer == 1 || (sysBoundaryLayer == 2 && sysBoundaryFlag == sysboundarytype::NOT_SYSBOUNDARY);
+   #ifdef USE_GPU
    const bool dontCompute2ndDerivatives = parameters.ohmHallTerm < 2 || sysBoundaryLayer == 1;
+   #else
+   const bool dontCompute2ndDerivatives = Parameters::ohmHallTerm < 2 || sysBoundaryLayer == 1;
+   #endif
 
    if (doMoments) {
-      computeMomentsDerivativesDevice(moments, dmoments, stencil, atSysBoundary, parameters);
+      #ifdef USE_GPU
+      computeMomentsDerivatives(moments, dmoments, stencil, atSysBoundary, parameters);
+      #else
+      computeMomentsDerivatives(moments, dmoments, stencil, atSysBoundary);
+      #endif
    }
 
-   computePerbDerivativesDevice(perb, dperb, stencil, dontCompute2ndDerivatives, atSysBoundary, sysBoundaryFlag, parameters);
+   #ifdef USE_GPU
+   computePerbDerivatives(perb, dperb, stencil, dontCompute2ndDerivatives, atSysBoundary, sysBoundaryFlag, parameters);
+   #else
+   computePerbDerivatives(perb, dperb, stencil, dontCompute2ndDerivatives, atSysBoundary, sysBoundaryFlag);
+   #endif
 
    if (sysBoundaryFlag != sysboundarytype::NOT_SYSBOUNDARY) {
+      #ifdef USE_GPU
       SBC::SysBoundaryConditionDevice::setCellDerivativesToZero(dperb, dmoments, stencil, 3);
       SBC::SysBoundaryConditionDevice::setCellDerivativesToZero(dperb, dmoments, stencil, 4);
       SBC::SysBoundaryConditionDevice::setCellDerivativesToZero(dperb, dmoments, stencil, 5);
+      #else
+      SBC::SysBoundaryCondition::setCellDerivativesToZero(dperb, dmoments, stencil, 3);
+      SBC::SysBoundaryCondition::setCellDerivativesToZero(dperb, dmoments, stencil, 4);
+      SBC::SysBoundaryCondition::setCellDerivativesToZero(dperb, dmoments, stencil, 5);
+      #endif
    }
 }
 
@@ -448,79 +328,61 @@ __device__ void calculateDerivativesDevice(fsgrids::perbspan perb,
 
  * \sa calculateDerivatives calculateBVOLDerivativesSimple calculateBVOLDerivatives
  */
+#ifdef USE_GPU
 void calculateDerivativesSimple(fsgrids::perbspan perb,
                                 fsgrids::momentsspan moments,
                                 fsgrids::dperbspan dperb,
                                 fsgrids::dmomentsspan dmoments,
                                 fsgrids::technicalspan technical, FieldSolverGrid &fsgrid,
-                                const bool doMoments) {
+                                const bool doMoments, const DeviceParameters& parameters)
+#else
+void calculateDerivativesSimple(fsgrids::perbspan perb,
+                                fsgrids::momentsspan moments,
+                                fsgrids::dperbspan dperb,
+                                fsgrids::dmomentsspan dmoments,
+                                fsgrids::technicalspan technical, FieldSolverGrid &fsgrid,
+                                const bool doMoments)
+#endif
+{
    phiprof::Timer derivativesTimer{"Calculate face derivatives"};
    const size_t numCells = fsgrid.getNumCells();
 
    phiprof::Timer mpiTimer{"FS derivatives ghost updates MPI", {"MPI"}};
+
+   #ifdef USE_GPU
+   fsgrid.updateGhostCellsDevice(perb);
+   #else
    fsgrid.updateGhostCells(perb);
+   #endif
+
    if (doMoments) {
+      #ifdef USE_GPU
+      fsgrid.updateGhostCellsDevice(moments);
+      #else
       fsgrid.updateGhostCells(moments);
+      #endif
    }
    mpiTimer.stop();
+   #ifdef USE_GPU
+   cudaDeviceSynchronize();
+   #endif
 
    // Calculate derivatives
+   #ifdef USE_GPU
+   fsgrid.parallel_for_GPU([](int timerId) -> phiprof::Timer { return phiprof::Timer{timerId}; },
+                       phiprof::initializeTimer("FS derivatives compute cells"), technical,
+                       [=] __device__(const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
+                          calculateDerivatives(perb, moments, dperb, dmoments, stencil, sysBoundaryFlag, sysBoundaryLayer, doMoments, parameters);
+                       });
+   CHK_ERR(cudaGetLastError());
+   cudaDeviceSynchronize();
+   #else
    fsgrid.parallel_for([](int timerId) -> phiprof::Timer { return phiprof::Timer{timerId}; },
                        phiprof::initializeTimer("FS derivatives compute cells"), technical,
                        [=](const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
                           calculateDerivatives(perb, moments, dperb, dmoments, stencil, sysBoundaryFlag, sysBoundaryLayer, doMoments);
                        });
-
-   derivativesTimer.stop(numCells, "Spatial Cells");
-}
-
-/*! \brief High-level derivative calculation wrapper function.
- *
-
- * B has to be updated because after the system boundary update in propagateMagneticFieldSimple there is no consistent
- state of B yet everywhere.
- *
- * Then the derivatives are calculated.
- *
- * \param perb fsGrid holding the perturbed B quantities
- * \param moments fsGrid holding the moment quantities
- * \param dperb fsGrid holding the derivatives of perturbed B
- * \param dmoments fsGrid holding the derviatives of moments
- * \param technical fsGrid holding technical information (such as boundary types)
- * \param fsgrid fsgrid container
- * \param doMoments If true, the derivatives of moments (rho, V, P) are communicated to neighbours and their derivatives updated.
-
- * \sa calculateDerivatives calculateBVOLDerivativesSimple calculateBVOLDerivatives
- */
-void calculateDerivativesSimpleDevice(fsgrids::perbspan perb,
-                                fsgrids::momentsspan moments,
-                                fsgrids::dperbspan dperb,
-                                fsgrids::dmomentsspan dmoments,
-                                fsgrids::technicalspan technical, FieldSolverGrid &fsgrid,
-                                const bool doMoments, const DeviceParameters& parameters) {
-   phiprof::Timer derivativesTimer{"Calculate face derivatives"};
-   const size_t numCells = fsgrid.getNumCells();
-
-   phiprof::Timer mpiTimer{"FS derivatives ghost updates MPI", {"MPI"}};
-   cudaDeviceSynchronize();
-
-   {
-      fsgrid.updateGhostCellsDevice(perb);
-   }
-   if (doMoments) {
-      fsgrid.updateGhostCellsDevice(moments);
-   }
-   mpiTimer.stop();
-   cudaDeviceSynchronize();
-
-   // Calculate derivatives
-   fsgrid.parallel_for_GPU([](int timerId) -> phiprof::Timer { return phiprof::Timer{timerId}; },
-                       phiprof::initializeTimer("FS derivatives compute cells"), technical,
-                       [=] __device__(const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
-                          calculateDerivativesDevice(perb, moments, dperb, dmoments, stencil, sysBoundaryFlag, sysBoundaryLayer, doMoments, parameters);
-                       });
-   CHK_ERR(cudaGetLastError());
-   cudaDeviceSynchronize();
+   #endif
 
    derivativesTimer.stop(numCells, "Spatial Cells");
 }
@@ -540,8 +402,14 @@ void calculateDerivativesSimpleDevice(fsgrids::perbspan perb,
  * \sa calculateDerivatives calculateBVOLDerivativesSimple calculateDerivativesSimple
  */
 
+#ifdef USE_GPU
+__device__ void calculateBVOLDerivatives(fsgrids::volspan vol,
+                              fsgrids::consttechnicalspan technical, const fsgrid::FsStencil& stencil, const DeviceParameters& parameters)
+#else
 void calculateBVOLDerivatives(fsgrids::volspan vol,
-                              fsgrids::consttechnicalspan technical, const fsgrid::FsStencil& stencil) {
+                              fsgrids::consttechnicalspan technical, const fsgrid::FsStencil& stencil)
+#endif
+{
    const auto& tech = technical[stencil.ooo()];
 
    cuint sysBoundaryFlag = tech.sysBoundaryFlag;
@@ -554,83 +422,22 @@ void calculateBVOLDerivatives(fsgrids::volspan vol,
    auto computeDiff = [](const auto& i, const auto& right, const auto& left) { return 0.5 * (right[i] - left[i]); };
 
    auto computeLimiter = [](const auto& i, const auto& right, const auto& left, const auto& center) {
-      return limiter(left[i], center[i], right[i]);
-   };
-
-   auto& volCenter = vol[stencil.ooo()];
-   const auto poo = stencil.poo();
-   const auto moo = stencil.moo();
-   if (P::fieldSolverFiniteDifferencingAtBoundaries && atSysBoundary) {
-      volCenter[vf::dPERBXVOLdx] = computeDiff(vf::PERBXVOL, vol[poo], vol[moo]);
-      volCenter[vf::dPERBYVOLdx] = computeDiff(vf::PERBYVOL, vol[poo], vol[moo]);
-      volCenter[vf::dPERBZVOLdx] = computeDiff(vf::PERBZVOL, vol[poo], vol[moo]);
-   } else {
-      volCenter[vf::dPERBXVOLdx] = computeLimiter(vf::PERBXVOL, vol[poo], vol[moo], volCenter);
-      volCenter[vf::dPERBYVOLdx] = computeLimiter(vf::PERBYVOL, vol[poo], vol[moo], volCenter);
-      volCenter[vf::dPERBZVOLdx] = computeLimiter(vf::PERBZVOL, vol[poo], vol[moo], volCenter);
-   }
-
-   const auto opo = stencil.opo();
-   const auto omo = stencil.omo();
-   if (P::fieldSolverFiniteDifferencingAtBoundaries && atSysBoundary) {
-      volCenter[vf::dPERBXVOLdy] = computeDiff(vf::PERBXVOL, vol[opo], vol[omo]);
-      volCenter[vf::dPERBYVOLdy] = computeDiff(vf::PERBYVOL, vol[opo], vol[omo]);
-      volCenter[vf::dPERBZVOLdy] = computeDiff(vf::PERBZVOL, vol[opo], vol[omo]);
-   } else {
-      volCenter[vf::dPERBXVOLdy] = computeLimiter(vf::PERBXVOL, vol[opo], vol[omo], volCenter);
-      volCenter[vf::dPERBYVOLdy] = computeLimiter(vf::PERBYVOL, vol[opo], vol[omo], volCenter);
-      volCenter[vf::dPERBZVOLdy] = computeLimiter(vf::PERBZVOL, vol[opo], vol[omo], volCenter);
-   }
-
-   const auto oop = stencil.oop();
-   const auto oom = stencil.oom();
-   if (P::fieldSolverFiniteDifferencingAtBoundaries && atSysBoundary) {
-      volCenter[vf::dPERBXVOLdz] = computeDiff(vf::PERBXVOL, vol[oop], vol[oom]);
-      volCenter[vf::dPERBYVOLdz] = computeDiff(vf::PERBYVOL, vol[oop], vol[oom]);
-      volCenter[vf::dPERBZVOLdz] = computeDiff(vf::PERBZVOL, vol[oop], vol[oom]);
-   } else {
-      volCenter[vf::dPERBXVOLdz] = computeLimiter(vf::PERBXVOL, vol[oop], vol[oom], volCenter);
-      volCenter[vf::dPERBYVOLdz] = computeLimiter(vf::PERBYVOL, vol[oop], vol[oom], volCenter);
-      volCenter[vf::dPERBZVOLdz] = computeLimiter(vf::PERBZVOL, vol[oop], vol[oom], volCenter);
-   }
-}
-
-/*! \brief Low-level spatial derivatives calculation.
- *
- * Calculate the spatial derivatives of BVOL or set them to zero.
- *
- * For sysBoundaryLayer 1 or 2, we are near a boundary, and we wish to use regular centered differences instead of slope
- * limiter-adjusted values. This is to minimize oscillations as a smooth behaviour is required near artificial
- * boundaries, unlike at boundaries and shocks inside the simulation domain.
- *
- * \param vol fsGrid holding the volume averaged fields
- * \param technical fsGrid holding technical information (such as boundary types)
- * \param stencil fsgrid stencil of current cell
- *
- * \sa calculateDerivatives calculateBVOLDerivativesSimple calculateDerivativesSimple
- */
-
-__device__ void calculateBVOLDerivativesDevice(fsgrids::volspan vol,
-                              fsgrids::consttechnicalspan technical, const fsgrid::FsStencil& stencil, const DeviceParameters& parameters) {
-   const auto& tech = technical[stencil.ooo()];
-
-   cuint sysBoundaryFlag = tech.sysBoundaryFlag;
-   cuint sysBoundaryLayer = tech.sysBoundaryLayer;
-   const bool atSysBoundary =
-       sysBoundaryLayer == 1 || (sysBoundaryLayer == 2 && sysBoundaryFlag == sysboundarytype::NOT_SYSBOUNDARY);
-
-   using vf = fsgrids::volfields;
-
-   auto computeDiff = [](const auto& i, const auto& right, const auto& left) { return 0.5 * (right[i] - left[i]); };
-
-   auto computeLimiter = [](const auto& i, const auto& right, const auto& left, const auto& center) {
+      #ifdef USE_GPU
       return deviceLimiter(left[i], center[i], right[i]);
+      #else
+      return limiter(left[i], center[i], right[i]);
+      #endif
    };
 
    auto& volCenter = vol[stencil.ooo()];
    const auto poo = stencil.poo();
    const auto moo = stencil.moo();
-   if (parameters.fieldSolverFiniteDifferencingAtBoundaries && atSysBoundary) {
+   #ifdef USE_GPU
+   if (parameters.fieldSolverFiniteDifferencingAtBoundaries && atSysBoundary)
+   #else
+   if (P::fieldSolverFiniteDifferencingAtBoundaries && atSysBoundary)
+   #endif
+   {
       volCenter[vf::dPERBXVOLdx] = computeDiff(vf::PERBXVOL, vol[poo], vol[moo]);
       volCenter[vf::dPERBYVOLdx] = computeDiff(vf::PERBYVOL, vol[poo], vol[moo]);
       volCenter[vf::dPERBZVOLdx] = computeDiff(vf::PERBZVOL, vol[poo], vol[moo]);
@@ -642,7 +449,12 @@ __device__ void calculateBVOLDerivativesDevice(fsgrids::volspan vol,
 
    const auto opo = stencil.opo();
    const auto omo = stencil.omo();
-   if (parameters.fieldSolverFiniteDifferencingAtBoundaries && atSysBoundary) {
+   #ifdef USE_GPU
+   if (parameters.fieldSolverFiniteDifferencingAtBoundaries && atSysBoundary)
+   #else
+   if (P::fieldSolverFiniteDifferencingAtBoundaries && atSysBoundary)
+   #endif
+   {
       volCenter[vf::dPERBXVOLdy] = computeDiff(vf::PERBXVOL, vol[opo], vol[omo]);
       volCenter[vf::dPERBYVOLdy] = computeDiff(vf::PERBYVOL, vol[opo], vol[omo]);
       volCenter[vf::dPERBZVOLdy] = computeDiff(vf::PERBZVOL, vol[opo], vol[omo]);
@@ -654,7 +466,12 @@ __device__ void calculateBVOLDerivativesDevice(fsgrids::volspan vol,
 
    const auto oop = stencil.oop();
    const auto oom = stencil.oom();
-   if (parameters.fieldSolverFiniteDifferencingAtBoundaries && atSysBoundary) {
+   #ifdef USE_GPU
+   if (parameters.fieldSolverFiniteDifferencingAtBoundaries && atSysBoundary)
+   #else
+   if (P::fieldSolverFiniteDifferencingAtBoundaries && atSysBoundary)
+   #endif
+   {
       volCenter[vf::dPERBXVOLdz] = computeDiff(vf::PERBXVOL, vol[oop], vol[oom]);
       volCenter[vf::dPERBYVOLdz] = computeDiff(vf::PERBYVOL, vol[oop], vol[oom]);
       volCenter[vf::dPERBZVOLdz] = computeDiff(vf::PERBZVOL, vol[oop], vol[oom]);
@@ -676,56 +493,43 @@ __device__ void calculateBVOLDerivativesDevice(fsgrids::volspan vol,
  *
  * \sa calculateDerivatives calculateBVOLDerivatives calculateDerivativesSimple
  */
+#ifdef USE_GPU
 void calculateBVOLDerivativesSimple(fsgrids::volspan vol,
-                                    fsgrids::technicalspan technical, FieldSolverGrid &fsgrid) {
+                                    fsgrids::technicalspan technical, FieldSolverGrid &fsgrid, const DeviceParameters& parameters)
+#else
+void calculateBVOLDerivativesSimple(fsgrids::volspan vol,
+                                    fsgrids::technicalspan technical, FieldSolverGrid &fsgrid)
+#endif
+{
    phiprof::Timer derivsTimer{"Calculate volume derivatives"};
    const size_t numCells = fsgrid.getNumCells();
 
    phiprof::Timer commTimer{"BVOL derivatives ghost updates MPI", {"MPI"}};
+
+   #ifdef USE_GPU
+   fsgrid.updateGhostCellsDevice(vol);
+   cudaDeviceSynchronize();
+   #else
    fsgrid.updateGhostCells(vol);
+   #endif
    commTimer.stop(numCells, "Spatial Cells");
 
    // Calculate derivatives
+   #ifdef USE_GPU
+   fsgrid.parallel_for_GPU([](int timerId) ->  phiprof::Timer { return phiprof::Timer{timerId}; },
+                       phiprof::initializeTimer("FS derivatives BVOL compute cells"), technical,
+                       [=] __device__(const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
+                          calculateBVOLDerivatives(vol, technical, stencil, parameters);
+                      });
+   CHK_ERR(cudaGetLastError());
+   cudaDeviceSynchronize();
+   #else
    fsgrid.parallel_for([](int timerId) ->  phiprof::Timer { return phiprof::Timer{timerId}; },
                        phiprof::initializeTimer("FS derivatives BVOL compute cells"), technical,
                        [=](const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
                           calculateBVOLDerivatives(vol, technical, stencil);
                       });
-
-   derivsTimer.stop(numCells, "Spatial Cells");
-}
-
-/*! \brief High-level derivative calculation wrapper function.
- *
- * BVOL has been calculated locally by calculateVolumeAveragedFields but not communicated.
- * For the acceleration step one needs the cross-derivatives of BVOL
- *
- * \param vol fsGrid holding the volume averaged fields
- * \param technical fsGrid holding technical information (such as boundary types)
- * \param fsgrid fsgrid container
- *
- * \sa calculateDerivatives calculateBVOLDerivatives calculateDerivativesSimple
- */
-void calculateBVOLDerivativesSimpleDevice(fsgrids::volspan vol,
-                                    fsgrids::technicalspan technical, FieldSolverGrid &fsgrid, const DeviceParameters& parameters) {
-   phiprof::Timer derivsTimer{"Calculate volume derivatives"};
-   const size_t numCells = fsgrid.getNumCells();
-
-   phiprof::Timer commTimer{"BVOL derivatives ghost updates MPI", {"MPI"}};
-   {
-      fsgrid.updateGhostCellsDevice(vol);
-   }
-   commTimer.stop(numCells, "Spatial Cells");
-   cudaDeviceSynchronize();
-
-   // Calculate derivatives
-   fsgrid.parallel_for_GPU([](int timerId) ->  phiprof::Timer { return phiprof::Timer{timerId}; },
-                       phiprof::initializeTimer("FS derivatives BVOL compute cells"), technical,
-                       [=] __device__(const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
-                          calculateBVOLDerivativesDevice(vol, technical, stencil, parameters);
-                      });
-   CHK_ERR(cudaGetLastError());
-   cudaDeviceSynchronize();
+   #endif
 
    derivsTimer.stop(numCells, "Spatial Cells");
 }
@@ -743,58 +547,7 @@ void calculateBVOLDerivativesSimpleDevice(fsgrids::volspan vol,
  * \sa calculateDerivatives calculateBVOLDerivativesSimple calculateDerivativesSimple
  */
 
-void calculateCurvature(fsgrids::volspan vol,
-                        fsgrids::constbgbspan bgb,
-                        const fsgrid::FsStencil& stencil, const std::array<Real, 3>& gridSpacing) {
-   auto normalize = [&vol, &bgb](auto i) -> std::array<Real, 3> {
-      const auto& b = bgb[i];
-      const auto& v = vol[i];
-      const Real bx = b[fsgrids::bgbfield::BGBXVOL] + v[fsgrids::volfields::PERBXVOL];
-      const Real by = b[fsgrids::bgbfield::BGBYVOL] + v[fsgrids::volfields::PERBYVOL];
-      const Real bz = b[fsgrids::bgbfield::BGBZVOL] + v[fsgrids::volfields::PERBZVOL];
-      const Real bnorm = sqrt(bx*bx + by*by + bz*bz);
-
-      return {
-          bx / bnorm,
-          by / bnorm,
-          bz / bnorm,
-      };
-   };
-
-   const auto [bx, by, bz] = normalize(stencil.ooo());
-   const auto [left_x_bx, left_x_by, left_x_bz] = normalize(stencil.moo());
-   const auto [rght_x_bx, rght_x_by, rght_x_bz] = normalize(stencil.poo());
-   const auto [left_y_bx, left_y_by, left_y_bz] = normalize(stencil.omo());
-   const auto [rght_y_bx, rght_y_by, rght_y_bz] = normalize(stencil.opo());
-   const auto [left_z_bx, left_z_by, left_z_bz] = normalize(stencil.oom());
-   const auto [rght_z_bx, rght_z_by, rght_z_bz] = normalize(stencil.oop());
-
-   auto& volCenter = vol[stencil.ooo()];
-   volCenter[fsgrids::volfields::CURVATUREX] = bx * 0.5 * (rght_x_bx - left_x_bx) / gridSpacing[0] +
-                                               by * 0.5 * (rght_y_bx - left_y_bx) / gridSpacing[1] +
-                                               bz * 0.5 * (rght_z_bx - left_z_bx) / gridSpacing[2];
-   volCenter[fsgrids::volfields::CURVATUREY] = bx * 0.5 * (rght_x_by - left_x_by) / gridSpacing[0] +
-                                               by * 0.5 * (rght_y_by - left_y_by) / gridSpacing[1] +
-                                               bz * 0.5 * (rght_z_by - left_z_by) / gridSpacing[2];
-   volCenter[fsgrids::volfields::CURVATUREZ] = bx * 0.5 * (rght_x_bz - left_x_bz) / gridSpacing[0] +
-                                               by * 0.5 * (rght_y_bz - left_y_bz) / gridSpacing[1] +
-                                               bz * 0.5 * (rght_z_bz - left_z_bz) / gridSpacing[2];
-}
-
-/*! \brief Low-level curvature calculation.
- *
- *
- * \param vol fsGrid holding the volume averaged fields
- * \param bgb fsGrid holding the background fields
- * \param stencil fsgrid stencil
- * \param gridSpacing cell sizes in x,y,z
- *
- * http://fusionwiki.ciemat.es/wiki/Magnetic_curvature
- *
- * \sa calculateDerivatives calculateBVOLDerivativesSimple calculateDerivativesSimple
- */
-
-__device__ void calculateCurvatureDevice(fsgrids::volspan vol,
+functionDevice void calculateCurvature(fsgrids::volspan vol,
                         fsgrids::constbgbspan bgb,
                         const fsgrid::FsStencil& stencil, const std::array<Real, 3>& gridSpacing) {
    auto normalize = [&vol, &bgb](auto i) -> std::array<Real, 3> {
@@ -841,16 +594,41 @@ __device__ void calculateCurvatureDevice(fsgrids::volspan vol,
  *
  * \sa calculateDerivatives calculateBVOLDerivatives calculateDerivativesSimple
  */
+#ifdef USE_GPU
 void calculateCurvatureSimple(fsgrids::volspan vol,
                               fsgrids::constbgbspan bgb,
-                              fsgrids::technicalspan technical, FieldSolverGrid &fsgrid) {
+                              fsgrids::technicalspan technical, FieldSolverGrid &fsgrid)
+#else
+void calculateCurvatureSimple(fsgrids::volspan vol,
+                              fsgrids::constbgbspan bgb,
+                              fsgrids::technicalspan technical, FieldSolverGrid &fsgrid)
+#endif
+{
    phiprof::Timer curvatureTimer{"Calculate curvature"};
    const size_t numCells = fsgrid.getNumCells();
 
    phiprof::Timer commTimer{"Calculate curvature ghost updates MPI", {"MPI"}};
+   #ifdef USE_GPU
+   fsgrid.updateGhostCellsDevice(vol);
+   cudaDeviceSynchronize();
+   #else
    fsgrid.updateGhostCells(vol);
+   #endif
    commTimer.stop(numCells, "Spatial Cells");
 
+   #ifdef USE_GPU
+   fsgrid.parallel_for_GPU([](int timerId) -> phiprof::Timer { return phiprof::Timer{timerId}; },
+                       phiprof::initializeTimer("Calculate curvature compute cells"), technical,
+                       [=] __device__(const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
+                          const bool compute = (sysBoundaryFlag == sysboundarytype::NOT_SYSBOUNDARY &&
+                                     sysBoundaryLayer != 1 && sysBoundaryLayer != 2);
+                          if (compute) {
+                             calculateCurvature(vol, bgb, stencil, coordinates.physicalGridSpacing);
+                          }
+                       });
+   CHK_ERR(cudaGetLastError());
+   cudaDeviceSynchronize();
+   #else
    fsgrid.parallel_for([](int timerId) -> phiprof::Timer { return phiprof::Timer{timerId}; },
                        phiprof::initializeTimer("Calculate curvature compute cells"), technical,
                        [=](const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
@@ -860,39 +638,7 @@ void calculateCurvatureSimple(fsgrids::volspan vol,
                              calculateCurvature(vol, bgb, stencil, coordinates.physicalGridSpacing);
                           }
                        });
-   curvatureTimer.stop(numCells, "Spatial Cells");
-}
-
-/*! \brief High-level curvature calculation wrapper function.
- *
- * \param vol fsGrid holding the volume averaged fields
- * \param bgb fsGrid holding the background fields
- * \param technical fsGrid holding technical information (such as boundary types)
- * \param fsgrid fsgrid container
- *
- * \sa calculateDerivatives calculateBVOLDerivatives calculateDerivativesSimple
- */
-void calculateCurvatureSimpleDevice(fsgrids::volspan vol,
-                              fsgrids::constbgbspan bgb,
-                              fsgrids::technicalspan technical, FieldSolverGrid &fsgrid) {
-   phiprof::Timer curvatureTimer{"Calculate curvature"};
-   const size_t numCells = fsgrid.getNumCells();
-
-   phiprof::Timer commTimer{"Calculate curvature ghost updates MPI", {"MPI"}};
-   fsgrid.updateGhostCellsDevice(vol);
-   commTimer.stop(numCells, "Spatial Cells");
-
-   fsgrid.parallel_for_GPU([](int timerId) -> phiprof::Timer { return phiprof::Timer{timerId}; },
-                       phiprof::initializeTimer("Calculate curvature compute cells"), technical,
-                       [=] __device__(const fsgrid::Coordinates &coordinates, const fsgrid::FsStencil& stencil, cuint sysBoundaryFlag, cuint sysBoundaryLayer) {
-                          const bool compute = (sysBoundaryFlag == sysboundarytype::NOT_SYSBOUNDARY &&
-                                     sysBoundaryLayer != 1 && sysBoundaryLayer != 2);
-                          if (compute) {
-                             calculateCurvatureDevice(vol, bgb, stencil, coordinates.physicalGridSpacing);
-                          }
-                       });
-   CHK_ERR(cudaGetLastError());
-   cudaDeviceSynchronize();
+   #endif
    curvatureTimer.stop(numCells, "Spatial Cells");
 }
 

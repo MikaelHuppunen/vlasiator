@@ -28,33 +28,39 @@
 
 #include "fs_limiters.h"
 
+#ifdef USE_GPU
+void calculateDerivativesSimple(fsgrids::perbspan perb,
+                                fsgrids::momentsspan moments,
+                                fsgrids::dperbspan dperb,
+                                fsgrids::dmomentsspan dmoments,
+                                fsgrids::technicalspan technical, FieldSolverGrid &fsgrid,
+                                const bool doMoments, const DeviceParameters& parameters);
+#else
 void calculateDerivativesSimple(fsgrids::perbspan perb,
                                 fsgrids::momentsspan moments,
                                 fsgrids::dperbspan dperb,
                                 fsgrids::dmomentsspan dmoments,
                                 fsgrids::technicalspan technical, FieldSolverGrid &fsgrid,
                                 const bool doMoments);
+#endif
 
-void calculateDerivativesSimpleDevice(fsgrids::perbspan perb,
-                                fsgrids::momentsspan moments,
-                                fsgrids::dperbspan dperb,
-                                fsgrids::dmomentsspan dmoments,
-                                fsgrids::technicalspan technical, FieldSolverGrid &fsgrid,
-                                const bool doMoments, const DeviceParameters& parameters);
-
+#ifdef USE_GPU
+void calculateBVOLDerivativesSimple(fsgrids::volspan vol,
+                                    fsgrids::technicalspan technical, FieldSolverGrid &fsgrid, const DeviceParameters& parameters);
+#else
 void calculateBVOLDerivativesSimple(fsgrids::volspan vol,
                                     fsgrids::technicalspan technical, FieldSolverGrid &fsgrid);
+#endif
 
-void calculateBVOLDerivativesSimpleDevice(fsgrids::volspan vol,
-                                    fsgrids::technicalspan technical, FieldSolverGrid &fsgrid, const DeviceParameters& parameters);
-
+#ifdef USE_GPU
 void calculateCurvatureSimple(fsgrids::volspan vol,
                               fsgrids::constbgbspan bgb,
                               fsgrids::technicalspan technical, FieldSolverGrid &fsgrid);
-
-void calculateCurvatureSimpleDevice(fsgrids::volspan vol,
+#else
+void calculateCurvatureSimple(fsgrids::volspan vol,
                               fsgrids::constbgbspan bgb,
                               fsgrids::technicalspan technical, FieldSolverGrid &fsgrid);
+#endif
 
 void calculateScaledDeltasSimple(dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geometry>& mpiGrid);
 

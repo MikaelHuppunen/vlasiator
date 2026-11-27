@@ -837,7 +837,7 @@ int simulate(int argn,char* args[]) {
       cudaMemcpy(d_dperb, host_dperb.data(),  host_dperb.size() * sizeof(fsgrids::dperbElement), cudaMemcpyHostToDevice);
       cudaMemcpy(d_moments, host_moments.data(),  host_moments.size() * sizeof(fsgrids::momentsElement), cudaMemcpyHostToDevice);
       std::span<fsgrids::technical> dev_technical(d_technical, technical.size());
-      calculateDerivativesSimpleDevice(
+      calculateDerivativesSimple(
          dev_perb,
          dev_moments,
          dev_dperb,
